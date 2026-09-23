@@ -1,0 +1,52 @@
+import "@/App.css";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { Toaster } from "@/components/ui/sonner";
+import { Loader2 } from "lucide-react";
+import Login from "@/pages/Login";
+import Register from "@/pages/Register";
+import Dashboard from "@/pages/Dashboard";
+import Scenes from "@/pages/Scenes";
+import SceneEditor from "@/pages/SceneEditor";
+import ExportPage from "@/pages/ExportPage";
+import Sources from "@/pages/Sources";
+import Help from "@/pages/Help";
+
+function Protected({ children }) {
+  const { user } = useAuth();
+  if (user === null) return <div className="min-h-screen flex items-center justify-center bg-[#F5F6F8]"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div>;
+  if (!user) return <Navigate to="/login" replace />;
+  return children;
+}
+
+function Public({ children }) {
+  const { user } = useAuth();
+  if (user === null) return <div className="min-h-screen flex items-center justify-center bg-[#F5F6F8]"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div>;
+  if (user) return <Navigate to="/dashboard" replace />;
+  return children;
+}
+
+function App() {
+  return (
+    <div className="App">
+      <BrowserRouter>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<Public><Login /></Public>} />
+            <Route path="/register" element={<Public><Register /></Public>} />
+            <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+            <Route path="/scenes" element={<Protected><Scenes /></Protected>} />
+            <Route path="/scenes/:id" element={<Protected><SceneEditor /></Protected>} />
+            <Route path="/scenes/:id/export" element={<Protected><ExportPage /></Protected>} />
+            <Route path="/sources" element={<Protected><Sources /></Protected>} />
+            <Route path="/help" element={<Protected><Help /></Protected>} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+          <Toaster position="top-right" richColors />
+        </AuthProvider>
+      </BrowserRouter>
+    </div>
+  );
+}
+
+export default App;
