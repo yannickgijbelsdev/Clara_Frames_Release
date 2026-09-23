@@ -50,9 +50,11 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F6F8] grid-bg flex items-center justify-center px-4">
+    <div className="min-h-screen relative flex items-center justify-center px-4 overflow-hidden"
+      style={{ backgroundColor: "#e9eaec", backgroundImage: "url('https://customer-assets-v7afamib.emergentagent.net/job_overlay-settings-hub/artifacts/lj18iq0v_KOODH_BEAR_MULTIPLE.png')", backgroundSize: "cover", backgroundPosition: "center" }}>
+      <div className="absolute inset-0 bg-[#F5F6F8]/30 backdrop-blur-[1px]" />
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4 }}
-        className="w-full max-w-md bg-white rounded-3xl clara-soft p-8">
+        className="relative z-10 w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl clara-soft ring-1 ring-white/60 p-8">
         <div className="flex items-center gap-2.5 mb-7">
           <Logo />
           <span className="font-display font-semibold text-slate-900 text-lg">Overlay Studio</span>
