@@ -101,7 +101,7 @@ export default function SceneCanvas({ scene, editable = false, selectedId, onSel
     <div ref={wrapRef} className="relative w-full" style={{ aspectRatio: `${scene.width} / ${scene.height}` }}>
       <div
         onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}
-        onClick={() => editable && onSelect?.(null)}
+        onClick={(e) => { if (editable && e.target === e.currentTarget) onSelect?.(null); }}
         style={{
           position: "absolute", top: 0, left: 0,
           width: scene.width, height: scene.height,
@@ -116,17 +116,18 @@ export default function SceneCanvas({ scene, editable = false, selectedId, onSel
             <div key={el.id}
               data-testid={`canvas-el-${el.id}`}
               onPointerDown={(e) => onPointerDown(e, el, "move")}
+              onClick={(e) => e.stopPropagation()}
               style={{
                 ...elBoxStyle(el),
                 cursor: editable ? "move" : "default",
-                outline: selected ? "2px solid #fb7185" : "none",
+                outline: selected ? "2px solid #5f6da6" : "none",
                 outlineOffset: 2,
               }}>
               <ElementContent el={el} sourceValues={sourceValues} />
               {selected && (
                 <div
                   onPointerDown={(e) => onPointerDown(e, el, "resize")}
-                  style={{ position: "absolute", right: -6, bottom: -6, width: 16, height: 16, background: "#fb7185", borderRadius: 4, cursor: "nwse-resize", border: "2px solid #fff" }} />
+                  style={{ position: "absolute", right: -6, bottom: -6, width: 16, height: 16, background: "#5f6da6", borderRadius: 4, cursor: "nwse-resize", border: "2px solid #fff" }} />
               )}
             </div>
           );

@@ -5,6 +5,7 @@ import api from "@/lib/api";
 import AppLayout from "@/components/AppLayout";
 import { PrimaryButton, SecondaryButton } from "@/components/PrimaryButton";
 import SceneCanvas from "@/components/SceneCanvas";
+import { useWorkspace } from "@/context/WorkspaceContext";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -13,17 +14,18 @@ import { Plus, Pencil, Trash2, MonitorPlay } from "lucide-react";
 
 export default function Scenes() {
   const nav = useNavigate();
+  const { current } = useWorkspace();
   const [scenes, setScenes] = useState([]);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
 
-  const load = () => api.get("/scenes").then(({ data }) => setScenes(data)).catch(() => {});
-  useEffect(() => { load(); }, []);
+  const load = () => { if (current) api.get(`/scenes?workspace_id=${current}`).then(({ data }) => setScenes(data)).catch(() => {}); };
+  useEffect(() => { load(); }, [current]);
 
   const create = async () => {
     if (!name.trim()) return;
     const { data } = await api.post("/scenes", {
-      name: name.trim(), width: 1920, height: 1080, background: { color: "#0b1020" },
+      name: name.trim(), width: 1920, height: 1080, background: { color: "#0b1020" }, workspace_id: current,
       elements: [
         { id: crypto.randomUUID(), type: "text", x: 120, y: 120, w: 900, h: 120, rotation: 0, opacity: 1,
           props: { name: "title", text: "LIVE NOW" }, style: { color: "#ffffff", fontSize: 84, fontWeight: 800, fontFamily: "'Outfit', sans-serif" } },

@@ -1,6 +1,7 @@
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { WorkspaceProvider } from "@/context/WorkspaceContext";
 import { Toaster } from "@/components/ui/sonner";
 import { Loader2 } from "lucide-react";
 import Login from "@/pages/Login";
@@ -11,6 +12,8 @@ import SceneEditor from "@/pages/SceneEditor";
 import ExportPage from "@/pages/ExportPage";
 import Sources from "@/pages/Sources";
 import Help from "@/pages/Help";
+import Settings from "@/pages/Settings";
+import Users from "@/pages/Users";
 
 function Protected({ children }) {
   const { user } = useAuth();
@@ -31,18 +34,22 @@ function App() {
     <div className="App">
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<Public><Login /></Public>} />
-            <Route path="/register" element={<Public><Register /></Public>} />
-            <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
-            <Route path="/scenes" element={<Protected><Scenes /></Protected>} />
-            <Route path="/scenes/:id" element={<Protected><SceneEditor /></Protected>} />
-            <Route path="/scenes/:id/export" element={<Protected><ExportPage /></Protected>} />
-            <Route path="/sources" element={<Protected><Sources /></Protected>} />
-            <Route path="/help" element={<Protected><Help /></Protected>} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-          <Toaster position="top-right" richColors />
+          <WorkspaceProvider>
+            <Routes>
+              <Route path="/login" element={<Public><Login /></Public>} />
+              <Route path="/register" element={<Public><Register /></Public>} />
+              <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+              <Route path="/scenes" element={<Protected><Scenes /></Protected>} />
+              <Route path="/scenes/:id" element={<Protected><SceneEditor /></Protected>} />
+              <Route path="/scenes/:id/export" element={<Protected><ExportPage /></Protected>} />
+              <Route path="/sources" element={<Protected><Sources /></Protected>} />
+              <Route path="/settings" element={<Protected><Settings /></Protected>} />
+              <Route path="/users" element={<Protected><Users /></Protected>} />
+              <Route path="/help" element={<Protected><Help /></Protected>} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+            <Toaster position="top-right" richColors />
+          </WorkspaceProvider>
         </AuthProvider>
       </BrowserRouter>
     </div>

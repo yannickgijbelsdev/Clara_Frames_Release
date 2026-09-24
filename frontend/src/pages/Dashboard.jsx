@@ -4,76 +4,86 @@ import { motion } from "framer-motion";
 import api from "@/lib/api";
 import AppLayout from "@/components/AppLayout";
 import { PrimaryButton } from "@/components/PrimaryButton";
-import { useAuth } from "@/context/AuthContext";
-import { Layers, Radio, Plus, MonitorPlay, ArrowRight } from "lucide-react";
+import { useWorkspace } from "@/context/WorkspaceContext";
+import { Plus, Layers, Radio, Search, MonitorPlay } from "lucide-react";
 
 export default function Dashboard() {
   const nav = useNavigate();
-  const { user } = useAuth();
+  const { current, currentWs } = useWorkspace();
   const [scenes, setScenes] = useState([]);
   const [sources, setSources] = useState([]);
+  const [q, setQ] = useState("");
 
   useEffect(() => {
-    api.get("/scenes").then(({ data }) => setScenes(data)).catch(() => {});
-    api.get("/sources").then(({ data }) => setSources(data)).catch(() => {});
-  }, []);
+    if (!current) return;
+    api.get(`/scenes?workspace_id=${current}`).then(({ data }) => setScenes(data)).catch(() => {});
+    api.get(`/sources?workspace_id=${current}`).then(({ data }) => setSources(data)).catch(() => {});
+  }, [current]);
 
-  const stats = [
-    { label: "Overlay scenes", value: scenes.length, icon: Layers, to: "/scenes", color: "from-[#8f99c5] to-[#545f8f]" },
-    { label: "API sources", value: sources.length, icon: Radio, to: "/sources", color: "from-rose-400 to-rose-600" },
-    { label: "Ready for vMix", value: scenes.length, icon: MonitorPlay, to: "/scenes", color: "from-emerald-400 to-emerald-600" },
-  ];
+  const filtered = scenes.filter((s) => s.name.toLowerCase().includes(q.toLowerCase()));
 
   return (
-    <AppLayout title={`Welcome, ${user?.name || "creator"}`} subtitle="Design broadcast overlays and export them straight into vMix."
-      actions={<PrimaryButton icon={Plus} data-testid="dash-new-scene" onClick={() => nav("/scenes")}>New scene</PrimaryButton>}>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        {stats.map((s, i) => (
-          <motion.button key={s.label} onClick={() => nav(s.to)}
-            data-testid={`stat-${i}`}
-            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
-            className="text-left bg-white rounded-3xl clara-soft clara-hover clara-trans p-5 flex items-center gap-4">
-            <span className={`h-12 w-12 rounded-2xl bg-gradient-to-br ${s.color} text-white flex items-center justify-center shrink-0`}>
-              <s.icon className="h-6 w-6" />
-            </span>
-            <div>
-              <div className="font-display text-3xl font-bold text-slate-900">{s.value}</div>
-              <div className="text-sm text-slate-500">{s.label}</div>
-            </div>
-          </motion.button>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white rounded-3xl clara-soft p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-lg font-semibold text-slate-900">Recent scenes</h2>
-            <button onClick={() => nav("/scenes")} className="text-sm text-rose-600 font-medium inline-flex items-center gap-1">View all <ArrowRight className="h-3.5 w-3.5" /></button>
-          </div>
-          {scenes.length === 0 ? (
-            <p className="text-sm text-slate-400 py-6 text-center">No scenes yet. Create your first overlay.</p>
-          ) : (
-            <div className="space-y-2">
-              {scenes.slice(0, 4).map((s) => (
-                <button key={s.id} onClick={() => nav(`/scenes/${s.id}`)} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 text-left">
-                  <span className="h-10 w-10 rounded-xl bg-gradient-to-br from-[#8f99c5] to-[#545f8f] text-white flex items-center justify-center font-bold shrink-0">{s.name.slice(0, 1).toUpperCase()}</span>
-                  <div className="flex-1 min-w-0"><div className="font-medium text-slate-900 truncate">{s.name}</div><div className="text-xs text-slate-400">{(s.elements || []).length} element(s)</div></div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl clara-soft p-6 text-white flex flex-col justify-between">
+    <AppLayout>
+      {/* top row: big stat card + compact metrics pill */}
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-10">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-3xl clara-soft p-5 flex items-center gap-5">
+          <div className="font-display text-5xl font-bold text-slate-900 leading-none">{scenes.length}</div>
           <div>
-            <MonitorPlay className="h-8 w-8 text-rose-400 mb-3" />
-            <h2 className="font-display text-xl font-semibold">How it plugs into vMix</h2>
-            <p className="text-sm text-slate-300 mt-2 leading-relaxed">Build a scene, then add it to vMix as a single <b>Web Browser input</b> (live overlay) or bind Title fields to the <b>Data Source (XML/JSON)</b> endpoint.</p>
+            <div className="text-[11px] uppercase tracking-[0.2em] text-brand-500 font-bold">{currentWs?.name || "Workspace"}</div>
+            <div className="font-medium text-slate-900">Scenes created</div>
           </div>
-          <button onClick={() => nav("/help")} className="mt-5 self-start inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 rounded-full px-4 py-2 text-sm font-medium">Read the vMix guide <ArrowRight className="h-4 w-4" /></button>
-        </div>
+          <PrimaryButton icon={Plus} data-testid="dash-new-scene" onClick={() => nav("/scenes")} className="ml-4">New scene</PrimaryButton>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+          className="bg-white rounded-full clara-soft px-5 py-3 flex items-center gap-4">
+          <div className="flex items-center gap-2 text-slate-500 text-sm"><Layers className="h-4 w-4" />Scenes <b className="text-slate-900 ml-0.5">{scenes.length}</b></div>
+          <div className="h-5 w-px bg-slate-200" />
+          <div className="flex items-center gap-2 text-slate-500 text-sm"><Radio className="h-4 w-4" />Sources <b className="text-slate-900 ml-0.5">{sources.length}</b></div>
+        </motion.div>
       </div>
+
+      {/* center card */}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+        className="max-w-3xl mx-auto bg-white rounded-3xl clara-soft p-6">
+        <div className="flex items-center justify-between gap-4 mb-5 flex-wrap">
+          <span className="text-sm px-3 py-1.5 rounded-full bg-slate-100 text-slate-500 font-medium">{currentWs?.name || "All scenes"}</span>
+          <div className="relative flex-1 max-w-xs ml-auto min-w-[180px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input data-testid="dash-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search scenes…"
+              className="w-full pl-9 pr-3 py-2 rounded-full border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400/40 focus:border-brand-300 transition" />
+          </div>
+        </div>
+
+        {filtered.length === 0 ? (
+          <div className="py-10 text-center">
+            <MonitorPlay className="h-9 w-9 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm text-slate-400">{scenes.length === 0 ? "No scenes yet in this environment." : "No scenes match your search."}</p>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {filtered.slice(0, 6).map((s) => (
+              <button key={s.id} data-testid={`dash-scene-${s.id}`} onClick={() => nav(`/scenes/${s.id}`)}
+                className="w-full flex items-center gap-4 py-3 px-2 rounded-2xl hover:bg-slate-50 text-left transition-colors">
+                <span className="relative h-10 w-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center shrink-0">
+                  <Layers className="h-5 w-5" />
+                  <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-slate-900 truncate">{s.name}</div>
+                  <div className="text-xs text-slate-400">{(s.elements || []).length} element(s) · {s.width}×{s.height}</div>
+                </div>
+                <span className="text-xs font-medium text-emerald-600 shrink-0">Ready</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="pt-4 mt-3 border-t border-slate-100 text-center">
+          <button data-testid="dash-view-all" onClick={() => nav("/scenes")} className="text-sm text-brand-600 font-medium hover:text-brand-700 transition-colors">View all scenes</button>
+        </div>
+      </motion.div>
     </AppLayout>
   );
 }

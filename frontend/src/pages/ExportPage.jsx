@@ -12,14 +12,14 @@ function UrlRow({ icon: Icon, title, desc, url, testid }) {
   return (
     <div className="bg-white rounded-2xl clara-soft p-4">
       <div className="flex items-start gap-3">
-        <span className="h-10 w-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0"><Icon className="h-5 w-5" /></span>
+        <span className="h-10 w-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0"><Icon className="h-5 w-5" /></span>
         <div className="flex-1 min-w-0">
           <div className="font-semibold text-slate-900">{title}</div>
           <div className="text-xs text-slate-500 mb-2">{desc}</div>
           <div className="flex items-center gap-2">
             <code data-testid={testid} className="flex-1 min-w-0 truncate text-xs font-mono bg-slate-900 text-slate-100 rounded-lg px-3 py-2">{url}</code>
             <button onClick={copy} className="h-9 w-9 shrink-0 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"><Copy className="h-4 w-4" /></button>
-            <a href={url} target="_blank" rel="noreferrer" className="text-xs text-rose-600 font-medium shrink-0">Open</a>
+            <a href={url} target="_blank" rel="noreferrer" className="text-xs text-brand-600 font-medium shrink-0">Open</a>
           </div>
         </div>
       </div>
@@ -83,6 +83,26 @@ export default function ExportPage() {
               <b className="text-slate-900">In vMix:</b> click <b>Add Input → Web Browser</b>, paste the overlay URL, set size to 1920×1080 and enable transparency for a clean key.
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="mt-5 bg-white rounded-3xl clara-soft p-6">
+        <h2 className="font-display text-lg font-semibold text-slate-900 mb-1">Per-element vMix outputs</h2>
+        <p className="text-sm text-slate-500 mb-4">Every element has its own live text endpoint — add each one manually in vMix as a Data Source or Title binding.</p>
+        <div className="divide-y divide-slate-100">
+          {(scene.elements || []).map((el) => {
+            const url = `${BACKEND}/api/public/scene/${t}/element/${el.id}.txt`;
+            return (
+              <div key={el.id} data-testid={`el-out-${el.id}`} className="flex items-center gap-3 py-3 flex-wrap">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 shrink-0">{el.type.replace("_", " ")}</span>
+                <span className="font-medium text-slate-800 text-sm shrink-0 min-w-[90px] truncate">{el.props?.name || el.id.slice(0, 6)}</span>
+                <code className="flex-1 min-w-0 truncate text-xs font-mono bg-slate-900 text-slate-100 rounded-lg px-3 py-1.5">{url}</code>
+                <button onClick={() => { navigator.clipboard.writeText(url); toast.success("Copied"); }} className="h-8 w-8 shrink-0 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"><Copy className="h-4 w-4" /></button>
+                <a href={url} target="_blank" rel="noreferrer" className="text-xs text-brand-600 font-medium shrink-0">Open</a>
+              </div>
+            );
+          })}
+          {(scene.elements || []).length === 0 && <p className="text-sm text-slate-400 py-4 text-center">No elements in this scene yet.</p>}
         </div>
       </div>
     </AppLayout>

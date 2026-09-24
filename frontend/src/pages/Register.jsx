@@ -45,7 +45,8 @@ export default function Register() {
         className="w-full max-w-md bg-white rounded-3xl clara-soft p-8">
         <div className="flex items-center gap-2.5 mb-7">
           <Logo />
-          <span className="font-display font-semibold text-slate-900 text-lg">Overlay Studio</span>
+          <div className="h-5 w-px bg-slate-200/70" />
+          <span className="font-display font-semibold text-slate-900 text-lg">Clara Frames</span>
         </div>
 
         {step === "form" && (
@@ -60,22 +61,22 @@ export default function Register() {
               <Input data-testid="reg-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@studio.tv" className="rounded-xl" /></div>
             <div className="space-y-1.5"><Label>Password</Label>
               <Input data-testid="reg-password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="min. 6 characters" className="rounded-xl" /></div>
-            {error && <p data-testid="reg-error" className="text-sm text-rose-600">{error}</p>}
+            {error && <p data-testid="reg-error" className="text-sm text-red-600">{error}</p>}
             <PrimaryButton data-testid="reg-submit" type="submit" disabled={loading} className="w-full justify-center">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Continue"}
             </PrimaryButton>
-            <p className="text-sm text-slate-500 text-center">Have an account? <Link to="/login" className="text-rose-600 font-medium">Sign in</Link></p>
+            <p className="text-sm text-slate-500 text-center">Have an account? <Link to="/login" className="text-brand-600 font-medium">Sign in</Link></p>
           </form>
         )}
 
         {step === "setup" && info && (
           <form onSubmit={submitSetup} className="space-y-4">
-            <div className="flex items-center gap-2 text-slate-900"><ShieldCheck className="h-5 w-5 text-rose-600" /><h1 className="font-display text-2xl font-bold">Scan QR code</h1></div>
+            <div className="flex items-center gap-2 text-slate-900"><ShieldCheck className="h-5 w-5 text-brand-600" /><h1 className="font-display text-2xl font-bold">Scan QR code</h1></div>
             <p className="text-sm text-slate-500">Add this to Google Authenticator / Authy, then enter the code.</p>
             <img src={info.qr} alt="QR" className="mx-auto h-44 w-44 rounded-xl border border-slate-200" />
             <p className="text-xs text-slate-400 text-center font-mono break-all">{info.secret}</p>
             <Input data-testid="mfa-code" inputMode="numeric" maxLength={6} required value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder="000000" className="rounded-xl text-center tracking-[0.5em] text-lg font-mono" />
-            {error && <p data-testid="reg-error" className="text-sm text-rose-600">{error}</p>}
+            {error && <p data-testid="reg-error" className="text-sm text-red-600">{error}</p>}
             <PrimaryButton data-testid="mfa-submit" type="submit" disabled={loading} className="w-full justify-center">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enable & finish"}
             </PrimaryButton>

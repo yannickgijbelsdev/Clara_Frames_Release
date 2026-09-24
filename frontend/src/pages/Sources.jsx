@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import api from "@/lib/api";
 import AppLayout from "@/components/AppLayout";
 import { PrimaryButton, SecondaryButton } from "@/components/PrimaryButton";
+import { useWorkspace } from "@/context/WorkspaceContext";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -19,14 +20,15 @@ const TYPE_META = {
 const empty = { name: "", type: "custom", url: "", method: "GET", refresh_interval: 30, fields: [{ key: "", label: "", path: "" }], latitude: 50.85, longitude: 4.35, timezone: "Europe/Brussels" };
 
 export default function Sources() {
+  const { current } = useWorkspace();
   const [sources, setSources] = useState([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
   const [testOut, setTestOut] = useState(null);
 
-  const load = () => api.get("/sources").then(({ data }) => setSources(data)).catch(() => {});
-  useEffect(() => { load(); }, []);
+  const load = () => { if (current) api.get(`/sources?workspace_id=${current}`).then(({ data }) => setSources(data)).catch(() => {}); };
+  useEffect(() => { load(); }, [current]);
 
   const openNew = () => { setForm(empty); setEditId(null); setTestOut(null); setOpen(true); };
   const openEdit = (s) => {
@@ -36,7 +38,7 @@ export default function Sources() {
 
   const save = async () => {
     if (!form.name.trim()) { toast.error("Name required"); return; }
-    const payload = { ...form, fields: form.fields.filter((f) => f.key && (form.type !== "custom" || f.path)) };
+    const payload = { ...form, workspace_id: current, fields: form.fields.filter((f) => f.key && (form.type !== "custom" || f.path)) };
     try {
       if (editId) await api.put(`/sources/${editId}`, payload);
       else await api.post("/sources", payload);
@@ -77,7 +79,7 @@ export default function Sources() {
               <motion.div key={s.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
                 data-testid={`source-card-${s.id}`}
                 className="bg-white rounded-3xl clara-soft clara-hover clara-trans p-5 flex items-start gap-4">
-                <span className="h-11 w-11 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0"><Meta.icon className="h-5 w-5" /></span>
+                <span className="h-11 w-11 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0"><Meta.icon className="h-5 w-5" /></span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-slate-900 truncate">{s.name}</span>
@@ -130,7 +132,7 @@ export default function Sources() {
                   <Input type="number" min="5" value={form.refresh_interval} onChange={(e) => setForm({ ...form, refresh_interval: parseInt(e.target.value) || 30 })} className="rounded-xl" /></div>
                 <div>
                   <div className="flex items-center justify-between mb-1.5"><Label>Field mappings</Label>
-                    <button onClick={addField} className="text-xs text-rose-600 font-medium inline-flex items-center gap-1"><Plus className="h-3 w-3" />Add</button></div>
+                    <button onClick={addField} className="text-xs text-brand-600 font-medium inline-flex items-center gap-1"><Plus className="h-3 w-3" />Add</button></div>
                   <div className="space-y-2">
                     {form.fields.map((f, i) => (
                       <div key={i} className="flex gap-2 items-center">
@@ -148,7 +150,7 @@ export default function Sources() {
             {testOut && (
               <div className="bg-slate-900 text-slate-100 rounded-xl p-3 text-xs font-mono overflow-x-auto">
                 {testOut.error ? <span className="text-rose-400">{testOut.error}</span> :
-                  Object.entries(testOut.values).map(([k, v]) => <div key={k}><span className="text-rose-300">{k}</span>: {String(v)}</div>)}
+                  Object.entries(testOut.values).map(([k, v]) => <div key={k}><span className="text-brand-300">{k}</span>: {String(v)}</div>)}
               </div>
             )}
 

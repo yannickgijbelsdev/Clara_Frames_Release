@@ -1,42 +1,83 @@
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Logo } from "@/components/Logo";
+import { TopLoadingBar } from "@/components/TopLoadingBar";
+import { PrimaryButton, SecondaryButton } from "@/components/PrimaryButton";
 import { useAuth } from "@/context/AuthContext";
-import { Globe, ChevronDown, HelpCircle, LogOut } from "lucide-react";
-
-const NAV = [
-  { to: "/dashboard", label: "Dashboard" },
-  { to: "/scenes", label: "Scenes" },
-  { to: "/sources", label: "API Sources" },
-  { to: "/help", label: "vMix Help" },
-];
+import { useWorkspace } from "@/context/WorkspaceContext";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Globe, ChevronDown, HelpCircle, LogOut, Settings, Users, Plus, Check } from "lucide-react";
 
 export default function AppLayout({ children, title, subtitle, actions }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { list, currentWs, setCurrent, createWs } = useWorkspace();
+  const [newEnvOpen, setNewEnvOpen] = useState(false);
+  const [envName, setEnvName] = useState("");
   const initials = (user?.name || user?.email || "U").slice(0, 1).toUpperCase();
+
+  const navItems = [
+    { to: "/dashboard", label: "Dashboard" },
+    { to: "/scenes", label: "Scenes" },
+    { to: "/sources", label: "API Sources" },
+    { to: "/help", label: "vMix Help" },
+    ...(user?.role === "admin" ? [{ to: "/users", label: "Users" }] : []),
+  ];
+
+  const avatarEl = user?.avatar
+    ? <img src={user.avatar} alt="" className="h-9 w-9 rounded-full object-cover shadow-sm" />
+    : <span className="h-9 w-9 rounded-full bg-brand-50 text-brand-600 font-semibold flex items-center justify-center shadow-sm">{initials}</span>;
+
+  const submitEnv = async () => {
+    if (!envName.trim()) return;
+    await createWs(envName.trim());
+    setEnvName(""); setNewEnvOpen(false);
+  };
 
   return (
     <div className="min-h-screen bg-[#F5F6F8]">
+      <TopLoadingBar />
       <header className="sticky top-0 z-30 bg-[#F5F6F8]/90 backdrop-blur-xl">
         <div className="max-w-[1400px] mx-auto px-6 h-16 flex items-center gap-3">
           <div className="flex items-center gap-2.5 shrink-0">
             <button data-testid="logo-btn" onClick={() => navigate("/dashboard")}><Logo /></button>
             <div className="hidden sm:block h-5 w-px bg-slate-200/70" />
             <span className="hidden sm:block font-display font-semibold text-slate-900 text-[15px] whitespace-nowrap">
-              Overlay Studio
+              Clara Frames
             </span>
           </div>
 
-          <button className="flex items-center gap-2 px-2.5 py-1.5 rounded-full border border-slate-200 hover:bg-slate-50 transition-colors max-w-[220px]">
-            <Globe className="h-4 w-4 text-slate-400 shrink-0" />
-            <span className="text-sm font-medium text-slate-800 truncate">vMix Workspace</span>
-            <ChevronDown className="h-4 w-4 text-slate-400" />
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button data-testid="workspace-switcher" className="flex items-center gap-2 px-2.5 py-1.5 rounded-full border border-slate-200 hover:bg-slate-50 transition-colors max-w-[220px]">
+                <Globe className="h-4 w-4 text-slate-400 shrink-0" />
+                <span className="text-sm font-medium text-slate-800 truncate">{currentWs?.name || "Environment"}</span>
+                <ChevronDown className="h-4 w-4 text-slate-400" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-60">
+              <DropdownMenuLabel>Environments</DropdownMenuLabel>
+              {list.map((w) => (
+                <DropdownMenuItem key={w.id} data-testid={`ws-item-${w.id}`} onClick={() => setCurrent(w.id)} className="cursor-pointer">
+                  <span className="h-2.5 w-2.5 rounded-full mr-2 shrink-0" style={{ background: w.color }} />
+                  <span className="flex-1 truncate">{w.name}</span>
+                  {currentWs?.id === w.id && <Check className="h-4 w-4 text-brand-600" />}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem data-testid="new-env-btn" onClick={() => setNewEnvOpen(true)} className="cursor-pointer text-brand-600 font-medium">
+                <Plus className="h-4 w-4 mr-2" />New environment
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <nav className="hidden xl:flex items-center gap-0.5 ml-3 flex-1">
-            {NAV.map(({ to, label }) => {
+            {navItems.map(({ to, label }) => {
               const active = location.pathname === to || location.pathname.startsWith(to + "/");
               return (
                 <NavLink key={to} to={to} data-testid={`nav-${label.toLowerCase().replace(/\s+/g, "-")}`}
@@ -53,23 +94,32 @@ export default function AppLayout({ children, title, subtitle, actions }) {
           </nav>
 
           <div className="flex items-center gap-3 ml-auto">
-            <button onClick={() => navigate("/help")} className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors">
+            <button onClick={() => navigate("/help")} className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors">
               <HelpCircle className="h-[19px] w-[19px]" />
             </button>
-            <div className="pl-3 border-l border-slate-200/60 flex items-center gap-2">
-              <span data-testid="user-avatar" className="h-9 w-9 rounded-full bg-rose-50 text-rose-600 font-semibold flex items-center justify-center shadow-sm">
-                {initials}
-              </span>
-              <button data-testid="logout-btn" onClick={logout} title="Log out"
-                className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
-                <LogOut className="h-4 w-4" />
-              </button>
+            <div className="pl-3 border-l border-slate-200/60">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button data-testid="account-menu" className="flex items-center gap-2 rounded-full pr-1.5 py-1 pl-1 hover:bg-slate-100/70 transition-colors">
+                    {avatarEl}
+                    <ChevronDown className="h-4 w-4 text-slate-400" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="truncate">{user?.name || user?.email}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem data-testid="menu-settings" onClick={() => navigate("/settings")} className="cursor-pointer"><Settings className="h-4 w-4 mr-2" />Settings</DropdownMenuItem>
+                  {user?.role === "admin" && <DropdownMenuItem data-testid="menu-users" onClick={() => navigate("/users")} className="cursor-pointer"><Users className="h-4 w-4 mr-2" />Users</DropdownMenuItem>}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem data-testid="logout-btn" onClick={logout} className="cursor-pointer text-red-600"><LogOut className="h-4 w-4 mr-2" />Log out</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>
 
         <nav className="xl:hidden flex items-center gap-1 px-4 pb-3 overflow-x-auto">
-          {NAV.map(({ to, label }) => (
+          {navItems.map(({ to, label }) => (
             <NavLink key={to} to={to}
               className={({ isActive }) => `flex items-center px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap ${isActive ? "bg-slate-900 text-white" : "text-slate-600 bg-slate-100"}`}>
               {label}
@@ -93,6 +143,20 @@ export default function AppLayout({ children, title, subtitle, actions }) {
         )}
         {children}
       </motion.main>
+
+      <Dialog open={newEnvOpen} onOpenChange={setNewEnvOpen}>
+        <DialogContent className="rounded-3xl">
+          <DialogHeader><DialogTitle className="font-display">New environment</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5"><Label>Environment name</Label>
+              <Input data-testid="env-name-input" value={envName} onChange={(e) => setEnvName(e.target.value)} placeholder="e.g. Sports Show 2026" className="rounded-xl" autoFocus onKeyDown={(e) => e.key === "Enter" && submitEnv()} /></div>
+            <div className="flex justify-end gap-2 pt-1">
+              <SecondaryButton onClick={() => setNewEnvOpen(false)}>Cancel</SecondaryButton>
+              <PrimaryButton data-testid="create-env-confirm" onClick={submitEnv}>Create</PrimaryButton>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

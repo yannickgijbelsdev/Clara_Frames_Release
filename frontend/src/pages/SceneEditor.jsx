@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import api from "@/lib/api";
+import api, { BACKEND } from "@/lib/api";
 import AppLayout from "@/components/AppLayout";
 import { PrimaryButton, SecondaryButton } from "@/components/PrimaryButton";
 import SceneCanvas from "@/components/SceneCanvas";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Type, Clock, Image as ImageIcon, CalendarClock, Radio, Save, Upload, Trash2, ArrowLeft, Loader2 } from "lucide-react";
+import { Type, Clock, Image as ImageIcon, CalendarClock, Radio, Save, Upload, Trash2, ArrowLeft, Loader2, Copy } from "lucide-react";
 
 const FONTS = ["'Outfit', sans-serif", "'Plus Jakarta Sans', sans-serif", "'JetBrains Mono', monospace", "Arial", "Georgia", "Impact"];
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
@@ -23,7 +23,7 @@ const templates = {
     props: { name: "logo", src: "" }, style: { objectFit: "contain" } }),
   timed_text: () => ({ id: uid(), type: "timed_text", x: 200, y: 800, w: 900, h: 200, rotation: 0, opacity: 1,
     props: { name: "promo", text: "Timed message", image: "", imagePosition: "left", start: "", end: "", timezone: "Europe/Brussels" },
-    style: { color: "#ffffff", fontSize: 48, fontWeight: 600, fontFamily: FONTS[1], backgroundColor: "#e11d48", borderRadius: 18, padding: 24, textAlign: "left" } }),
+    style: { color: "#ffffff", fontSize: 48, fontWeight: 600, fontFamily: FONTS[1], backgroundColor: "#5f6da6", borderRadius: 18, padding: 24, textAlign: "left" } }),
   api_field: () => ({ id: uid(), type: "api_field", x: 200, y: 400, w: 600, h: 100, rotation: 0, opacity: 1,
     props: { name: "api", sourceId: "", fieldKey: "", prefix: "", suffix: "" }, style: { color: "#ffffff", fontSize: 56, fontWeight: 700, fontFamily: FONTS[0], textAlign: "left" } }),
 };
@@ -95,7 +95,7 @@ export default function SceneEditor() {
             {TOOLS.map((t) => (
               <button key={t.type} data-testid={`add-${t.type}`} onClick={() => addEl(t.type)}
                 className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 border border-slate-100 transition-colors">
-                <t.icon className="h-4 w-4 text-rose-600" />{t.label}
+                <t.icon className="h-4 w-4 text-brand-600" />{t.label}
               </button>
             ))}
           </div>
@@ -223,7 +223,16 @@ export default function SceneEditor() {
                 ))}
               </div>
               <div className="space-y-1.5"><Label>Opacity: {Math.round((sel.opacity ?? 1) * 100)}%</Label>
-                <input type="range" min="0" max="1" step="0.05" value={sel.opacity ?? 1} onChange={(e) => updateEl(sel.id, { opacity: parseFloat(e.target.value) })} className="w-full accent-rose-600" /></div>
+                <input type="range" min="0" max="1" step="0.05" value={sel.opacity ?? 1} onChange={(e) => updateEl(sel.id, { opacity: parseFloat(e.target.value) })} className="w-full accent-brand-600" /></div>
+
+              <div className="pt-3 border-t border-slate-100">
+                <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">vMix output URL</Label>
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <code data-testid="el-output-url" className="flex-1 min-w-0 truncate text-[10px] font-mono bg-slate-900 text-slate-100 rounded-lg px-2 py-1.5">{`${BACKEND}/api/public/scene/${scene.public_token}/element/${sel.id}.txt`}</code>
+                  <button data-testid="copy-el-output" onClick={() => { navigator.clipboard.writeText(`${BACKEND}/api/public/scene/${scene.public_token}/element/${sel.id}.txt`); toast.success("vMix output URL copied"); }} className="h-7 w-7 shrink-0 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"><Copy className="h-3.5 w-3.5" /></button>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">Live text output for this element — add it in vMix as a Data Source. Save the scene first.</p>
+              </div>
             </div>
           )}
         </div>

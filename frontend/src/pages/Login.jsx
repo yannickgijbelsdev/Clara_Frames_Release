@@ -57,14 +57,15 @@ export default function Login() {
         className="relative z-10 w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl clara-soft ring-1 ring-white/60 p-8">
         <div className="flex items-center gap-2.5 mb-7">
           <Logo />
-          <span className="font-display font-semibold text-slate-900 text-lg">Overlay Studio</span>
+          <div className="h-5 w-px bg-slate-200/70" />
+          <span className="font-display font-semibold text-slate-900 text-lg">Clara Frames</span>
         </div>
 
         {step === "password" && (
           <form onSubmit={submitPassword} className="space-y-4">
             <div>
               <h1 className="font-display text-2xl font-bold text-slate-900">Welcome back</h1>
-              <p className="text-sm text-slate-500 mt-1">Sign in to build your vMix overlays.</p>
+              <p className="text-sm text-slate-500 mt-1">Build, compose and let it flow through your broadcast.</p>
             </div>
             <div className="space-y-1.5">
               <Label>Email</Label>
@@ -74,20 +75,20 @@ export default function Login() {
               <Label>Password</Label>
               <Input data-testid="login-password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="rounded-xl" />
             </div>
-            {error && <p data-testid="login-error" className="text-sm text-rose-600">{error}</p>}
+            {error && <p data-testid="login-error" className="text-sm text-red-600">{error}</p>}
             <PrimaryButton data-testid="login-submit" type="submit" disabled={loading} className="w-full justify-center">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Continue"}
             </PrimaryButton>
-            <p className="text-sm text-slate-500 text-center">No account? <Link to="/register" className="text-rose-600 font-medium">Create one</Link></p>
+            <p className="text-sm text-slate-500 text-center">No account? <Link to="/register" className="text-brand-600 font-medium">Create one</Link></p>
           </form>
         )}
 
         {step === "code" && (
           <form onSubmit={submitCode} className="space-y-4">
-            <div className="flex items-center gap-2 text-slate-900"><ShieldCheck className="h-5 w-5 text-rose-600" /><h1 className="font-display text-2xl font-bold">Two-factor code</h1></div>
+            <div className="flex items-center gap-2 text-slate-900"><ShieldCheck className="h-5 w-5 text-brand-600" /><h1 className="font-display text-2xl font-bold">Two-factor code</h1></div>
             <p className="text-sm text-slate-500">Enter the 6-digit code from your authenticator app.</p>
             <Input data-testid="mfa-code" inputMode="numeric" maxLength={6} required value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder="000000" className="rounded-xl text-center tracking-[0.5em] text-lg font-mono" />
-            {error && <p data-testid="login-error" className="text-sm text-rose-600">{error}</p>}
+            {error && <p data-testid="login-error" className="text-sm text-red-600">{error}</p>}
             <PrimaryButton data-testid="mfa-submit" type="submit" disabled={loading} className="w-full justify-center">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify & sign in"}
             </PrimaryButton>
@@ -96,12 +97,12 @@ export default function Login() {
 
         {step === "setup" && setupInfo && (
           <form onSubmit={submitSetup} className="space-y-4">
-            <div className="flex items-center gap-2 text-slate-900"><ShieldCheck className="h-5 w-5 text-rose-600" /><h1 className="font-display text-2xl font-bold">Set up 2FA</h1></div>
+            <div className="flex items-center gap-2 text-slate-900"><ShieldCheck className="h-5 w-5 text-brand-600" /><h1 className="font-display text-2xl font-bold">Set up 2FA</h1></div>
             <p className="text-sm text-slate-500">Scan this QR with Google Authenticator, then enter a code to finish.</p>
             <img src={setupInfo.qr} alt="QR" className="mx-auto h-44 w-44 rounded-xl border border-slate-200" />
             <p className="text-xs text-slate-400 text-center font-mono break-all">{setupInfo.secret}</p>
             <Input data-testid="mfa-code" inputMode="numeric" maxLength={6} required value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder="000000" className="rounded-xl text-center tracking-[0.5em] text-lg font-mono" />
-            {error && <p data-testid="login-error" className="text-sm text-rose-600">{error}</p>}
+            {error && <p data-testid="login-error" className="text-sm text-red-600">{error}</p>}
             <PrimaryButton data-testid="mfa-submit" type="submit" disabled={loading} className="w-full justify-center">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enable & sign in"}
             </PrimaryButton>

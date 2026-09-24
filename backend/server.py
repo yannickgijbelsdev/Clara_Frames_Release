@@ -9,8 +9,10 @@ import io
 import re
 import uuid
 import base64
+import secrets
 import asyncio
 import logging
+from zoneinfo import ZoneInfo
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Any, Dict
 
@@ -85,6 +87,42 @@ def make_qr_data_url(uri: str) -> str:
     img.save(buf, format="PNG")
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
+def gen_backup_codes(n: int = 8):
+    codes = ["-".join([secrets.token_hex(2), secrets.token_hex(2)]) for _ in range(n)]
+    hashes = [hash_password(c) for c in codes]
+    return codes, hashes
+
+def check_backup(code: str, hashes: list):
+    for h in hashes:
+        if verify_password(code, h):
+            return h
+    return None
+
+_WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+def format_clock_py(tz: str, fmt: str) -> str:
+    try:
+        now = datetime.now(ZoneInfo(tz or "UTC"))
+    except Exception:
+        now = datetime.now(timezone.utc)
+    f = fmt or "HH:mm:ss"
+    return (f.replace("dddd", _WEEKDAYS[now.weekday()])
+             .replace("YYYY", f"{now.year}")
+             .replace("MMMM", _MONTHS[now.month - 1])
+             .replace("MM", f"{now.month:02d}")
+             .replace("DD", f"{now.day:02d}")
+             .replace("HH", f"{now.hour:02d}")
+             .replace("mm", f"{now.minute:02d}")
+             .replace("ss", f"{now.second:02d}"))
+
+def _hhmm(v):
+    try:
+        h, m = v.split(":")
+        return int(h) * 60 + int(m)
+    except Exception:
+        return None
+
 async def get_current_user(request: Request) -> dict:
     token = request.cookies.get("access_token")
     if not token:
@@ -104,11 +142,19 @@ async def get_current_user(request: Request) -> dict:
         user.pop("_id", None)
         user.pop("password_hash", None)
         user.pop("totp_secret", None)
+        user.pop("totp_secret_pending", None)
+        user["backup_codes_count"] = len(user.get("backup_codes", []))
+        user.pop("backup_codes", None)
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+async def require_admin(user: dict = Depends(get_current_user)) -> dict:
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
 
 # ---------------------------------------------------------------------------
 # Pydantic models
@@ -147,6 +193,7 @@ class SourceInput(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     timezone: Optional[str] = None
+    workspace_id: Optional[str] = None
 
 class SceneInput(BaseModel):
     name: str
@@ -154,6 +201,32 @@ class SceneInput(BaseModel):
     height: int = 1080
     background: Dict[str, Any] = {"color": "#0b1020"}
     elements: List[Dict[str, Any]] = []
+    workspace_id: Optional[str] = None
+
+class ChangePassword(BaseModel):
+    current_password: str
+    new_password: str
+
+class ProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    avatar: Optional[str] = None
+
+class TwoFAConfirm(BaseModel):
+    code: str
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    name: str = "User"
+    role: str = "user"
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    role: Optional[str] = None
+
+class WorkspaceInput(BaseModel):
+    name: str
+    color: str = "#5f6da6"
 
 # ---------------------------------------------------------------------------
 # Auth endpoints
@@ -213,10 +286,138 @@ async def mfa_verify(body: MfaVerifyInput, response: Response):
     user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
-    if not pyotp.TOTP(user["totp_secret"]).verify(body.code, valid_window=1):
+    code = body.code.strip()
+    ok = pyotp.TOTP(user["totp_secret"]).verify(code, valid_window=1)
+    if not ok:
+        h = check_backup(code, user.get("backup_codes", []))
+        if h:
+            await db.users.update_one({"_id": user["_id"]}, {"$pull": {"backup_codes": h}})
+            ok = True
+    if not ok:
         raise HTTPException(status_code=401, detail="Invalid authentication code")
     set_auth_cookies(response, str(user["_id"]), user["email"])
     return {"id": str(user["_id"]), "email": user["email"], "name": user.get("name"), "role": user.get("role")}
+
+# ---- Account management ----
+@api_router.post("/auth/change-password")
+async def change_password(body: ChangePassword, user: dict = Depends(get_current_user)):
+    doc = await db.users.find_one({"_id": ObjectId(user["id"])})
+    if not verify_password(body.current_password, doc["password_hash"]):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    if len(body.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    await db.users.update_one({"_id": doc["_id"]}, {"$set": {"password_hash": hash_password(body.new_password)}})
+    return {"ok": True}
+
+@api_router.put("/auth/profile")
+async def update_profile(body: ProfileUpdate, user: dict = Depends(get_current_user)):
+    upd = {}
+    if body.name is not None:
+        upd["name"] = body.name
+    if body.avatar is not None:
+        upd["avatar"] = body.avatar
+    if upd:
+        await db.users.update_one({"_id": ObjectId(user["id"])}, {"$set": upd})
+    return {**user, **upd}
+
+@api_router.post("/auth/2fa/reset")
+async def reset_2fa(user: dict = Depends(get_current_user)):
+    secret = pyotp.random_base32()
+    await db.users.update_one({"_id": ObjectId(user["id"])}, {"$set": {"totp_secret_pending": secret}})
+    uri = pyotp.TOTP(secret).provisioning_uri(name=user["email"], issuer_name=ISSUER)
+    return {"otpauth_url": uri, "secret": secret, "qr": make_qr_data_url(uri)}
+
+@api_router.post("/auth/2fa/confirm")
+async def confirm_2fa(body: TwoFAConfirm, user: dict = Depends(get_current_user)):
+    doc = await db.users.find_one({"_id": ObjectId(user["id"])})
+    pending = doc.get("totp_secret_pending")
+    if not pending:
+        raise HTTPException(status_code=400, detail="Start a 2FA reset first")
+    if not pyotp.TOTP(pending).verify(body.code.strip(), valid_window=1):
+        raise HTTPException(status_code=401, detail="Invalid authentication code")
+    codes, hashes = gen_backup_codes()
+    await db.users.update_one({"_id": doc["_id"]}, {"$set": {
+        "totp_secret": pending, "mfa_enabled": True, "backup_codes": hashes},
+        "$unset": {"totp_secret_pending": ""}})
+    return {"ok": True, "backup_codes": codes}
+
+@api_router.post("/auth/2fa/backup-codes")
+async def regen_backup_codes(user: dict = Depends(get_current_user)):
+    codes, hashes = gen_backup_codes()
+    await db.users.update_one({"_id": ObjectId(user["id"])}, {"$set": {"backup_codes": hashes}})
+    return {"backup_codes": codes}
+
+# ---- User management (admin) ----
+@api_router.get("/users")
+async def list_users(admin: dict = Depends(require_admin)):
+    docs = await db.users.find({}).to_list(500)
+    return [{"id": str(d["_id"]), "email": d["email"], "name": d.get("name"),
+             "role": d.get("role", "user"), "mfa_enabled": d.get("mfa_enabled", False),
+             "created_at": d.get("created_at")} for d in docs]
+
+@api_router.post("/users")
+async def create_user(body: UserCreate, admin: dict = Depends(require_admin)):
+    email = body.email.lower()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=400, detail="Email already registered")
+    doc = {"email": email, "password_hash": hash_password(body.password), "name": body.name,
+           "role": body.role, "totp_secret": pyotp.random_base32(), "mfa_enabled": False,
+           "created_at": datetime.now(timezone.utc).isoformat()}
+    res = await db.users.insert_one(doc)
+    return {"id": str(res.inserted_id), "email": email, "name": body.name, "role": body.role, "mfa_enabled": False}
+
+@api_router.put("/users/{user_id}")
+async def update_user(user_id: str, body: UserUpdate, admin: dict = Depends(require_admin)):
+    upd = {k: v for k, v in {"name": body.name, "role": body.role}.items() if v is not None}
+    if upd:
+        await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": upd})
+    return {"ok": True}
+
+@api_router.delete("/users/{user_id}")
+async def delete_user(user_id: str, admin: dict = Depends(require_admin)):
+    if user_id == admin["id"]:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
+    await db.users.delete_one({"_id": ObjectId(user_id)})
+    return {"ok": True}
+
+# ---- Workspaces / environments ----
+async def ensure_default_workspace(user_id: str) -> str:
+    ws = await db.workspaces.find_one({"user_id": user_id})
+    if not ws:
+        doc = {"id": str(uuid.uuid4()), "user_id": user_id, "name": "My Project",
+               "color": "#5f6da6", "created_at": datetime.now(timezone.utc).isoformat()}
+        await db.workspaces.insert_one(doc)
+        return doc["id"]
+    return ws["id"]
+
+@api_router.get("/workspaces")
+async def list_workspaces(user: dict = Depends(get_current_user)):
+    await ensure_default_workspace(user["id"])
+    docs = await db.workspaces.find({"user_id": user["id"]}, {"_id": 0}).to_list(200)
+    return docs
+
+@api_router.post("/workspaces")
+async def create_workspace(body: WorkspaceInput, user: dict = Depends(get_current_user)):
+    doc = {"id": str(uuid.uuid4()), "user_id": user["id"], "name": body.name,
+           "color": body.color, "created_at": datetime.now(timezone.utc).isoformat()}
+    await db.workspaces.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+@api_router.put("/workspaces/{ws_id}")
+async def update_workspace(ws_id: str, body: WorkspaceInput, user: dict = Depends(get_current_user)):
+    await db.workspaces.update_one({"id": ws_id, "user_id": user["id"]}, {"$set": {"name": body.name, "color": body.color}})
+    return {"ok": True}
+
+@api_router.delete("/workspaces/{ws_id}")
+async def delete_workspace(ws_id: str, user: dict = Depends(get_current_user)):
+    count = await db.workspaces.count_documents({"user_id": user["id"]})
+    if count <= 1:
+        raise HTTPException(status_code=400, detail="You need at least one environment")
+    await db.workspaces.delete_one({"id": ws_id, "user_id": user["id"]})
+    await db.scenes.delete_many({"user_id": user["id"], "workspace_id": ws_id})
+    await db.sources.delete_many({"user_id": user["id"], "workspace_id": ws_id})
+    return {"ok": True}
 
 @api_router.post("/auth/logout")
 async def logout(response: Response):
@@ -303,8 +504,11 @@ def _prep_builtin(body: SourceInput) -> dict:
     return {"url": body.url, "fields": [f.model_dump() for f in body.fields]}
 
 @api_router.get("/sources")
-async def list_sources(user: dict = Depends(get_current_user)):
-    docs = await db.sources.find({"user_id": user["id"]}, {"last_raw": 0}).to_list(500)
+async def list_sources(workspace_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+    q = {"user_id": user["id"]}
+    if workspace_id:
+        q["workspace_id"] = workspace_id
+    docs = await db.sources.find(q, {"last_raw": 0}).to_list(500)
     for d in docs:
         d.pop("_id", None)
     return docs
@@ -315,6 +519,7 @@ async def create_source(body: SourceInput, user: dict = Depends(get_current_user
     doc = {
         "id": str(uuid.uuid4()),
         "user_id": user["id"],
+        "workspace_id": body.workspace_id,
         "name": body.name,
         "type": body.type,
         "url": prep.get("url", body.url),
@@ -369,8 +574,11 @@ async def test_source(source_id: str, user: dict = Depends(get_current_user)):
 # Scenes
 # ---------------------------------------------------------------------------
 @api_router.get("/scenes")
-async def list_scenes(user: dict = Depends(get_current_user)):
-    docs = await db.scenes.find({"user_id": user["id"]}).to_list(500)
+async def list_scenes(workspace_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+    q = {"user_id": user["id"]}
+    if workspace_id:
+        q["workspace_id"] = workspace_id
+    docs = await db.scenes.find(q).to_list(500)
     for d in docs:
         d.pop("_id", None)
     return docs
@@ -380,6 +588,7 @@ async def create_scene(body: SceneInput, user: dict = Depends(get_current_user))
     doc = {
         "id": str(uuid.uuid4()),
         "user_id": user["id"],
+        "workspace_id": body.workspace_id,
         "name": body.name,
         "width": body.width,
         "height": body.height,
@@ -454,6 +663,37 @@ async def build_scene_data(scene: dict) -> Dict[str, Any]:
             val = source_cache.get(sid, {}).get(props.get("fieldKey"))
             out[name] = val if val is not None else ""
     return out
+
+async def resolve_element_value(el: dict) -> str:
+    p = el.get("props", {})
+    t = el.get("type")
+    if t == "text":
+        return p.get("text", "")
+    if t == "image":
+        return p.get("src", "")
+    if t == "clock":
+        return format_clock_py(p.get("timezone"), p.get("format"))
+    if t == "timed_text":
+        text = p.get("text", "")
+        s, e = p.get("start"), p.get("end")
+        if not s or not e:
+            return text
+        try:
+            now = datetime.now(ZoneInfo(p.get("timezone") or "UTC"))
+        except Exception:
+            now = datetime.now(timezone.utc)
+        n = now.hour * 60 + now.minute
+        sm, em = _hhmm(s), _hhmm(e)
+        if sm is None or em is None:
+            return text
+        vis = (sm <= n <= em) if sm <= em else (n >= sm or n <= em)
+        return text if vis else ""
+    if t == "api_field":
+        src = await db.sources.find_one({"id": p.get("sourceId")})
+        vals = await resolve_source_values(src) if src else {}
+        v = vals.get(p.get("fieldKey"))
+        return (p.get("prefix", "") + (str(v) if v is not None else "") + p.get("suffix", ""))
+    return ""
 
 # ---------------------------------------------------------------------------
 # Public endpoints (consumed by vMix) - no auth
@@ -668,6 +908,24 @@ async def public_values(token: str):
         out[f"{sid}:{p.get('fieldKey')}"] = cache.get(sid, {}).get(p.get("fieldKey"), "")
     return JSONResponse(out)
 
+@api_router.get("/public/scene/{token}/element/{element_id}.txt", response_class=PlainTextResponse)
+async def public_element_txt(token: str, element_id: str):
+    scene = await _get_public_scene(token)
+    el = next((e for e in scene.get("elements", []) if e.get("id") == element_id), None)
+    if not el:
+        raise HTTPException(status_code=404, detail="Element not found")
+    return PlainTextResponse(str(await resolve_element_value(el)))
+
+@api_router.get("/public/scene/{token}/element/{element_id}.json")
+async def public_element_json(token: str, element_id: str):
+    scene = await _get_public_scene(token)
+    el = next((e for e in scene.get("elements", []) if e.get("id") == element_id), None)
+    if not el:
+        raise HTTPException(status_code=404, detail="Element not found")
+    p = el.get("props", {})
+    return JSONResponse({"id": element_id, "name": p.get("name"), "type": el.get("type"),
+                         "value": await resolve_element_value(el)})
+
 @api_router.get("/")
 async def root():
     return {"message": "vMix Overlay Studio API"}
@@ -680,6 +938,7 @@ async def startup():
     await db.users.create_index("email", unique=True)
     await db.sources.create_index("user_id")
     await db.scenes.create_index("public_token", unique=True)
+    await db.workspaces.create_index("user_id")
     # seed admin with MFA enabled + known secret (for automated testing)
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@example.com")
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")

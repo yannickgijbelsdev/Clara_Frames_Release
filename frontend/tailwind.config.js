@@ -28,6 +28,10 @@ module.exports = {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
+        brand: {
+          50: '#eef0f7', 100: '#e0e4f1', 200: '#c6cde4', 300: '#a9b1d4',
+          400: '#8f99c5', 500: '#7380b6', 600: '#5f6da6', 700: '#4d5a8c', 800: '#3f4a73',
+        },
       },
       keyframes: {
         'accordion-down': { from: { height: '0' }, to: { height: 'var(--radix-accordion-content-height)' } },
