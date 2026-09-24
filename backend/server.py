@@ -368,6 +368,12 @@ async def create_user(body: UserCreate, admin: dict = Depends(require_admin)):
 
 @api_router.put("/users/{user_id}")
 async def update_user(user_id: str, body: UserUpdate, admin: dict = Depends(require_admin)):
+    if body.role and body.role != "admin":
+        target = await db.users.find_one({"_id": ObjectId(user_id)})
+        if target and target.get("role") == "admin":
+            admin_count = await db.users.count_documents({"role": "admin"})
+            if admin_count <= 1:
+                raise HTTPException(status_code=400, detail="You cannot demote the last admin")
     upd = {k: v for k, v in {"name": body.name, "role": body.role}.items() if v is not None}
     if upd:
         await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": upd})
@@ -377,6 +383,11 @@ async def update_user(user_id: str, body: UserUpdate, admin: dict = Depends(requ
 async def delete_user(user_id: str, admin: dict = Depends(require_admin)):
     if user_id == admin["id"]:
         raise HTTPException(status_code=400, detail="You cannot delete your own account")
+    target = await db.users.find_one({"_id": ObjectId(user_id)})
+    if target and target.get("role") == "admin":
+        admin_count = await db.users.count_documents({"role": "admin"})
+        if admin_count <= 1:
+            raise HTTPException(status_code=400, detail="You cannot delete the last admin")
     await db.users.delete_one({"_id": ObjectId(user_id)})
     return {"ok": True}
 
@@ -411,6 +422,9 @@ async def update_workspace(ws_id: str, body: WorkspaceInput, user: dict = Depend
 
 @api_router.delete("/workspaces/{ws_id}")
 async def delete_workspace(ws_id: str, user: dict = Depends(get_current_user)):
+    existing = await db.workspaces.find_one({"id": ws_id, "user_id": user["id"]})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Environment not found")
     count = await db.workspaces.count_documents({"user_id": user["id"]})
     if count <= 1:
         raise HTTPException(status_code=400, detail="You need at least one environment")

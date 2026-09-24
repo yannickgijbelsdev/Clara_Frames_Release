@@ -25,12 +25,22 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Full MFA auth (email/password + TOTP), admin seeded (admin@example.com / admin123, secret JBSWY3DPEHPK3PXP).
 - Sources CRUD + test; Scenes CRUD; drag/resize 16:9 canvas editor with per-element property panel.
 - Export page with copyable vMix URLs + downloadable settings file; live preview.
-- Clara Campaigns app shell (left-aligned nav, animated dark pill, rose primary buttons).
-- Verified: 29/29 backend tests + full frontend flow pass.
+- Clara Frames app shell (koodh-beak periwinkle logo, left-aligned nav, animated dark pill, periwinkle buttons, top loading bar).
+- Verified: iter1 29/29 backend + full frontend pass.
+
+## Implemented (iter 2, 2026-06)
+- Fixed editor click-deselect bug (clicking an element keeps the properties panel open).
+- Per-element vMix outputs: GET /api/public/scene/{token}/element/{id}.txt and .json (live text per element); shown in editor panel + Export page.
+- Account Settings page: change password, avatar (URL/color presets), 2FA reset (QR + confirm), backup codes (generate/regenerate); login accepts single-use backup codes.
+- User management (admin): list/create/update-role/delete users; guards against deleting/demoting the last admin.
+- Multiple environments (workspaces): header switcher, create/switch; scenes & sources scoped by workspace_id; cascade delete.
+- Cleaner dashboard (big stat card + metrics pill + searchable recent-scenes card).
+- Recolored theme rose→periwinkle (brand palette); login bears background + divider; new login subtitle.
+- Verified: iter2 53/53 backend + full frontend pass.
 
 ## Backlog / next
 - P1: Image/photo upload (object storage) instead of URL-only.
-- P1: Per-column timezone/format for clock in data.json (currently UTC ISO server-side; overlay honors it client-side).
-- P2: Signed one-time setup token to gate TOTP-secret exposure on first login.
+- P1: Require re-auth (current password/TOTP) before 2FA reset.
+- P2: Per-column timezone/format for clock in data.json.
 - P2: Brute-force lockout on login/mfa endpoints.
-- P2: Animation/transitions for element show/hide; more presets (lower-third templates).
+- P2: Cache-Control/ETag on per-element output endpoints (polled every 1s by vMix).

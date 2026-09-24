@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 2 testing of Clara Frames covering all new features + regression. Backend: 53/53 pytest tests pass (29 regression from iter1 + 24 new). Frontend: full Playwright happy-path verified — MFA login → workspace switcher (create+switch, list-scoped scenes cleared correctly) → new scene creation → editor bug-fix regression PASSED (clicking a canvas element keeps properties-panel visible; clicking bare canvas background deselects). Per-element output URL (data-testid el-output-url) is populated and ends with .txt; Export page shows per-element outputs (el-out-{id}). Save/Export flow works. Users page (new-user-btn) and Settings page (settings-name, cur-pw, new-pw, change-pw-btn, reset-2fa-btn) render correctly. Dashboard clean layout (dash-new-scene, dash-search, dash-view-all) present. Backend covered: workspaces auto-create, CRUD, cascade delete, cannot-delete-last (400); scene/source scoping by workspace_id; per-element .txt/.json endpoints (text, clock format HH:mm:ss regex verified) + 404; account settings (change-password wrong/short/ok, profile update, 2FA reset+confirm returns 8 backup_codes, regen backup-codes); mfa/verify with backup code succeeds AND consumes single-use; user management (list, create, update-role, admin cannot delete self, delete, duplicate 400, non-admin 403). No new bugs found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dialogs (new scene, new environment)", "issues": ["React a11y warning still present: Missing Description or aria-describedby for DialogContent. Same low-priority polish flagged in iter1 — add DialogDescription to shadcn Dialogs."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/pytest/iter2_regression.xml",
+    "/app/test_reports/pytest/iter2_new.xml"
+  ],
+  "action_items": [
+    "(Optional / low priority) Add DialogDescription to shadcn Dialogs to silence Radix a11y warnings. Carried over from iter1 – still present."
+  ],
+  "critical_code_review_comments": [
+    "server.py /auth/2fa/reset does not require re-authentication (current password or TOTP) — an attacker with a stolen access cookie can reset the user's TOTP secret and, after /2fa/confirm, take over MFA. Consider requiring current password + current TOTP before generating the pending secret.",
+    "server.py /users PUT endpoint accepts role changes but does not prevent an admin from demoting the last admin (could lock everyone out of user management). Consider guard: `if changing role from admin to user AND admin count == 1 -> 400`.",
+    "server.py DELETE /workspaces cascades scenes+sources but does not check ownership on cascade payload (uses user_id + workspace_id, so safe); however DELETE /workspaces/{id} does not verify the workspace actually belongs to the user before counting — count is user-scoped, so cannot delete arbitrary workspace, but returning 200 for a non-existent id is misleading (should 404).",
+    "server.py get_current_user pops totp_secret_pending BUT profile response `PUT /auth/profile` returns `{**user, **upd}` where `user` is already sanitized — good. No secret leakage observed.",
+    "server.py /public/scene/{token}/element/{id}.txt has no caching/rate-limiting; clock endpoints will be hit every 1s by vMix — fine for MVP but consider ETag or Cache-Control for image/text values.",
+    "Frontend SceneCanvas.jsx bug fix looks correct: element div uses onClick stopPropagation AND the background onClick is guarded by e.target===e.currentTarget. Verified in browser."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_new_features.py (new)"
+  ],
+  "success_rate": {"backend": "100% (53/53)", "frontend": "100% (all data-testids and flows verified: bug fix, workspaces, per-element outputs, dashboard, users, settings)"},
+  "test_credentials": "admin@example.com / admin123, TOTP secret JBSWY3DPEHPK3PXP. 2FA reset tests run on freshly registered throwaway users (per instructions) — admin secret preserved.",
+  "seed_data_creation": "Ephemeral test data (TEST_ prefixed workspaces, scenes, sources; test_*@example.com users) is created and cleaned up within tests. Post-run manual cleanup removed lingering TEST_UI_WS workspace and TEST_UI_Scene_v2 scene.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Two backend test files now: /app/backend/tests/backend_test.py (regression – auth, sources, scenes, public endpoints) and /app/backend/tests/test_new_features.py (workspaces, per-element outputs, account settings, backup-code login, user management). Both use pyotp against ADMIN_TOTP_SECRET=JBSWY3DPEHPK3PXP. Do not run 2FA-reset/confirm on admin — the test_new_features.py test uses a freshly registered user via the fresh_user fixture. Run with `python -m pytest backend/tests/ -v -n 0` (pytest-xdist parallelism is default via pytest.ini but disabled here to avoid session-scope fixture duplication).",
+  "rca of the issue": "N/A – previously-reported click-deselect bug is fixed and verified. See critical_code_review_comments for new observations worth follow-up."
+}
