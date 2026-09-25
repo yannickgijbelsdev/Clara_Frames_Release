@@ -818,7 +818,25 @@ OVERLAY_HTML = r"""<!DOCTYPE html>
   #stage{position:absolute;top:0;left:0;transform-origin:top left;}
   .el{position:absolute;box-sizing:border-box;display:flex;}
   img.el-img{width:100%;height:100%;}
+  @keyframes clara-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+  @keyframes clara-fade{0%,100%{opacity:.15}50%{opacity:1}}
+  @keyframes clara-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+  @keyframes clara-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-12%)}}
+  @keyframes clara-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6%)}}
+  @keyframes clara-blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+  @keyframes clara-slide{0%{transform:translateX(-18%)}100%{transform:translateX(18%)}}
 </style></head>
+<script>
+function applyAnim(node, p){
+  var a = p.animation; if(!a || a==='none') return;
+  var dur = p.animationDuration || 2;
+  var map = {pulse:'clara-pulse',fade:'clara-fade',spin:'clara-spin',bounce:'clara-bounce',float:'clara-float',blink:'clara-blink',slide:'clara-slide'};
+  var name = map[a]; if(!name) return;
+  var timing = a==='spin' ? 'linear' : (a==='slide' ? 'ease-in-out' : 'ease-in-out');
+  var dir = a==='slide' ? ' alternate' : '';
+  node.style.animation = name+' '+dur+'s '+timing+' infinite'+dir;
+}
+</script>
 <body>
 <div id="stage"></div>
 <script>
@@ -830,17 +848,30 @@ stage.style.width = SCENE.width + 'px';
 stage.style.height = SCENE.height + 'px';
 if (SCENE.background && SCENE.background.color) stage.style.background = SCENE.background.color;
 if (SCENE.background && SCENE.background.src) {
+  var bfit = SCENE.background.fit || 'cover';
   var bg;
   if (SCENE.background.type === 'video') {
     bg = document.createElement('video');
     bg.src = SCENE.background.src; bg.autoplay = true; bg.loop = true; bg.muted = true;
     bg.setAttribute('playsinline', ''); bg.setAttribute('muted', '');
+    bg.style.width = '100%'; bg.style.height = '100%'; bg.style.objectFit = bfit === 'contain' ? 'contain' : 'cover';
+  } else if (bfit === 'repeat') {
+    bg = document.createElement('div');
+    bg.style.width = '100%'; bg.style.height = '100%';
+    bg.style.backgroundImage = 'url(' + SCENE.background.src + ')'; bg.style.backgroundRepeat = 'repeat';
   } else {
     bg = document.createElement('img'); bg.src = SCENE.background.src;
+    bg.style.width = '100%'; bg.style.height = '100%'; bg.style.objectFit = bfit === 'contain' ? 'contain' : 'cover';
   }
   bg.style.position = 'absolute'; bg.style.top = 0; bg.style.left = 0;
-  bg.style.width = '100%'; bg.style.height = '100%'; bg.style.objectFit = 'cover';
   stage.appendChild(bg);
+}
+if (SCENE.background && SCENE.background.overlayColor && (SCENE.background.overlayOpacity || 0) > 0) {
+  var ov = document.createElement('div');
+  ov.style.position = 'absolute'; ov.style.top = 0; ov.style.left = 0;
+  ov.style.width = '100%'; ov.style.height = '100%';
+  ov.style.background = SCENE.background.overlayColor; ov.style.opacity = SCENE.background.overlayOpacity;
+  stage.appendChild(ov);
 }
 
 function fit(){
@@ -918,26 +949,31 @@ const apiEls = [];
 SCENE.elements.forEach(el => {
   const p = el.props || {};
   const d = baseStyle(el);
+  const inner = document.createElement('div');
+  inner.style.width = '100%'; inner.style.height = '100%'; inner.style.display = 'flex';
+  inner.style.justifyContent = 'inherit'; inner.style.alignItems = 'inherit';
+  applyAnim(inner, p);
   if (el.type === 'image'){
-    if (p.src){ const img = document.createElement('img'); img.className='el-img'; img.src=p.src;
-      img.style.objectFit = (el.style&&el.style.objectFit)||'contain'; d.appendChild(img);} 
+    if (p.src){ const img = document.createElement('img'); img.src=p.src; img.style.width='100%'; img.style.height='100%';
+      img.style.objectFit = (el.style&&el.style.objectFit)||'contain'; inner.appendChild(img);} 
   } else if (el.type === 'clock'){
-    d.textContent = fmtClock(p.timezone, p.format);
-    clocks.push({d, p});
+    inner.textContent = fmtClock(p.timezone, p.format);
+    clocks.push({d: inner, p});
   } else if (el.type === 'timed_text'){
     const wrap = document.createElement('div'); wrap.style.display='flex'; wrap.style.flexDirection = p.imagePosition==='top'?'column':'row';
     wrap.style.alignItems='center'; wrap.style.gap='16px'; wrap.style.width='100%'; wrap.style.height='100%';
     if (p.image){ const im=document.createElement('img'); im.src=p.image; im.style.objectFit='cover';
       im.style.height = p.imagePosition==='top'?'60%':'100%'; im.style.borderRadius='12px'; wrap.appendChild(im);}    
     const txt=document.createElement('div'); txt.textContent=p.text||''; txt.style.flex='1'; wrap.appendChild(txt);
-    d.appendChild(wrap);
+    inner.appendChild(wrap);
     timeds.push({d, p});
   } else if (el.type === 'api_field'){
-    d.textContent = (p.prefix||'') + '…' + (p.suffix||'');
-    apiEls.push({d, p});
+    inner.textContent = (p.prefix||'') + '…' + (p.suffix||'');
+    apiEls.push({d: inner, p});
   } else { // text
-    d.textContent = p.text || '';
+    inner.textContent = p.text || '';
   }
+  d.appendChild(inner);
   stage.appendChild(d);
 });
 

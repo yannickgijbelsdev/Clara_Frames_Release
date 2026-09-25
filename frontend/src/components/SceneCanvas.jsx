@@ -1,6 +1,16 @@
 import { useRef, useState, useEffect, useLayoutEffect, useCallback } from "react";
 import { formatClock } from "@/lib/clock";
 
+const ANIM_MAP = { pulse: "clara-pulse", fade: "clara-fade", spin: "clara-spin", bounce: "clara-bounce", float: "clara-float", blink: "clara-blink", slide: "clara-slide" };
+function animStyle(el) {
+  const a = el.props?.animation;
+  if (!a || a === "none" || !ANIM_MAP[a]) return {};
+  const dur = el.props?.animationDuration || 2;
+  const timing = a === "spin" ? "linear" : "ease-in-out";
+  const dir = a === "slide" ? " alternate" : "";
+  return { animation: `${ANIM_MAP[a]} ${dur}s ${timing} infinite${dir}` };
+}
+
 function elBoxStyle(el) {
   const st = el.style || {};
   const s = {
@@ -110,9 +120,20 @@ export default function SceneCanvas({ scene, editable = false, selectedId, onSel
           overflow: "hidden",
         }}
       >
-        {scene.background?.src && (scene.background?.type === "video"
-          ? <video key={scene.background.src} src={scene.background.src} autoPlay loop muted playsInline style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-          : <img src={scene.background.src} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />)}
+        {scene.background?.src && (() => {
+          const bg = scene.background;
+          const fit = bg.fit || "cover";
+          if (bg.type === "video") {
+            return <video key={bg.src} src={bg.src} autoPlay loop muted playsInline style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: fit === "contain" ? "contain" : "cover" }} />;
+          }
+          if (fit === "repeat") {
+            return <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${bg.src})`, backgroundRepeat: "repeat" }} />;
+          }
+          return <img src={bg.src} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: fit === "contain" ? "contain" : "cover" }} />;
+        })()}
+        {scene.background?.overlayColor && (scene.background?.overlayOpacity ?? 0) > 0 && (
+          <div style={{ position: "absolute", inset: 0, background: scene.background.overlayColor, opacity: scene.background.overlayOpacity, pointerEvents: "none" }} />
+        )}
         {(scene.elements || []).map((el) => {
           const selected = editable && el.id === selectedId;
           return (
@@ -126,7 +147,9 @@ export default function SceneCanvas({ scene, editable = false, selectedId, onSel
                 outline: selected ? "2px solid #5f6da6" : "none",
                 outlineOffset: 2,
               }}>
-              <ElementContent el={el} sourceValues={sourceValues} />
+              <div style={{ width: "100%", height: "100%", display: "flex", justifyContent: "inherit", alignItems: "inherit", ...animStyle(el) }}>
+                <ElementContent el={el} sourceValues={sourceValues} />
+              </div>
               {selected && (
                 <div
                   onPointerDown={(e) => onPointerDown(e, el, "resize")}

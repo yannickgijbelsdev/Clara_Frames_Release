@@ -113,6 +113,29 @@ export default function SceneEditor() {
                 : { color: scene.background?.color || "#0b1020" } })}
               testid="bg-media" />
             <p className="text-[10px] text-slate-400">Upload an MP4/WebM or GIF for a moving background (max 50 MB).</p>
+            {scene.background?.src && scene.background?.type !== "color" && (
+              <div className="space-y-2 pt-1">
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Fit</Label>
+                  <Select value={scene.background?.fit || "cover"} onValueChange={(v) => setScene({ ...scene, background: { ...scene.background, fit: v } })}>
+                    <SelectTrigger className="rounded-xl" data-testid="bg-fit"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cover">Fill (cover)</SelectItem>
+                      <SelectItem value="contain">Fit (contain)</SelectItem>
+                      <SelectItem value="repeat">Repeat (tile)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Dim overlay</Label>
+                  <div className="flex items-center gap-2">
+                    <input type="color" data-testid="bg-overlay-color" value={scene.background?.overlayColor || "#000000"} onChange={(e) => setScene({ ...scene, background: { ...scene.background, overlayColor: e.target.value } })} className="h-9 w-14 rounded-lg border border-slate-200 cursor-pointer" />
+                    <input type="range" min="0" max="1" step="0.05" value={scene.background?.overlayOpacity ?? 0} onChange={(e) => setScene({ ...scene, background: { ...scene.background, overlayOpacity: parseFloat(e.target.value) } })} className="flex-1 accent-brand-600" data-testid="bg-overlay-opacity" />
+                    <span className="text-xs text-slate-500 w-9 text-right">{Math.round((scene.background?.overlayOpacity ?? 0) * 100)}%</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -235,6 +258,22 @@ export default function SceneEditor() {
               </div>
               <div className="space-y-1.5"><Label>Opacity: {Math.round((sel.opacity ?? 1) * 100)}%</Label>
                 <input type="range" min="0" max="1" step="0.05" value={sel.opacity ?? 1} onChange={(e) => updateEl(sel.id, { opacity: parseFloat(e.target.value) })} className="w-full accent-brand-600" /></div>
+
+              <div className="space-y-1.5 pt-3 border-t border-slate-100">
+                <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Animation</Label>
+                <Select value={sel.props.animation || "none"} onValueChange={(v) => updateProps({ animation: v })}>
+                  <SelectTrigger className="rounded-xl" data-testid="prop-animation"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {["none", "pulse", "fade", "spin", "bounce", "float", "blink", "slide"].map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {sel.props.animation && sel.props.animation !== "none" && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 w-20 shrink-0">Speed {sel.props.animationDuration || 2}s</span>
+                    <input type="range" min="0.3" max="6" step="0.1" value={sel.props.animationDuration ?? 2} onChange={(e) => updateProps({ animationDuration: parseFloat(e.target.value) })} className="flex-1 accent-brand-600" data-testid="prop-anim-speed" />
+                  </div>
+                )}
+              </div>
 
               <div className="pt-3 border-t border-slate-100">
                 <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">vMix output URL</Label>
