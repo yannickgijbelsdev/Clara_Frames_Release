@@ -3,6 +3,7 @@ import api, { apiErr } from "@/lib/api";
 import AppLayout from "@/components/AppLayout";
 import { PrimaryButton, SecondaryButton } from "@/components/PrimaryButton";
 import { useAuth } from "@/context/AuthContext";
+import { ImageUpload } from "@/components/ImageUpload";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -70,7 +71,8 @@ export default function Settings() {
           </div>
           <div className="space-y-3">
             <div className="space-y-1.5"><Label>Name</Label><Input data-testid="settings-name" value={name} onChange={(e) => setName(e.target.value)} className="rounded-xl" /></div>
-            <div className="space-y-1.5"><Label>Avatar image URL</Label><Input data-testid="settings-avatar" value={avatar} onChange={(e) => setAvatar(e.target.value)} placeholder="https://…/me.png" className="rounded-xl text-sm" /></div>
+            <div className="space-y-1.5"><Label>Avatar image</Label>
+              <ImageUpload value={avatar} onChange={setAvatar} testid="settings-avatar" /></div>
             <PrimaryButton data-testid="save-profile-btn" onClick={saveProfile}>Save profile</PrimaryButton>
           </div>
         </Card>

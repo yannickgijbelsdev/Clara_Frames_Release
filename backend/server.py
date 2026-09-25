@@ -21,8 +21,10 @@ import bcrypt
 import pyotp
 import qrcode
 import requests
+import boto3
+from botocore.config import Config
 from bson import ObjectId
-from fastapi import FastAPI, APIRouter, Request, Response, HTTPException, Depends
+from fastapi import FastAPI, APIRouter, Request, Response, HTTPException, Depends, UploadFile, File
 from fastapi.responses import HTMLResponse, PlainTextResponse, JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -38,6 +40,25 @@ db = client[os.environ['DB_NAME']]
 JWT_SECRET = os.environ['JWT_SECRET']
 JWT_ALGORITHM = "HS256"
 ISSUER = "vMix Overlay Studio"
+
+# S3 / object storage (Hetzner, public-read)
+S3_ENDPOINT = os.environ.get("S3_ENDPOINT", "")
+S3_BUCKET = os.environ.get("S3_BUCKET", "")
+S3_REGION = os.environ.get("S3_REGION", "eu-central")
+_s3_client = None
+
+def get_s3():
+    global _s3_client
+    if _s3_client is None:
+        _s3_client = boto3.client(
+            "s3",
+            endpoint_url=S3_ENDPOINT,
+            region_name=S3_REGION,
+            aws_access_key_id=os.environ.get("S3_ACCESS_KEY"),
+            aws_secret_access_key=os.environ.get("S3_SECRET_KEY"),
+            config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
+        )
+    return _s3_client
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -442,6 +463,33 @@ async def logout(response: Response):
 @api_router.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
     return user
+
+# ---------------------------------------------------------------------------
+# Uploads (S3 object storage)
+# ---------------------------------------------------------------------------
+ALLOWED_UPLOAD_TYPES = {"image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif", "image/svg+xml"}
+
+@api_router.post("/uploads")
+async def upload_file(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    if file.content_type not in ALLOWED_UPLOAD_TYPES:
+        raise HTTPException(status_code=400, detail="Only image files are allowed (png, jpg, webp, gif, svg)")
+    data = await file.read()
+    if len(data) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large (max 10 MB)")
+    ext = (file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "bin")
+    ext = re.sub(r"[^a-z0-9]", "", ext)[:5] or "bin"
+    key = f"uploads/{user['id']}/{uuid.uuid4().hex}.{ext}"
+    try:
+        await asyncio.to_thread(
+            get_s3().put_object,
+            Bucket=S3_BUCKET, Key=key, Body=data,
+            ContentType=file.content_type, ACL="public-read",
+        )
+    except Exception as e:
+        logger.error(f"S3 upload failed: {e}")
+        raise HTTPException(status_code=502, detail="Upload to storage failed")
+    url = f"{S3_ENDPOINT.rstrip('/')}/{S3_BUCKET}/{key}"
+    return {"url": url, "key": key}
 
 # ---------------------------------------------------------------------------
 # API Sources

@@ -4,6 +4,7 @@ import api, { BACKEND } from "@/lib/api";
 import AppLayout from "@/components/AppLayout";
 import { PrimaryButton, SecondaryButton } from "@/components/PrimaryButton";
 import SceneCanvas from "@/components/SceneCanvas";
+import { ImageUpload } from "@/components/ImageUpload";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -143,16 +144,16 @@ export default function SceneEditor() {
               )}
 
               {sel.type === "image" && (
-                <div className="space-y-1.5"><Label>Image URL</Label>
-                  <Input value={sel.props.src || ""} onChange={(e) => updateProps({ src: e.target.value })} className="rounded-xl text-sm" placeholder="https://…/logo.png" data-testid="prop-src" /></div>
+                <div className="space-y-1.5"><Label>Image / logo</Label>
+                  <ImageUpload value={sel.props.src} onChange={(url) => updateProps({ src: url })} testid="prop-src" /></div>
               )}
 
               {sel.type === "timed_text" && (
                 <>
                   <div className="space-y-1.5"><Label>Text</Label>
                     <Textarea value={sel.props.text || ""} onChange={(e) => updateProps({ text: e.target.value })} className="rounded-xl text-sm" data-testid="prop-text" /></div>
-                  <div className="space-y-1.5"><Label>Photo URL</Label>
-                    <Input value={sel.props.image || ""} onChange={(e) => updateProps({ image: e.target.value })} className="rounded-xl text-sm" placeholder="https://…/photo.jpg" /></div>
+                  <div className="space-y-1.5"><Label>Photo</Label>
+                    <ImageUpload value={sel.props.image} onChange={(url) => updateProps({ image: url })} testid="prop-photo" /></div>
                   <div className="space-y-1.5"><Label>Photo position</Label>
                     <Select value={sel.props.imagePosition || "left"} onValueChange={(v) => updateProps({ imagePosition: v })}>
                       <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
