@@ -110,6 +110,9 @@ export default function SceneCanvas({ scene, editable = false, selectedId, onSel
           overflow: "hidden",
         }}
       >
+        {scene.background?.src && (scene.background?.type === "video"
+          ? <video key={scene.background.src} src={scene.background.src} autoPlay loop muted playsInline style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+          : <img src={scene.background.src} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />)}
         {(scene.elements || []).map((el) => {
           const selected = editable && el.id === selectedId;
           return (

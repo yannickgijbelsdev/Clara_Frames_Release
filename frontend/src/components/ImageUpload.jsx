@@ -4,14 +4,15 @@ import { toast } from "sonner";
 import { Upload, Loader2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
-export function ImageUpload({ value, onChange, testid = "image-upload", previewClass = "h-16" }) {
+export function ImageUpload({ value, onChange, testid = "image-upload", previewClass = "h-16", accept = "image/*", maxMB = 10 }) {
   const ref = useRef(null);
   const [loading, setLoading] = useState(false);
+  const isVideo = /\.(mp4|webm|mov|ogg)$/i.test(value || "");
 
   const onFile = async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    if (f.size > 10 * 1024 * 1024) { toast.error("File too large (max 10 MB)"); e.target.value = ""; return; }
+    if (f.size > maxMB * 1024 * 1024) { toast.error(`File too large (max ${maxMB} MB)`); e.target.value = ""; return; }
     setLoading(true);
     try {
       const fd = new FormData();
@@ -38,11 +39,13 @@ export function ImageUpload({ value, onChange, testid = "image-upload", previewC
       </div>
       {value && (
         <div className="relative inline-block">
-          <img src={value} alt="" className={`${previewClass} rounded-lg object-contain border border-slate-200 bg-slate-50`} />
+          {isVideo
+            ? <video src={value} muted loop autoPlay playsInline className={`${previewClass} rounded-lg object-cover border border-slate-200 bg-slate-50`} />
+            : <img src={value} alt="" className={`${previewClass} rounded-lg object-contain border border-slate-200 bg-slate-50`} />}
           <button type="button" onClick={() => onChange("")} className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-slate-900 text-white flex items-center justify-center"><X className="h-3 w-3" /></button>
         </div>
       )}
-      <input ref={ref} type="file" accept="image/*" className="hidden" onChange={onFile} data-testid={`${testid}-file`} />
+      <input ref={ref} type="file" accept={accept} className="hidden" onChange={onFile} data-testid={`${testid}-file`} />
     </div>
   );
 }

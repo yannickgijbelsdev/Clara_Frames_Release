@@ -467,15 +467,19 @@ async def me(user: dict = Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 # Uploads (S3 object storage)
 # ---------------------------------------------------------------------------
-ALLOWED_UPLOAD_TYPES = {"image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif", "image/svg+xml"}
+ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif", "image/svg+xml"}
+ALLOWED_VIDEO_TYPES = {"video/mp4", "video/webm", "video/quicktime", "video/ogg"}
+ALLOWED_UPLOAD_TYPES = ALLOWED_IMAGE_TYPES | ALLOWED_VIDEO_TYPES
 
 @api_router.post("/uploads")
 async def upload_file(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
     if file.content_type not in ALLOWED_UPLOAD_TYPES:
-        raise HTTPException(status_code=400, detail="Only image files are allowed (png, jpg, webp, gif, svg)")
+        raise HTTPException(status_code=400, detail="Only image or video files are allowed")
     data = await file.read()
-    if len(data) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="File too large (max 10 MB)")
+    is_video = file.content_type in ALLOWED_VIDEO_TYPES
+    limit = 50 * 1024 * 1024 if is_video else 10 * 1024 * 1024
+    if len(data) > limit:
+        raise HTTPException(status_code=400, detail=f"File too large (max {50 if is_video else 10} MB)")
     ext = (file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "bin")
     ext = re.sub(r"[^a-z0-9]", "", ext)[:5] or "bin"
     key = f"uploads/{user['id']}/{uuid.uuid4().hex}.{ext}"
@@ -825,6 +829,19 @@ const stage = document.getElementById('stage');
 stage.style.width = SCENE.width + 'px';
 stage.style.height = SCENE.height + 'px';
 if (SCENE.background && SCENE.background.color) stage.style.background = SCENE.background.color;
+if (SCENE.background && SCENE.background.src) {
+  var bg;
+  if (SCENE.background.type === 'video') {
+    bg = document.createElement('video');
+    bg.src = SCENE.background.src; bg.autoplay = true; bg.loop = true; bg.muted = true;
+    bg.setAttribute('playsinline', ''); bg.setAttribute('muted', '');
+  } else {
+    bg = document.createElement('img'); bg.src = SCENE.background.src;
+  }
+  bg.style.position = 'absolute'; bg.style.top = 0; bg.style.left = 0;
+  bg.style.width = '100%'; bg.style.height = '100%'; bg.style.objectFit = 'cover';
+  stage.appendChild(bg);
+}
 
 function fit(){
   const sx = window.innerWidth / SCENE.width;

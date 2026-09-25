@@ -100,9 +100,19 @@ export default function SceneEditor() {
               </button>
             ))}
           </div>
-          <div className="mt-5 space-y-1.5">
+          <div className="mt-5 space-y-2">
             <Label className="text-[11px] uppercase tracking-widest text-slate-400 font-bold">Background</Label>
-            <input type="color" data-testid="bg-color" value={scene.background?.color || "#0b1020"} onChange={(e) => setScene({ ...scene, background: { color: e.target.value } })} className="w-full h-9 rounded-lg cursor-pointer border border-slate-200" />
+            <input type="color" data-testid="bg-color" value={scene.background?.color || "#0b1020"}
+              onChange={(e) => setScene({ ...scene, background: { ...scene.background, color: e.target.value } })}
+              className="w-full h-9 rounded-lg cursor-pointer border border-slate-200" />
+            <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold pt-1 block">Image / video background</Label>
+            <ImageUpload accept="image/*,video/*" maxMB={50} previewClass="h-20"
+              value={scene.background?.type && scene.background?.type !== "color" ? scene.background?.src : ""}
+              onChange={(url) => setScene({ ...scene, background: url
+                ? { color: scene.background?.color || "#0b1020", type: /\.(mp4|webm|mov|ogg)$/i.test(url) ? "video" : "image", src: url }
+                : { color: scene.background?.color || "#0b1020" } })}
+              testid="bg-media" />
+            <p className="text-[10px] text-slate-400">Upload an MP4/WebM or GIF for a moving background (max 50 MB).</p>
           </div>
         </div>
 
