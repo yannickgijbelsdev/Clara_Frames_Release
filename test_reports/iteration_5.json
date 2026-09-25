@@ -1,0 +1,26 @@
+{
+  "summary": "Iteration 5: verified per-element ANIMATION presets and scene BACKGROUND fit + dim-overlay end-to-end. Backend (new /app/backend/tests/test_anim_bg.py, 5/5 pass): (1) POST /api/scenes persists background={color,type:'image',src,fit:'repeat',overlayColor:'#123456',overlayOpacity:0.42} and elements[].props.animation='pulse' + animationDuration=1.5; GET /api/scenes/{id} returns them intact. (2) PUT /api/scenes/{id} round-trips fit through cover/contain/repeat and overlayOpacity through 0.7 (note: PUT requires full SceneInput body, not a patch). (3) GET /api/public/scene/{token}/overlay HTML contains @keyframes clara-pulse/fade/spin/bounce/float/blink/slide, applyAnim helper, backgroundRepeat branch, and the exact overlayColor value #123456. (4) Regression: GET /api/public/scene/{token}/element/{id}.txt returns the element value. Frontend (Playwright, all assertions pass): MFA login OK; created TEST_FE_Anim scene; added all 5 element types (add-text/add-clock/add-image/add-timed_text/add-api_field) — each keeps properties-panel open on selection; prop-animation Select renders with options none/pulse/fade/spin/bounce/float/blink/slide; selecting 'pulse' reveals prop-anim-speed slider AND applies inline style containing 'clara-pulse' to the inner wrapper on the canvas; setting bg-media to https://example.com/tile.png reveals bg-fit + bg-overlay-color + bg-overlay-opacity; setting fit=Repeat(tile) and opacity=0.55 then save-scene-btn persists — after page reload the bg-fit shows 'Repeat (tile)', overlay-opacity input value = 0.55, and clara-pulse animation is still applied.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_anim_bg.py",
+    "/app/test_reports/pytest/iter5_anim_bg.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "PUT /api/scenes/{id} requires the FULL SceneInput (name, workspace_id, elements, background). A partial-update PATCH endpoint would reduce client-side race conditions and payload size; not blocking but worth considering.",
+    "SceneEditor onChange still infers background.type from URL extension (/\\.(mp4|webm|mov|ogg)$/i) — a video/tile served without a known extension (CDN/presigned) is misclassified as type:'image'. Carried over from iter 4.",
+    "Overlay HTML uses inline style.animation via applyAnim on the inner wrapper — same shape as SceneCanvas, good parity. No handling for reduced-motion (prefers-reduced-motion) — cosmetic.",
+    "No validation on background.overlayOpacity range in Pydantic (client can send 5.0 or -1). Consider clamping 0..1 server-side.",
+    "No enum validation on background.fit or props.animation server-side; unknown values are stored as-is (frontend defaults to 'cover' / no-op if unknown, so not a break).",
+    "Carried over: server.py upload_file still buffers full file in memory before size check; content-type trusted from client; no DELETE for uploads (orphan cleanup); /auth/2fa/reset without re-auth."
+  ],
+  "updated_files": ["/app/backend/tests/test_anim_bg.py (new)"],
+  "success_rate": {"backend": "100% (5/5 new; prior 62 tests untouched)", "frontend": "100% on the two new features + regression on element add + property-panel selection"},
+  "test_credentials": "admin@example.com / admin123, TOTP secret JBSWY3DPEHPK3PXP",
+  "seed_data_creation": "Test scenes were created and cleaned up (TEST_AnimBG_Scene, TEST_AnimBG_Regress, TEST_FE_Anim all deleted). No S3 uploads this iteration.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend animation/background tests: /app/backend/tests/test_anim_bg.py. PUT /api/scenes/{id} takes full SceneInput — send the whole current scene. Frontend testids: bg-media (URL input), bg-fit (Select), bg-overlay-color, bg-overlay-opacity, prop-animation (Select), prop-anim-speed, add-{text,clock,image,timed_text,api_field}, new-scene-btn, create-scene-confirm, save-scene-btn. Login button label is 'Continue' (not 'Sign in'). Animation applied via inline style.animation containing 'clara-<preset>' on inner wrapper — assert via DOM scan for substring 'clara-pulse'.",
+  "rca of the issue": "N/A — both new features work end-to-end. Only one test-side fix needed: initial PUT test sent a partial body and got 422 — corrected by sending full SceneInput."
+}

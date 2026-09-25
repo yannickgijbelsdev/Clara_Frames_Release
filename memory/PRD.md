@@ -50,6 +50,12 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - ImageUpload extended with accept + maxMB props and inline video preview.
 - Verified: iter4 9/9 video-background tests + full UI wiring pass.
 
+## Implemented (iter 5, 2026-06)
+- Background fit options per scene: Fill (cover) / Fit (contain) / Repeat (tile), for image and video backgrounds.
+- Dim overlay: pick an overlay color + opacity that tints the background media (below elements) in editor, preview and vMix overlay.
+- Element animation presets on any element (incl. SVG logos): pulse, fade, spin, bounce, float, blink, slide + adjustable speed; CSS keyframes shared by editor canvas and the vMix overlay HTML (applied on an inner wrapper so rotation still works).
+- Verified: iter5 5/5 backend tests + full UI wiring pass.
+
 ## Known follow-ups (code review, non-blocking)
 - Upload reads full file into memory before size check; consider streaming/max_upload_size.
 - Content-type trusted from client header (no magic-byte sniffing).
