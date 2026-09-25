@@ -11,6 +11,7 @@ import Scenes from "@/pages/Scenes";
 import SceneEditor from "@/pages/SceneEditor";
 import ExportPage from "@/pages/ExportPage";
 import Sources from "@/pages/Sources";
+import MediaLibrary from "@/pages/MediaLibrary";
 import Help from "@/pages/Help";
 import Settings from "@/pages/Settings";
 import Users from "@/pages/Users";
@@ -43,6 +44,7 @@ function App() {
               <Route path="/scenes/:id" element={<Protected><SceneEditor /></Protected>} />
               <Route path="/scenes/:id/export" element={<Protected><ExportPage /></Protected>} />
               <Route path="/sources" element={<Protected><Sources /></Protected>} />
+              <Route path="/media" element={<Protected><MediaLibrary /></Protected>} />
               <Route path="/settings" element={<Protected><Settings /></Protected>} />
               <Route path="/users" element={<Protected><Users /></Protected>} />
               <Route path="/help" element={<Protected><Help /></Protected>} />

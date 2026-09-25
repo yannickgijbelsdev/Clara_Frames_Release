@@ -493,7 +493,31 @@ async def upload_file(file: UploadFile = File(...), user: dict = Depends(get_cur
         logger.error(f"S3 upload failed: {e}")
         raise HTTPException(status_code=502, detail="Upload to storage failed")
     url = f"{S3_ENDPOINT.rstrip('/')}/{S3_BUCKET}/{key}"
-    return {"url": url, "key": key}
+    media = {
+        "id": str(uuid.uuid4()), "user_id": user["id"], "key": key, "url": url,
+        "content_type": file.content_type, "size": len(data),
+        "name": file.filename or key.split("/")[-1], "is_video": is_video,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.media.insert_one(media)
+    return {"url": url, "key": key, "id": media["id"]}
+
+@api_router.get("/media")
+async def list_media(user: dict = Depends(get_current_user)):
+    docs = await db.media.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return docs
+
+@api_router.delete("/media/{media_id}")
+async def delete_media(media_id: str, user: dict = Depends(get_current_user)):
+    doc = await db.media.find_one({"id": media_id, "user_id": user["id"]})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Media not found")
+    try:
+        await asyncio.to_thread(get_s3().delete_object, Bucket=S3_BUCKET, Key=doc["key"])
+    except Exception as e:
+        logger.error(f"S3 delete failed: {e}")
+    await db.media.delete_one({"id": media_id})
+    return {"ok": True}
 
 # ---------------------------------------------------------------------------
 # API Sources

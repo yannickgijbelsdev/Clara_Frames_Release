@@ -25,6 +25,7 @@ export default function AppLayout({ children, title, subtitle, actions }) {
     { to: "/dashboard", label: "Dashboard" },
     { to: "/scenes", label: "Scenes" },
     { to: "/sources", label: "API Sources" },
+    { to: "/media", label: "Media" },
     { to: "/help", label: "vMix Help" },
     ...(user?.role === "admin" ? [{ to: "/users", label: "Users" }] : []),
   ];
