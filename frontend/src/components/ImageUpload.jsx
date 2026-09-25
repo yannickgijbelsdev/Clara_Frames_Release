@@ -11,6 +11,7 @@ export function ImageUpload({ value, onChange, testid = "image-upload", previewC
   const onFile = async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
+    if (f.size > 10 * 1024 * 1024) { toast.error("File too large (max 10 MB)"); e.target.value = ""; return; }
     setLoading(true);
     try {
       const fd = new FormData();

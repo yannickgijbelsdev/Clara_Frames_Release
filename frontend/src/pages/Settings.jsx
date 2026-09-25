@@ -32,8 +32,12 @@ export default function Settings() {
   const [backup, setBackup] = useState(null);
 
   const saveProfile = async () => {
-    try { const { data } = await api.put("/auth/profile", { name, avatar }); setUser((u) => ({ ...u, ...data })); toast.success("Profile updated"); }
-    catch (e) { toast.error(apiErr(e.response?.data?.detail)); }
+    try {
+      await api.put("/auth/profile", { name, avatar });
+      const { data } = await api.get("/auth/me");
+      setUser(data);
+      toast.success("Profile updated");
+    } catch (e) { toast.error(apiErr(e.response?.data?.detail)); }
   };
   const changePw = async () => {
     try { await api.post("/auth/change-password", { current_password: cur, new_password: npw }); setCur(""); setNpw(""); toast.success("Password changed"); }

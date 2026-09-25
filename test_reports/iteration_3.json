@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 3 focus: new S3 upload feature. Backend: added test_uploads.py (5/5 pass) validating 401 unauth, 400 non-image, 400 >10MB, 200 upload returns {url,key} with 'nbg1.your-objectstorage.com/koodh-clara' and PUBLIC GET on returned URL returns HTTP 200 image/*; jpg content-type accepted. Frontend Playwright: MFA login OK; Scene editor add-image + set_input_files on prop-src-file uploads and sets prop-src to S3 URL containing 'nbg1.your-objectstorage.com' and 'koodh-clara' (verified); add-timed_text + prop-photo-file uploads and sets prop-photo to S3 URL (verified); save-scene works. Settings page settings-avatar-file uploads to S3, settings-avatar field populated with nbg1 URL, Save profile succeeds ('Profile updated' toast shown). No regressions in login/scene create/edit/save. Prior regression backend test files (backend_test.py, test_new_features.py) unchanged.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Settings avatar → header", "issue": "After saving profile with a new avatar URL, the app header avatar image did not visibly update to the new S3 URL until a full reload (AuthContext user object not refetched/updated after PUT /auth/profile). PUT succeeds and /auth/me returns the new avatar; only the header component's state is stale.", "affected_selectors": ["header img"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_uploads.py",
+    "/app/test_reports/pytest/iter3_uploads.xml"
+  ],
+  "action_items": [
+    "(Low priority) In Settings.jsx saveProfile handler, after successful PUT /auth/profile, update AuthContext user (e.g., setUser({...user, avatar, name})) or call refreshMe() so the header avatar reflects the new S3 URL without reload."
+  ],
+  "critical_code_review_comments": [
+    "server.py POST /api/uploads reads full file into memory (await file.read()) before size check — a malicious client could stream >>10MB and OOM the worker before the 10MB check triggers. Consider reading in chunks and aborting once size threshold is exceeded, or set Starlette max_upload_size.",
+    "server.py /api/uploads relies solely on client-supplied Content-Type header for allow-list. A caller can send arbitrary bytes with content_type=image/png. For public-read S3 objects this is a minor content-spoofing risk. Consider sniffing magic bytes (imghdr / Pillow) server-side.",
+    "server.py S3 keys use uuid4 hex, but ACL='public-read' means any object uploaded is world-readable indefinitely; there is no DELETE endpoint to clean up when a user removes an image from a scene. Orphan objects will accumulate. Consider tracking uploaded keys per user and adding a cleanup path.",
+    "ImageUpload.jsx does not enforce accept / size on the client side — user gets a server 400 for oversized files after network round-trip. Add client-side size check + accept='image/*' (already set) plus surface a friendlier progress state.",
+    "server.py /auth/2fa/reset still does not require re-auth (carried over from iter2)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_uploads.py (new)"
+  ],
+  "success_rate": {"backend": "100% (5/5 upload tests; prior 53 regression tests untouched)", "frontend": "100% on upload wiring (image element, timed_text photo, settings avatar). One minor UX gap on header refresh after save."},
+  "test_credentials": "admin@example.com / admin123, TOTP secret JBSWY3DPEHPK3PXP.",
+  "seed_data_creation": "Uploaded 3 tiny (~70-byte) real PNG objects to Hetzner S3 (bucket koodh-clara, uploads/{admin_id}/*.png|.jpg). These are not auto-cleaned; consider a manual purge or an admin cleanup endpoint (see code review).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend upload tests live in /app/backend/tests/test_uploads.py — run with REACT_APP_BACKEND_URL exported (or run from repo root with pytest.ini rootdir=/app/backend and env set). Uses a real Hetzner S3 bucket so each run creates real objects. Playwright uses set_input_files on the hidden [data-testid$='-file'] input; UI dispatches onChange automatically, which triggers the multipart POST to /api/uploads. If UI upload appears to hang, wait ~4-5s — S3 PUT from server to Hetzner takes 1-3s.",
+  "rca of the issue": "N/A — no bugs blocking the feature. Upload backend + UI wiring works end-to-end. Only a minor stale-avatar-in-header refresh issue post save-profile and code-review level concerns (memory-bound file read, MIME trust, orphan objects, no client-side size check)."
+}

@@ -38,6 +38,12 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Recolored theme rose→periwinkle (brand palette); login bears background + divider; new login subtitle.
 - Verified: iter2 53/53 backend + full frontend pass.
 
+## Implemented (iter 3, 2026-06)
+- Image/file uploads to the user's own Hetzner S3 (endpoint nbg1.your-objectstorage.com, bucket koodh-clara, region eu-central, public-read) via boto3; POST /api/uploads returns a public URL.
+- Reusable ImageUpload component (URL field + Upload button + preview) wired into: scene image/logo element, timed-text photo, and Settings avatar.
+- Header avatar refreshes after profile save; client-side 10MB size guard.
+- Verified: iter3 5/5 upload backend tests + full UI upload wiring pass (public URL fetch HTTP 200).
+
 ## Backlog / next
 - P1: Image/photo upload (object storage) instead of URL-only.
 - P1: Require re-auth (current password/TOTP) before 2FA reset.
