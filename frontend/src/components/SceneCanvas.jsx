@@ -11,6 +11,15 @@ function animStyle(el) {
   return { animation: `${ANIM_MAP[a]} ${dur}s ${timing} infinite${dir}` };
 }
 
+const ENTRANCE_MAP = { fade: "clara-in-fade", "slide-up": "clara-in-up", "slide-down": "clara-in-down", "slide-left": "clara-in-left", "slide-right": "clara-in-right", zoom: "clara-in-zoom" };
+function entranceStyle(el) {
+  const e = el.props?.entrance;
+  if (!e || e === "none" || !ENTRANCE_MAP[e]) return {};
+  const dur = el.props?.entranceDuration || 0.6;
+  const delay = el.props?.entranceDelay || 0;
+  return { animation: `${ENTRANCE_MAP[e]} ${dur}s ease-out ${delay}s both` };
+}
+
 function elBoxStyle(el) {
   const st = el.style || {};
   const s = {
@@ -147,8 +156,10 @@ export default function SceneCanvas({ scene, editable = false, selectedId, onSel
                 outline: selected ? "2px solid #5f6da6" : "none",
                 outlineOffset: 2,
               }}>
-              <div style={{ width: "100%", height: "100%", display: "flex", justifyContent: "inherit", alignItems: "inherit", ...animStyle(el) }}>
-                <ElementContent el={el} sourceValues={sourceValues} />
+              <div style={{ width: "100%", height: "100%", display: "flex", justifyContent: "inherit", alignItems: "inherit", ...entranceStyle(el) }}>
+                <div style={{ width: "100%", height: "100%", display: "flex", justifyContent: "inherit", alignItems: "inherit", ...animStyle(el) }}>
+                  <ElementContent el={el} sourceValues={sourceValues} />
+                </div>
               </div>
               {selected && (
                 <div

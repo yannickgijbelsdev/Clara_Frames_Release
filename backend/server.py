@@ -849,6 +849,12 @@ OVERLAY_HTML = r"""<!DOCTYPE html>
   @keyframes clara-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6%)}}
   @keyframes clara-blink{0%,49%{opacity:1}50%,100%{opacity:0}}
   @keyframes clara-slide{0%{transform:translateX(-18%)}100%{transform:translateX(18%)}}
+  @keyframes clara-in-fade{from{opacity:0}to{opacity:1}}
+  @keyframes clara-in-up{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes clara-in-down{from{opacity:0;transform:translateY(-40px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes clara-in-left{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+  @keyframes clara-in-right{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:translateX(0)}}
+  @keyframes clara-in-zoom{from{opacity:0;transform:scale(0.8)}to{opacity:1;transform:scale(1)}}
 </style></head>
 <script>
 function applyAnim(node, p){
@@ -856,9 +862,20 @@ function applyAnim(node, p){
   var dur = p.animationDuration || 2;
   var map = {pulse:'clara-pulse',fade:'clara-fade',spin:'clara-spin',bounce:'clara-bounce',float:'clara-float',blink:'clara-blink',slide:'clara-slide'};
   var name = map[a]; if(!name) return;
-  var timing = a==='spin' ? 'linear' : (a==='slide' ? 'ease-in-out' : 'ease-in-out');
+  var timing = a==='spin' ? 'linear' : 'ease-in-out';
   var dir = a==='slide' ? ' alternate' : '';
   node.style.animation = name+' '+dur+'s '+timing+' infinite'+dir;
+}
+function entranceAnim(p){
+  var e = p.entrance; if(!e || e==='none') return null;
+  var map = {fade:'clara-in-fade','slide-up':'clara-in-up','slide-down':'clara-in-down','slide-left':'clara-in-left','slide-right':'clara-in-right',zoom:'clara-in-zoom'};
+  var name = map[e]; if(!name) return null;
+  var dur = p.entranceDuration || 0.6; var delay = p.entranceDelay || 0;
+  return name+' '+dur+'s ease-out '+delay+'s both';
+}
+function retriggerEntrance(node, p){
+  var a = entranceAnim(p); if(!a) return;
+  node.style.animation = 'none'; void node.offsetWidth; node.style.animation = a;
 }
 </script>
 <body>
@@ -973,6 +990,10 @@ const apiEls = [];
 SCENE.elements.forEach(el => {
   const p = el.props || {};
   const d = baseStyle(el);
+  const ent = document.createElement('div');
+  ent.style.width = '100%'; ent.style.height = '100%'; ent.style.display = 'flex';
+  ent.style.justifyContent = 'inherit'; ent.style.alignItems = 'inherit';
+  var ea = entranceAnim(p); if (ea) ent.style.animation = ea;
   const inner = document.createElement('div');
   inner.style.width = '100%'; inner.style.height = '100%'; inner.style.display = 'flex';
   inner.style.justifyContent = 'inherit'; inner.style.alignItems = 'inherit';
@@ -990,14 +1011,15 @@ SCENE.elements.forEach(el => {
       im.style.height = p.imagePosition==='top'?'60%':'100%'; im.style.borderRadius='12px'; wrap.appendChild(im);}    
     const txt=document.createElement('div'); txt.textContent=p.text||''; txt.style.flex='1'; wrap.appendChild(txt);
     inner.appendChild(wrap);
-    timeds.push({d, p});
+    timeds.push({d, p, ent});
   } else if (el.type === 'api_field'){
     inner.textContent = (p.prefix||'') + '…' + (p.suffix||'');
     apiEls.push({d: inner, p});
   } else { // text
     inner.textContent = p.text || '';
   }
-  d.appendChild(inner);
+  ent.appendChild(inner);
+  d.appendChild(ent);
   stage.appendChild(d);
 });
 
@@ -1008,7 +1030,9 @@ function tick(){
     let vis = true;
     if (s != null && e != null){ const n = nowMinutes(t.p.timezone);
       vis = s <= e ? (n >= s && n <= e) : (n >= s || n <= e); }
-    t.d.style.display = vis ? 'flex' : 'none';
+    if (vis && t._vis !== true){ t.d.style.display = 'flex'; retriggerEntrance(t.ent, t.p); }
+    else if (!vis && t._vis !== false){ t.d.style.display = 'none'; }
+    t._vis = vis;
   });
 }
 setInterval(tick, 1000); tick();

@@ -260,6 +260,28 @@ export default function SceneEditor() {
                 <input type="range" min="0" max="1" step="0.05" value={sel.opacity ?? 1} onChange={(e) => updateEl(sel.id, { opacity: parseFloat(e.target.value) })} className="w-full accent-brand-600" /></div>
 
               <div className="space-y-1.5 pt-3 border-t border-slate-100">
+                <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Entrance (plays once)</Label>
+                <Select value={sel.props.entrance || "none"} onValueChange={(v) => updateProps({ entrance: v })}>
+                  <SelectTrigger className="rounded-xl" data-testid="prop-entrance"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {["none", "fade", "slide-up", "slide-down", "slide-left", "slide-right", "zoom"].map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {sel.props.entrance && sel.props.entrance !== "none" && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500 w-24 shrink-0">Duration {sel.props.entranceDuration || 0.6}s</span>
+                      <input type="range" min="0.2" max="3" step="0.1" value={sel.props.entranceDuration ?? 0.6} onChange={(e) => updateProps({ entranceDuration: parseFloat(e.target.value) })} className="flex-1 accent-brand-600" data-testid="prop-entrance-dur" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500 w-24 shrink-0">Delay {sel.props.entranceDelay || 0}s</span>
+                      <input type="range" min="0" max="5" step="0.1" value={sel.props.entranceDelay ?? 0} onChange={(e) => updateProps({ entranceDelay: parseFloat(e.target.value) })} className="flex-1 accent-brand-600" data-testid="prop-entrance-delay" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1.5 pt-3 border-t border-slate-100">
                 <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Animation</Label>
                 <Select value={sel.props.animation || "none"} onValueChange={(v) => updateProps({ animation: v })}>
                   <SelectTrigger className="rounded-xl" data-testid="prop-animation"><SelectValue /></SelectTrigger>
