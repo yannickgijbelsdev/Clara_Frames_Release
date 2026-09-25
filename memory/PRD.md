@@ -62,6 +62,11 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - 'Media' nav item added.
 - Verified: iter6 5/5 backend tests + full UI wiring pass.
 
+## Implemented (iter 7, 2026-06)
+- Entrance (one-shot) animations per element: fade / slide-up / slide-down / slide-left / slide-right / zoom, with adjustable duration + delay; independent from the continuous animation (separate wrappers). timed_text replays its entrance each time it enters the visible window in the vMix overlay.
+- Media Library search + filter (All / Photos / Videos) with live counts.
+- Verified: iter7 3/3 backend tests + full UI wiring pass.
+
 ## Known follow-ups (code review, non-blocking)
 - Upload reads full file into memory before size check; consider streaming/max_upload_size.
 - Content-type trusted from client header (no magic-byte sniffing).

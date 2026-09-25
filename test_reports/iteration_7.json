@@ -1,0 +1,25 @@
+{
+  "summary": "Tested Entrance (one-shot) animations end-to-end. Backend (pytest 3/3 passing): PUT/GET /api/scenes persists props.entrance, entranceDuration, entranceDelay alongside continuous animation/animationDuration; overlay HTML at /api/public/scene/{token}/overlay contains all 6 entrance @keyframes (clara-in-fade/up/down/left/right/zoom), entranceAnim() + retriggerEntrance() helpers, references clara-in-up for slide-up preset, uses 'both' fill mode, and preserves clara-pulse on the inner wrapper (independent from entrance). Frontend (Playwright): MFA login OK, Scene Editor Properties panel shows 'Entrance (plays once)' select (prop-entrance) with 7 options none/fade/slide-up/slide-down/slide-left/slide-right/zoom; choosing fade reveals prop-entrance-dur + prop-entrance-delay sliders and canvas outer wrapper style.animation contains 'clara-in-fade'; picking slide-up produces clara-in-up, zoom produces clara-in-zoom. Both entrance + continuous (pulse) animations run independently on separate wrappers (verified two distinct style.animation values). Save (save-scene-btn) + reload persists entrance='zoom'. Regression: prop-animation and prop-anim-speed still work; el-output-url + copy-el-output present per-element. No issues found.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_entrance_anim.py",
+    "/app/test_reports/pytest/iter7_entrance.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "SceneEditor: prop-entrance-dur/prop-entrance-delay use plain HTML <input type=range>; consistent with prop-anim-speed but consider shadcn Slider for consistency with rest of app (minor).",
+    "OVERLAY_HTML: entranceAnim() defaults entranceDuration to 0.6 and entranceDelay to 0; matches frontend defaults (0.6 / 0) — good. Verify parity if defaults ever change."
+  ],
+  "updated_files": ["/app/backend/tests/test_entrance_anim.py"],
+  "success_rate": { "backend": "100%", "frontend": "100%" },
+  "test_credentials": "admin@example.com / admin123, TOTP JBSWY3DPEHPK3PXP",
+  "seed_data_creation": "Created 1 scene 'TEST_Entrance_UI' via UI and 1 scene 'TEST_Entrance_Scene' via pytest — both cleaned up (plus 2 leftover TEST_Entrance_UI scenes from earlier runs cleaned via API).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login: email admin@example.com, password admin123, then TOTP; the MFA verify button label is 'Verify & sign in'. New scene dialog input has placeholder containing 'Third'; confirm with 'Create' button. New scenes auto-seed a text element (LIVE NOW). Element testid pattern: canvas-el-{elementId}. Properties panel selectors: prop-entrance, prop-entrance-dur, prop-entrance-delay (only visible when entrance != none), prop-animation, prop-anim-speed (only visible when animation != none). Outer wrapper style.animation string is what carries clara-in-* entrance name; inner wrapper carries clara-pulse/fade/... continuous animation. Save button testid: save-scene-btn. Delete scene testid: del-scene-{sceneId}; browser 'confirm' dialog appears — accept it."
+}
