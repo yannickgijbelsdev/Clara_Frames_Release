@@ -44,6 +44,18 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Header avatar refreshes after profile save; client-side 10MB size guard.
 - Verified: iter3 5/5 upload backend tests + full UI upload wiring pass (public URL fetch HTTP 200).
 
+## Implemented (iter 4, 2026-06)
+- Video/GIF moving backgrounds per scene: uploads accept video/mp4|webm|quicktime|ogg (max 50MB) alongside images; scene.background = {color, type:'color'|'image'|'video', src}.
+- Background media renders full-bleed (looping muted video / image) behind elements in the editor canvas, live preview, and the vMix overlay HTML.
+- ImageUpload extended with accept + maxMB props and inline video preview.
+- Verified: iter4 9/9 video-background tests + full UI wiring pass.
+
+## Known follow-ups (code review, non-blocking)
+- Upload reads full file into memory before size check; consider streaming/max_upload_size.
+- Content-type trusted from client header (no magic-byte sniffing).
+- No cleanup of orphaned S3 objects when media is replaced/cleared.
+- Media type detection is extension-based (URL without known ext defaults to image).
+
 ## Backlog / next
 - P1: Image/photo upload (object storage) instead of URL-only.
 - P1: Require re-auth (current password/TOTP) before 2FA reset.

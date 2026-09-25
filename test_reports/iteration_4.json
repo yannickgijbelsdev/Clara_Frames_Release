@@ -1,0 +1,30 @@
+{
+  "summary": "Iteration 4: verified video-background feature end-to-end. Backend (test_video_bg.py, 9/9 pass): POST /api/uploads accepts video/mp4 and video/webm (returns nbg1.your-objectstorage.com/koodh-clara/uploads/{uid}/*.mp4|.webm, public GET = HTTP 200 content-type video/*), rejects text/plain (400), rejects >50MB video (400). Scene create/update with background={color,type:'video'|'image',src} persists and is returned by GET. Public overlay HTML at /api/public/scene/{token}/overlay embeds the scene JSON and contains createElement('video') + autoplay/loop/muted logic and the uploaded S3 URL. Clearing to solid color persists cleanly. Frontend Playwright: MFA login OK; Scene editor exposes data-testid bg-media/bg-media-btn/bg-media-file; set_input_files on bg-media-file uploads a tiny mp4 to S3 (~1s) and populates bg-media with the nbg1/koodh-clara/*.mp4 URL; two <video> elements matching the S3 src render on page (upload preview + full-bleed canvas background); Save works; clearing the input removes the canvas video. Element selection regression OK: adding a Text element opens the right-side properties panel (Font, Weight, Color, X/Y/W/H, Opacity all visible).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_video_bg.py",
+    "/app/test_reports/pytest/iter4_video_bg.xml",
+    "/app/backend/tests/test_uploads.py",
+    "/app/backend/tests/test_new_features.py",
+    "/app/backend/tests/backend_test.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py upload_file still reads the full file into memory (await file.read()) before size check; with the new 50MB video limit the attack surface grows (a malicious client can force ~50MB per request into worker RAM regardless of Content-Type). Consider streaming/incremental size check or Starlette max_upload_size.",
+    "server.py still trusts client Content-Type header only — a caller can label arbitrary bytes as video/mp4 or image/png. For public-read S3 objects this is a content-spoofing risk. Consider validating magic bytes for at least common types.",
+    "No DELETE for uploads — orphan objects accumulate every time a user replaces or clears a background. Consider tracking uploaded keys per user (Mongo collection) and cleaning up when a scene is updated/deleted, or add an admin purge endpoint.",
+    "ImageUpload.jsx computes isVideo purely from URL extension (.mp4|.webm|.mov|.ogg). URLs served with a video/* content-type but different/no extension (e.g. presigned or CDN paths) won't preview as video. Consider passing an explicit mediaType or sniffing the HEAD content-type.",
+    "SceneEditor's onChange re-computes background.type from URL extension too — same limitation; a video pasted as URL without a known extension will be persisted as type:'image' and render via <img>.",
+    "OVERLAY_HTML: <video> is autoplay+muted (correct for browsers) but no error/fallback handling if the S3 object 404s — the scene will just show the color; consider a small error listener that logs to console for debugging.",
+    "server.py /auth/2fa/reset still does not require re-auth (carried over)."
+  ],
+  "updated_files": ["/app/backend/tests/test_video_bg.py (new)"],
+  "success_rate": {"backend": "100% (9/9 new video-bg tests; prior 5/5 upload + 53 regression tests untouched)", "frontend": "100% on video-background UI wiring (upload, canvas render, clear, save; properties panel still opens on element select)"},
+  "test_credentials": "admin@example.com / admin123, TOTP secret JBSWY3DPEHPK3PXP",
+  "seed_data_creation": "Uploaded ~3 tiny (<8KB) real objects to Hetzner S3 bucket koodh-clara (2 .mp4, 1 .webm) under uploads/{admin_id}/. Also created + deleted one TEST_video_bg_scene in Mongo (cleaned up by test). One additional real mp4 remains referenced by the Levensloop scene from the Playwright run — remove manually if desired.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend tests live in /app/backend/tests/{test_uploads.py,test_video_bg.py,test_new_features.py,backend_test.py}. Run with REACT_APP_BACKEND_URL exported; pytest.ini rootdir=/app/backend, uses pytest-xdist workers (loadscope). Real Hetzner S3 — keep video payloads small (few KB). Overlay HTML is a template with __SCENE__/__TOKEN__/__BACKEND__ placeholders; assertions rely on 'createElement(\\'video\\')' and the embedded scene JSON containing 'type':'video'. Frontend testids for the new feature: bg-media (input), bg-media-btn (upload button), bg-media-file (hidden file input). Use set_input_files on bg-media-file — allow ~3-5s for the Hetzner PUT round-trip.",
+  "rca of the issue": "N/A — feature works end-to-end. Only code-review-level hardening comments (memory-bound read, MIME trust, orphan cleanup, extension-based media-type detection)."
+}
