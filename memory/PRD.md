@@ -56,6 +56,12 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Element animation presets on any element (incl. SVG logos): pulse, fade, spin, bounce, float, blink, slide + adjustable speed; CSS keyframes shared by editor canvas and the vMix overlay HTML (applied on an inner wrapper so rotation still works).
 - Verified: iter5 5/5 backend tests + full UI wiring pass.
 
+## Implemented (iter 6, 2026-06)
+- Media Library: every S3 upload is tracked (db.media); /media page shows all uploads with preview, size, Copy URL and Delete (removes S3 object + record).
+- Reuse picker: the upload control now has a Library button that opens a dialog to pick an existing upload (videos filtered out for image-only fields); used in scene image, timed-text photo, scene background and settings avatar.
+- 'Media' nav item added.
+- Verified: iter6 5/5 backend tests + full UI wiring pass.
+
 ## Known follow-ups (code review, non-blocking)
 - Upload reads full file into memory before size check; consider streaming/max_upload_size.
 - Content-type trusted from client header (no magic-byte sniffing).
