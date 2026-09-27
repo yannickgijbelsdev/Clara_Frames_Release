@@ -225,6 +225,22 @@ class SceneInput(BaseModel):
     flows: List[Dict[str, Any]] = []
     workspace_id: Optional[str] = None
 
+class PancarteInput(BaseModel):
+    name: str
+    width: int = 1920
+    height: int = 1080
+    background: Dict[str, Any] = {"color": "#0b1020"}
+    elements: List[Dict[str, Any]] = []
+    workspace_id: Optional[str] = None
+
+class FlowInput(BaseModel):
+    name: str
+    interval: int = 5
+    entrance: str = "fade"
+    entranceDuration: float = 0.6
+    pancarte_ids: List[str] = []
+    workspace_id: Optional[str] = None
+
 class ChangePassword(BaseModel):
     current_password: str
     new_password: str
@@ -729,6 +745,120 @@ async def regenerate_token(scene_id: str, user: dict = Depends(get_current_user)
     return {"public_token": token}
 
 # ---------------------------------------------------------------------------
+# Pancartes (reusable card designs) CRUD
+# ---------------------------------------------------------------------------
+@api_router.get("/pancartes")
+async def list_pancartes(workspace_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+    q = {"user_id": user["id"]}
+    if workspace_id:
+        q["workspace_id"] = workspace_id
+    docs = await db.pancartes.find(q).to_list(500)
+    for d in docs:
+        d.pop("_id", None)
+    return docs
+
+@api_router.post("/pancartes")
+async def create_pancarte(body: PancarteInput, user: dict = Depends(get_current_user)):
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "id": str(uuid.uuid4()), "user_id": user["id"], "workspace_id": body.workspace_id,
+        "name": body.name, "width": body.width, "height": body.height,
+        "background": body.background, "elements": body.elements,
+        "created_at": now, "updated_at": now,
+    }
+    await db.pancartes.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+@api_router.get("/pancartes/{pid}")
+async def get_pancarte(pid: str, user: dict = Depends(get_current_user)):
+    doc = await db.pancartes.find_one({"id": pid, "user_id": user["id"]}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Pancarte not found")
+    return doc
+
+@api_router.put("/pancartes/{pid}")
+async def update_pancarte(pid: str, body: PancarteInput, user: dict = Depends(get_current_user)):
+    existing = await db.pancartes.find_one({"id": pid, "user_id": user["id"]})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Pancarte not found")
+    await db.pancartes.update_one({"id": pid}, {"$set": {
+        "name": body.name, "width": body.width, "height": body.height,
+        "background": body.background, "elements": body.elements,
+        "updated_at": datetime.now(timezone.utc).isoformat()}})
+    return await db.pancartes.find_one({"id": pid}, {"_id": 0})
+
+@api_router.delete("/pancartes/{pid}")
+async def delete_pancarte(pid: str, user: dict = Depends(get_current_user)):
+    await db.pancartes.delete_one({"id": pid, "user_id": user["id"]})
+    return {"ok": True}
+
+# ---------------------------------------------------------------------------
+# Flows (ordered sequences of pancartes) CRUD
+# ---------------------------------------------------------------------------
+@api_router.get("/flows")
+async def list_flows(workspace_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+    q = {"user_id": user["id"]}
+    if workspace_id:
+        q["workspace_id"] = workspace_id
+    docs = await db.flows.find(q).to_list(500)
+    for d in docs:
+        d.pop("_id", None)
+    return docs
+
+@api_router.post("/flows")
+async def create_flow(body: FlowInput, user: dict = Depends(get_current_user)):
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "id": str(uuid.uuid4()), "user_id": user["id"], "workspace_id": body.workspace_id,
+        "name": body.name, "interval": body.interval, "entrance": body.entrance,
+        "entranceDuration": body.entranceDuration, "pancarte_ids": body.pancarte_ids,
+        "created_at": now, "updated_at": now,
+    }
+    await db.flows.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+@api_router.get("/flows/{fid}")
+async def get_flow(fid: str, user: dict = Depends(get_current_user)):
+    doc = await db.flows.find_one({"id": fid, "user_id": user["id"]}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Flow not found")
+    return doc
+
+@api_router.put("/flows/{fid}")
+async def update_flow(fid: str, body: FlowInput, user: dict = Depends(get_current_user)):
+    existing = await db.flows.find_one({"id": fid, "user_id": user["id"]})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Flow not found")
+    await db.flows.update_one({"id": fid}, {"$set": {
+        "name": body.name, "interval": body.interval, "entrance": body.entrance,
+        "entranceDuration": body.entranceDuration, "pancarte_ids": body.pancarte_ids,
+        "updated_at": datetime.now(timezone.utc).isoformat()}})
+    return await db.flows.find_one({"id": fid}, {"_id": 0})
+
+@api_router.delete("/flows/{fid}")
+async def delete_flow(fid: str, user: dict = Depends(get_current_user)):
+    await db.flows.delete_one({"id": fid, "user_id": user["id"]})
+    return {"ok": True}
+
+async def expand_scene_flows(scene: dict) -> dict:
+    """Attach resolved flow + pancarte docs to each scene flow placement (for the overlay)."""
+    for pl in scene.get("flows", []):
+        flow = None
+        if pl.get("flow_id"):
+            flow = await db.flows.find_one({"id": pl["flow_id"]}, {"_id": 0})
+        pl["_flow"] = flow
+        pans = []
+        if flow:
+            for pid in flow.get("pancarte_ids", []):
+                pan = await db.pancartes.find_one({"id": pid}, {"_id": 0})
+                if pan:
+                    pans.append(pan)
+        pl["_pancartes"] = pans
+    return scene
+
+# ---------------------------------------------------------------------------
 # Data resolution for a scene (shared by data.json / xml / overlay)
 # ---------------------------------------------------------------------------
 def _sanitize_key(s: str) -> str:
@@ -829,6 +959,7 @@ async def public_settings(token: str):
 @api_router.get("/public/scene/{token}/overlay", response_class=HTMLResponse)
 async def public_overlay(token: str):
     scene = await _get_public_scene(token)
+    scene = await expand_scene_flows(scene)
     import json as _json
     scene_json = _json.dumps(scene)
     backend = os.environ.get("FRONTEND_URL", "")
@@ -989,127 +1120,155 @@ function toMin(hhmm){ if(!hhmm) return null; const [h,m]=hhmm.split(':'); return
 const clocks = [];
 const timeds = [];
 const apiEls = [];
+var lastValues = {};
 
-SCENE.elements.forEach(el => {
+function buildElementNode(el){
   const p = el.props || {};
   const d = baseStyle(el);
   const ent = document.createElement('div');
-  ent.style.width = '100%'; ent.style.height = '100%'; ent.style.display = 'flex';
-  ent.style.justifyContent = 'inherit'; ent.style.alignItems = 'inherit';
-  var ea = entranceAnim(p); if (ea) ent.style.animation = ea;
+  ent.style.width='100%'; ent.style.height='100%'; ent.style.display='flex';
+  ent.style.justifyContent='inherit'; ent.style.alignItems='inherit';
+  var ea = entranceAnim(p); if(ea) ent.style.animation = ea;
   const inner = document.createElement('div');
-  inner.style.width = '100%'; inner.style.height = '100%'; inner.style.display = 'flex';
-  inner.style.justifyContent = 'inherit'; inner.style.alignItems = 'inherit';
+  inner.style.width='100%'; inner.style.height='100%'; inner.style.display='flex';
+  inner.style.justifyContent='inherit'; inner.style.alignItems='inherit';
   applyAnim(inner, p);
-  if (el.type === 'image'){
-    if (p.src){ const img = document.createElement('img'); img.src=p.src; img.style.width='100%'; img.style.height='100%';
-      img.style.objectFit = (el.style&&el.style.objectFit)||'contain'; inner.appendChild(img);} 
-  } else if (el.type === 'clock'){
+  var ref = {node:d, clock:null, api:null, timed:null};
+  if(el.type==='image'){
+    if(p.src){ var img=document.createElement('img'); img.src=p.src; img.style.width='100%'; img.style.height='100%';
+      img.style.objectFit=(el.style&&el.style.objectFit)||'contain'; inner.appendChild(img); }
+  } else if(el.type==='clock'){
     inner.textContent = fmtClock(p.timezone, p.format);
-    clocks.push({d: inner, p});
-  } else if (el.type === 'timed_text'){
-    const wrap = document.createElement('div'); wrap.style.display='flex'; wrap.style.flexDirection = p.imagePosition==='top'?'column':'row';
+    ref.clock = {d:inner, p:p};
+  } else if(el.type==='timed_text'){
+    var wrap=document.createElement('div'); wrap.style.display='flex'; wrap.style.flexDirection=p.imagePosition==='top'?'column':'row';
     wrap.style.alignItems='center'; wrap.style.gap='16px'; wrap.style.width='100%'; wrap.style.height='100%';
-    if (p.image){ const im=document.createElement('img'); im.src=p.image; im.style.objectFit='cover';
-      im.style.height = p.imagePosition==='top'?'60%':'100%'; im.style.borderRadius='12px'; wrap.appendChild(im);}    
-    const txt=document.createElement('div'); txt.textContent=p.text||''; txt.style.flex='1'; wrap.appendChild(txt);
+    if(p.image){ var im=document.createElement('img'); im.src=p.image; im.style.objectFit='cover';
+      im.style.height=p.imagePosition==='top'?'60%':'100%'; im.style.borderRadius='12px'; wrap.appendChild(im); }
+    var txt=document.createElement('div'); txt.textContent=p.text||''; txt.style.flex='1'; wrap.appendChild(txt);
     inner.appendChild(wrap);
-    timeds.push({d, p, ent});
-  } else if (el.type === 'api_field'){
-    inner.textContent = (p.prefix||'') + '…' + (p.suffix||'');
-    apiEls.push({d: inner, p});
-  } else { // text
+    ref.timed = {d:d, p:p, ent:ent};
+  } else if(el.type==='api_field'){
+    inner.textContent = (p.prefix||'') + '\u2026' + (p.suffix||'');
+    ref.api = {d:inner, p:p};
+  } else {
     inner.textContent = p.text || '';
   }
-  ent.appendChild(inner);
-  d.appendChild(ent);
-  stage.appendChild(d);
+  ent.appendChild(inner); d.appendChild(ent);
+  return ref;
+}
+
+function applyBackground(host, bg){
+  if(!bg) return;
+  if(bg.color) host.style.background = bg.color;
+  if(bg.src){
+    var bfit = bg.fit || 'cover'; var b;
+    if(bg.type==='video'){ b=document.createElement('video'); b.src=bg.src; b.autoplay=true; b.loop=true; b.muted=true;
+      b.setAttribute('playsinline',''); b.setAttribute('muted',''); b.style.width='100%'; b.style.height='100%'; b.style.objectFit=bfit==='contain'?'contain':'cover'; }
+    else if(bfit==='repeat'){ b=document.createElement('div'); b.style.width='100%'; b.style.height='100%'; b.style.backgroundImage='url('+bg.src+')'; b.style.backgroundRepeat='repeat'; }
+    else { b=document.createElement('img'); b.src=bg.src; b.style.width='100%'; b.style.height='100%'; b.style.objectFit=bfit==='contain'?'contain':'cover'; }
+    b.style.position='absolute'; b.style.top=0; b.style.left=0; host.appendChild(b);
+  }
+  if(bg.overlayColor && (bg.overlayOpacity||0)>0){
+    var ov=document.createElement('div'); ov.style.position='absolute'; ov.style.top=0; ov.style.left=0;
+    ov.style.width='100%'; ov.style.height='100%'; ov.style.background=bg.overlayColor; ov.style.opacity=bg.overlayOpacity; host.appendChild(ov);
+  }
+}
+
+(SCENE.elements||[]).forEach(function(el){
+  var ref = buildElementNode(el);
+  if(ref.clock) clocks.push(ref.clock);
+  if(ref.api) apiEls.push(ref.api);
+  if(ref.timed) timeds.push(ref.timed);
+  stage.appendChild(ref.node);
 });
 
-// ---- Flows (rotating pancartes) ----
-var flowVis = [];
-function buildCard(c, fl){
-  var s = fl.style||{};
-  var card = document.createElement('div');
-  card.style.width='100%'; card.style.height='100%'; card.style.display='flex'; card.style.alignItems='center';
-  card.style.gap='20px'; card.style.boxSizing='border-box';
-  card.style.background = s.backgroundColor || '#0b1020';
-  card.style.color = s.color || '#ffffff';
-  card.style.borderRadius = (s.borderRadius!=null?s.borderRadius:16)+'px';
-  card.style.padding = (s.padding!=null?s.padding:20)+'px';
-  card.style.fontFamily = s.fontFamily || "'Outfit',sans-serif";
-  card.style.overflow='hidden';
-  if (c.image){ var im=document.createElement('img'); im.src=c.image; im.style.height='100%'; im.style.aspectRatio='1/1';
-    im.style.objectFit='cover'; im.style.borderRadius='12px'; card.appendChild(im); }
-  var tw=document.createElement('div'); tw.style.flex='1'; tw.style.minWidth='0';
-  var t=document.createElement('div'); t.textContent=c.title||''; t.style.fontWeight='700';
-  t.style.fontSize=(s.titleSize||44)+'px'; t.style.lineHeight='1.1'; t.style.whiteSpace='nowrap'; t.style.overflow='hidden'; t.style.textOverflow='ellipsis';
-  var sub=document.createElement('div'); sub.textContent=c.subtitle||''; sub.style.fontSize=(s.subtitleSize||26)+'px';
-  sub.style.opacity='0.8'; sub.style.marginTop='6px';
-  tw.appendChild(t); tw.appendChild(sub); card.appendChild(tw);
-  return card;
+// ---- Flows of pancartes ----
+function renderPancarte(pan, w, h){
+  var box = document.createElement('div');
+  box.style.position='absolute'; box.style.top=0; box.style.left=0; box.style.width=w+'px'; box.style.height=h+'px'; box.style.overflow='hidden';
+  var pw = pan.width||1920, ph = pan.height||1080;
+  var scale = Math.min(w/pw, h/ph);
+  var sw = pw*scale, sh = ph*scale;
+  var st = document.createElement('div');
+  st.style.position='absolute'; st.style.left=((w-sw)/2)+'px'; st.style.top=((h-sh)/2)+'px';
+  st.style.width=pw+'px'; st.style.height=ph+'px'; st.style.transformOrigin='top left'; st.style.transform='scale('+scale+')'; st.style.overflow='hidden';
+  applyBackground(st, pan.background);
+  var res = {node:box, clocks:[], apis:[]};
+  (pan.elements||[]).forEach(function(el){
+    var ref = buildElementNode(el);
+    if(ref.clock) res.clocks.push(ref.clock);
+    if(ref.api) res.apis.push(ref.api);
+    st.appendChild(ref.node);
+  });
+  box.appendChild(st);
+  return res;
 }
-(SCENE.flows||[]).forEach(function(fl){
+
+function updateApis(list, values){
+  list.forEach(function(a){ var v = values[a.p.sourceId+':'+a.p.fieldKey]; if(v==null) v=''; a.d.textContent=(a.p.prefix||'')+v+(a.p.suffix||''); });
+}
+
+var placements = [];
+(SCENE.flows||[]).forEach(function(pl){
+  var flow = pl._flow || null;
+  var pans = pl._pancartes || [];
   var cont = document.createElement('div');
-  cont.style.position='absolute'; cont.style.left=fl.x+'px'; cont.style.top=fl.y+'px';
-  cont.style.width=fl.w+'px'; cont.style.height=fl.h+'px'; cont.style.overflow='visible';
-  var host = document.createElement('div'); host.style.width='100%'; host.style.height='100%';
-  cont.appendChild(host); stage.appendChild(cont);
-  var idx = 0, adv = null;
-  function renderCard(){
-    host.innerHTML='';
-    var cards = fl.cards||[]; if(!cards.length){ return; }
-    var card = buildCard(cards[idx % cards.length], fl);
-    var ea = entranceAnim({entrance: fl.entrance, entranceDuration: fl.entranceDuration});
-    if (ea) card.style.animation = ea;
-    host.appendChild(card);
+  cont.style.position='absolute'; cont.style.left=pl.x+'px'; cont.style.top=pl.y+'px';
+  cont.style.width=pl.w+'px'; cont.style.height=pl.h+'px'; cont.style.overflow='hidden';
+  stage.appendChild(cont);
+  var idx=0, adv=null, cur={clocks:[],apis:[]};
+  function render(){
+    cont.innerHTML='';
+    if(!pans.length){ return; }
+    var pan = pans[idx % pans.length];
+    var r = renderPancarte(pan, pl.w, pl.h);
+    var ea = entranceAnim({entrance: flow?flow.entrance:'none', entranceDuration: flow?flow.entranceDuration:0.6});
+    if(ea) r.node.style.animation = ea;
+    cont.appendChild(r.node);
+    cur = {clocks:r.clocks, apis:r.apis};
+    cur.clocks.forEach(function(c){ c.d.textContent = fmtClock(c.p.timezone, c.p.format); });
+    updateApis(cur.apis, lastValues);
   }
-  function advance(){ idx++; renderCard(); }
-  function startAdv(){ if(!adv && (fl.cards||[]).length>1){ adv=setInterval(advance, Math.max(1,(fl.interval||5))*1000); } }
+  function advance(){ idx++; render(); }
+  function startAdv(){ if(!adv && pans.length>1){ adv=setInterval(advance, Math.max(1,(flow&&flow.interval)||5)*1000); } }
   function stopAdv(){ if(adv){ clearInterval(adv); adv=null; } }
-  var st = fl.schedule||{};
-  renderCard();
-  if (st.mode === 'everyX'){ cont.style.display='none'; }
-  else { startAdv(); }
-  flowVis.push({fl:fl, cont:cont, startAdv:startAdv, stopAdv:stopAdv, renderCard:renderCard, reset:function(){idx=0;}});
+  var sc = pl.schedule||{};
+  render();
+  if(sc.mode==='everyX'){ cont.style.display='none'; } else { startAdv(); }
+  placements.push({pl:pl, cont:cont, getCur:function(){return cur;}, render:render, startAdv:startAdv, stopAdv:stopAdv, reset:function(){idx=0;}});
 });
 
 function tick(){
-  clocks.forEach(c => c.d.textContent = fmtClock(c.p.timezone, c.p.format));
-  timeds.forEach(t => {
-    const s = toMin(t.p.start), e = toMin(t.p.end);
-    let vis = true;
-    if (s != null && e != null){ const n = nowMinutes(t.p.timezone);
-      vis = s <= e ? (n >= s && n <= e) : (n >= s || n <= e); }
-    if (vis && t._vis !== true){ t.d.style.display = 'flex'; retriggerEntrance(t.ent, t.p); }
-    else if (!vis && t._vis !== false){ t.d.style.display = 'none'; }
-    t._vis = vis;
+  clocks.forEach(function(c){ c.d.textContent = fmtClock(c.p.timezone, c.p.format); });
+  timeds.forEach(function(t){
+    var s=toMin(t.p.start), e=toMin(t.p.end); var vis=true;
+    if(s!=null && e!=null){ var n=nowMinutes(t.p.timezone); vis = s<=e ? (n>=s && n<=e) : (n>=s || n<=e); }
+    if(vis && t._vis!==true){ t.d.style.display='flex'; retriggerEntrance(t.ent, t.p); }
+    else if(!vis && t._vis!==false){ t.d.style.display='none'; }
+    t._vis=vis;
   });
-  flowVis.forEach(function(f){
-    var sc = f.fl.schedule||{};
-    if (sc.mode !== 'everyX') return;
-    var cycle = Math.max(1,(sc.everyMinutes||5))*60;
-    var show = Math.max(1,(sc.showSeconds||15));
-    var now = Math.floor(Date.now()/1000);
-    var vis = (now % cycle) < show;
-    if (vis && f._v !== true){ f.cont.style.display='block'; f.reset(); f.renderCard(); f.startAdv(); }
-    else if (!vis && f._v !== false){ f.cont.style.display='none'; f.stopAdv(); }
-    f._v = vis;
+  placements.forEach(function(f){
+    var sc=f.pl.schedule||{};
+    if(sc.mode==='everyX'){
+      var cycle=Math.max(1,(sc.everyMinutes||5))*60; var show=Math.max(1,(sc.showSeconds||15));
+      var now=Math.floor(Date.now()/1000); var vis=(now%cycle)<show;
+      if(vis && f._v!==true){ f.cont.style.display='block'; f.reset(); f.render(); f.startAdv(); }
+      else if(!vis && f._v!==false){ f.cont.style.display='none'; f.stopAdv(); }
+      f._v=vis;
+    }
+    var cur=f.getCur(); cur.clocks.forEach(function(c){ c.d.textContent=fmtClock(c.p.timezone,c.p.format); });
   });
 }
 setInterval(tick, 1000); tick();
 
 async function poll(){
-  if (!apiEls.length) return;
   try{
     const r = await fetch(BACKEND + '/api/public/scene/' + TOKEN + '/values.json');
     const data = await r.json();
-    apiEls.forEach(a => {
-      const key = a.p.sourceId + ':' + a.p.fieldKey;
-      let v = data[key];
-      if (v == null) v = '';
-      a.d.textContent = (a.p.prefix||'') + v + (a.p.suffix||'');
-    });
+    lastValues = data;
+    updateApis(apiEls, data);
+    placements.forEach(function(f){ updateApis(f.getCur().apis, data); });
   }catch(e){}
 }
 setInterval(poll, 5000); poll();
@@ -1118,19 +1277,37 @@ setInterval(poll, 5000); poll();
 
 @api_router.get("/public/scene/{token}/values.json")
 async def public_values(token: str):
-    """Raw source values keyed by sourceId:fieldKey for overlay polling."""
+    """Raw source values keyed by sourceId:fieldKey for overlay polling (scene + pancarte elements)."""
     scene = await _get_public_scene(token)
     out: Dict[str, Any] = {}
     cache: Dict[str, Dict[str, Any]] = {}
-    for el in scene.get("elements", []):
+
+    async def add_el(el):
         if el.get("type") != "api_field":
-            continue
+            return
         p = el.get("props", {})
         sid = p.get("sourceId")
-        if sid and sid not in cache:
-            src = await db.sources.find_one({"id": sid})
-            cache[sid] = await resolve_source_values(src) if src else {}
+        if not sid:
+            return
+        if sid not in cache:
+            src_doc = await db.sources.find_one({"id": sid})
+            cache[sid] = await resolve_source_values(src_doc) if src_doc else {}
         out[f"{sid}:{p.get('fieldKey')}"] = cache.get(sid, {}).get(p.get("fieldKey"), "")
+
+    for el in scene.get("elements", []):
+        await add_el(el)
+    for pl in scene.get("flows", []):
+        if not pl.get("flow_id"):
+            continue
+        flow = await db.flows.find_one({"id": pl["flow_id"]})
+        if not flow:
+            continue
+        for pid in flow.get("pancarte_ids", []):
+            pan = await db.pancartes.find_one({"id": pid})
+            if not pan:
+                continue
+            for el in pan.get("elements", []):
+                await add_el(el)
     return JSONResponse(out)
 
 @api_router.get("/public/scene/{token}/element/{element_id}.txt", response_class=PlainTextResponse)

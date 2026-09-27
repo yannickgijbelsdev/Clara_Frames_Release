@@ -9,6 +9,10 @@ import Register from "@/pages/Register";
 import Dashboard from "@/pages/Dashboard";
 import Scenes from "@/pages/Scenes";
 import SceneEditor from "@/pages/SceneEditor";
+import Pancartes from "@/pages/Pancartes";
+import PancarteEditor from "@/pages/PancarteEditor";
+import Flows from "@/pages/Flows";
+import FlowEditor from "@/pages/FlowEditor";
 import ExportPage from "@/pages/ExportPage";
 import Sources from "@/pages/Sources";
 import MediaLibrary from "@/pages/MediaLibrary";
@@ -43,6 +47,10 @@ function App() {
               <Route path="/scenes" element={<Protected><Scenes /></Protected>} />
               <Route path="/scenes/:id" element={<Protected><SceneEditor /></Protected>} />
               <Route path="/scenes/:id/export" element={<Protected><ExportPage /></Protected>} />
+              <Route path="/pancartes" element={<Protected><Pancartes /></Protected>} />
+              <Route path="/pancartes/:id" element={<Protected><PancarteEditor /></Protected>} />
+              <Route path="/flows" element={<Protected><Flows /></Protected>} />
+              <Route path="/flows/:id" element={<Protected><FlowEditor /></Protected>} />
               <Route path="/sources" element={<Protected><Sources /></Protected>} />
               <Route path="/media" element={<Protected><MediaLibrary /></Protected>} />
               <Route path="/settings" element={<Protected><Settings /></Protected>} />

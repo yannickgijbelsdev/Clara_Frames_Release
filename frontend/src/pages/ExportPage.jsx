@@ -31,8 +31,22 @@ export default function ExportPage() {
   const { id } = useParams();
   const nav = useNavigate();
   const [scene, setScene] = useState(null);
+  const [flowsData, setFlowsData] = useState({});
 
-  const load = () => api.get(`/scenes/${id}`).then(({ data }) => setScene(data)).catch(() => nav("/scenes"));
+  const load = () => api.get(`/scenes/${id}`).then(({ data }) => {
+    setScene(data);
+    if (data.workspace_id) {
+      Promise.all([
+        api.get(`/flows?workspace_id=${data.workspace_id}`),
+        api.get(`/pancartes?workspace_id=${data.workspace_id}`),
+      ]).then(([f, p]) => {
+        const panById = Object.fromEntries(p.data.map((x) => [x.id, x]));
+        const map = {};
+        f.data.forEach((fl) => { map[fl.id] = { flow: fl, pancartes: (fl.pancarte_ids || []).map((pid) => panById[pid]).filter(Boolean) }; });
+        setFlowsData(map);
+      }).catch(() => {});
+    }
+  }).catch(() => nav("/scenes"));
   useEffect(() => { load(); }, [id]);
 
   const regen = async () => {
@@ -77,7 +91,7 @@ export default function ExportPage() {
           <div className="bg-slate-100 rounded-3xl clara-soft p-4 sticky top-24">
             <div className="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-2">Live preview</div>
             <div className="rounded-2xl overflow-hidden ring-1 ring-slate-300">
-              <SceneCanvas scene={scene} />
+              <SceneCanvas scene={scene} flowsData={flowsData} />
             </div>
             <div className="mt-4 text-sm text-slate-600 leading-relaxed">
               <b className="text-slate-900">In vMix:</b> click <b>Add Input → Web Browser</b>, paste the overlay URL, set size to 1920×1080 and enable transparency for a clean key.

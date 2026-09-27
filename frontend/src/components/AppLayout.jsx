@@ -24,6 +24,8 @@ export default function AppLayout({ children, title, subtitle, actions }) {
   const navItems = [
     { to: "/dashboard", label: "Dashboard" },
     { to: "/scenes", label: "Scenes" },
+    { to: "/pancartes", label: "Pancartes" },
+    { to: "/flows", label: "Flows" },
     { to: "/sources", label: "API Sources" },
     { to: "/media", label: "Media" },
     { to: "/help", label: "vMix Help" },
