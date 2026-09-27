@@ -20,6 +20,58 @@ function entranceStyle(el) {
   return { animation: `${ENTRANCE_MAP[e]} ${dur}s ease-out ${delay}s both` };
 }
 
+function flowEntranceStyle(fl) {
+  const e = fl.entrance;
+  if (!e || e === "none" || !ENTRANCE_MAP[e]) return {};
+  const dur = fl.entranceDuration || 0.6;
+  return { animation: `${ENTRANCE_MAP[e]} ${dur}s ease-out both` };
+}
+
+function PancarteCard({ card, style }) {
+  const s = style || {};
+  return (
+    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", gap: 20, boxSizing: "border-box",
+      background: s.backgroundColor || "#0b1020", color: s.color || "#ffffff",
+      borderRadius: s.borderRadius != null ? s.borderRadius : 16, padding: s.padding != null ? s.padding : 20,
+      fontFamily: s.fontFamily || "'Outfit', sans-serif", overflow: "hidden" }}>
+      {card?.image && <img src={card.image} alt="" style={{ height: "100%", aspectRatio: "1 / 1", objectFit: "cover", borderRadius: 12 }} />}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: s.titleSize || 44, lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card?.title || "Title"}</div>
+        <div style={{ fontSize: s.subtitleSize || 26, opacity: 0.8, marginTop: 6 }}>{card?.subtitle || ""}</div>
+      </div>
+    </div>
+  );
+}
+
+function FlowRegion({ flow, editable, selected, onPointerDownRegion }) {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    const cards = flow.cards || [];
+    if (cards.length <= 1) return;
+    const t = setInterval(() => setIdx((i) => (i + 1) % cards.length), Math.max(1, flow.interval || 5) * 1000);
+    return () => clearInterval(t);
+  }, [flow.cards?.length, flow.interval]);
+  const cards = flow.cards || [];
+  const card = cards.length ? cards[idx % cards.length] : null;
+  return (
+    <div data-testid={`canvas-flow-${flow.id}`}
+      onPointerDown={editable ? (e) => onPointerDownRegion(e, flow, "move") : undefined}
+      onClick={(e) => e.stopPropagation()}
+      style={{ position: "absolute", left: flow.x, top: flow.y, width: flow.w, height: flow.h, overflow: "visible",
+        cursor: editable ? "move" : "default", outline: selected ? "2px dashed #5f6da6" : "none", outlineOffset: 3 }}>
+      <div key={`${idx}:${flow.entrance}`} style={{ width: "100%", height: "100%", ...flowEntranceStyle(flow) }}>
+        {card ? <PancarteCard card={card} style={flow.style} /> : (
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", border: "2px dashed rgba(148,163,184,.5)", borderRadius: 12, fontSize: 14 }}>Empty flow — add cards</div>
+        )}
+      </div>
+      {selected && (
+        <div onPointerDown={(e) => onPointerDownRegion(e, flow, "resize")}
+          style={{ position: "absolute", right: -6, bottom: -6, width: 16, height: 16, background: "#5f6da6", borderRadius: 4, cursor: "nwse-resize", border: "2px solid #fff" }} />
+      )}
+    </div>
+  );
+}
+
 function elBoxStyle(el) {
   const st = el.style || {};
   const s = {
@@ -72,7 +124,7 @@ function ElementContent({ el, tick, sourceValues }) {
   return <span>{p.text || "Text"}</span>;
 }
 
-export default function SceneCanvas({ scene, editable = false, selectedId, onSelect, onUpdate, sourceValues }) {
+export default function SceneCanvas({ scene, editable = false, selectedId, onSelect, onUpdate, sourceValues, selectedFlowId, onSelectFlow, onUpdateFlow }) {
   const wrapRef = useRef(null);
   const [scale, setScale] = useState(0.3);
   const [, force] = useState(0);
@@ -94,25 +146,26 @@ export default function SceneCanvas({ scene, editable = false, selectedId, onSel
     return () => clearInterval(t);
   }, []);
 
-  const onPointerDown = useCallback((e, el, mode) => {
+  const onPointerDown = useCallback((e, item, mode, kind = "el") => {
     if (!editable) return;
     e.stopPropagation();
     e.target.setPointerCapture?.(e.pointerId);
-    drag.current = { id: el.id, mode, startX: e.clientX, startY: e.clientY, ox: el.x, oy: el.y, ow: el.w, oh: el.h };
-    onSelect?.(el.id);
-  }, [editable, onSelect]);
+    drag.current = { id: item.id, mode, kind, startX: e.clientX, startY: e.clientY, ox: item.x, oy: item.y, ow: item.w, oh: item.h };
+    if (kind === "flow") onSelectFlow?.(item.id); else onSelect?.(item.id);
+  }, [editable, onSelect, onSelectFlow]);
 
   const onPointerMove = useCallback((e) => {
     const d = drag.current;
     if (!d) return;
     const dx = (e.clientX - d.startX) / scale;
     const dy = (e.clientY - d.startY) / scale;
+    const upd = d.kind === "flow" ? onUpdateFlow : onUpdate;
     if (d.mode === "move") {
-      onUpdate?.(d.id, { x: Math.round(d.ox + dx), y: Math.round(d.oy + dy) });
+      upd?.(d.id, { x: Math.round(d.ox + dx), y: Math.round(d.oy + dy) });
     } else {
-      onUpdate?.(d.id, { w: Math.max(20, Math.round(d.ow + dx)), h: Math.max(20, Math.round(d.oh + dy)) });
+      upd?.(d.id, { w: Math.max(20, Math.round(d.ow + dx)), h: Math.max(20, Math.round(d.oh + dy)) });
     }
-  }, [scale, onUpdate]);
+  }, [scale, onUpdate, onUpdateFlow]);
 
   const onPointerUp = useCallback(() => { drag.current = null; }, []);
 
@@ -120,7 +173,7 @@ export default function SceneCanvas({ scene, editable = false, selectedId, onSel
     <div ref={wrapRef} className="relative w-full" style={{ aspectRatio: `${scene.width} / ${scene.height}` }}>
       <div
         onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}
-        onClick={(e) => { if (editable && e.target === e.currentTarget) onSelect?.(null); }}
+        onClick={(e) => { if (editable && e.target === e.currentTarget) { onSelect?.(null); onSelectFlow?.(null); } }}
         style={{
           position: "absolute", top: 0, left: 0,
           width: scene.width, height: scene.height,
@@ -169,6 +222,11 @@ export default function SceneCanvas({ scene, editable = false, selectedId, onSel
             </div>
           );
         })}
+        {(scene.flows || []).map((fl) => (
+          <FlowRegion key={fl.id} flow={fl} editable={editable}
+            selected={editable && fl.id === selectedFlowId}
+            onPointerDownRegion={(e, item, mode) => onPointerDown(e, item, mode, "flow")} />
+        ))}
       </div>
     </div>
   );

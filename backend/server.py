@@ -222,6 +222,7 @@ class SceneInput(BaseModel):
     height: int = 1080
     background: Dict[str, Any] = {"color": "#0b1020"}
     elements: List[Dict[str, Any]] = []
+    flows: List[Dict[str, Any]] = []
     workspace_id: Optional[str] = None
 
 class ChangePassword(BaseModel):
@@ -684,6 +685,7 @@ async def create_scene(body: SceneInput, user: dict = Depends(get_current_user))
         "height": body.height,
         "background": body.background,
         "elements": body.elements,
+        "flows": body.flows,
         "public_token": uuid.uuid4().hex,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -707,6 +709,7 @@ async def update_scene(scene_id: str, body: SceneInput, user: dict = Depends(get
     await db.scenes.update_one({"id": scene_id}, {"$set": {
         "name": body.name, "width": body.width, "height": body.height,
         "background": body.background, "elements": body.elements,
+        "flows": body.flows,
         "updated_at": datetime.now(timezone.utc).isoformat()}})
     doc = await db.scenes.find_one({"id": scene_id}, {"_id": 0})
     return doc
@@ -1023,6 +1026,54 @@ SCENE.elements.forEach(el => {
   stage.appendChild(d);
 });
 
+// ---- Flows (rotating pancartes) ----
+var flowVis = [];
+function buildCard(c, fl){
+  var s = fl.style||{};
+  var card = document.createElement('div');
+  card.style.width='100%'; card.style.height='100%'; card.style.display='flex'; card.style.alignItems='center';
+  card.style.gap='20px'; card.style.boxSizing='border-box';
+  card.style.background = s.backgroundColor || '#0b1020';
+  card.style.color = s.color || '#ffffff';
+  card.style.borderRadius = (s.borderRadius!=null?s.borderRadius:16)+'px';
+  card.style.padding = (s.padding!=null?s.padding:20)+'px';
+  card.style.fontFamily = s.fontFamily || "'Outfit',sans-serif";
+  card.style.overflow='hidden';
+  if (c.image){ var im=document.createElement('img'); im.src=c.image; im.style.height='100%'; im.style.aspectRatio='1/1';
+    im.style.objectFit='cover'; im.style.borderRadius='12px'; card.appendChild(im); }
+  var tw=document.createElement('div'); tw.style.flex='1'; tw.style.minWidth='0';
+  var t=document.createElement('div'); t.textContent=c.title||''; t.style.fontWeight='700';
+  t.style.fontSize=(s.titleSize||44)+'px'; t.style.lineHeight='1.1'; t.style.whiteSpace='nowrap'; t.style.overflow='hidden'; t.style.textOverflow='ellipsis';
+  var sub=document.createElement('div'); sub.textContent=c.subtitle||''; sub.style.fontSize=(s.subtitleSize||26)+'px';
+  sub.style.opacity='0.8'; sub.style.marginTop='6px';
+  tw.appendChild(t); tw.appendChild(sub); card.appendChild(tw);
+  return card;
+}
+(SCENE.flows||[]).forEach(function(fl){
+  var cont = document.createElement('div');
+  cont.style.position='absolute'; cont.style.left=fl.x+'px'; cont.style.top=fl.y+'px';
+  cont.style.width=fl.w+'px'; cont.style.height=fl.h+'px'; cont.style.overflow='visible';
+  var host = document.createElement('div'); host.style.width='100%'; host.style.height='100%';
+  cont.appendChild(host); stage.appendChild(cont);
+  var idx = 0, adv = null;
+  function renderCard(){
+    host.innerHTML='';
+    var cards = fl.cards||[]; if(!cards.length){ return; }
+    var card = buildCard(cards[idx % cards.length], fl);
+    var ea = entranceAnim({entrance: fl.entrance, entranceDuration: fl.entranceDuration});
+    if (ea) card.style.animation = ea;
+    host.appendChild(card);
+  }
+  function advance(){ idx++; renderCard(); }
+  function startAdv(){ if(!adv && (fl.cards||[]).length>1){ adv=setInterval(advance, Math.max(1,(fl.interval||5))*1000); } }
+  function stopAdv(){ if(adv){ clearInterval(adv); adv=null; } }
+  var st = fl.schedule||{};
+  renderCard();
+  if (st.mode === 'everyX'){ cont.style.display='none'; }
+  else { startAdv(); }
+  flowVis.push({fl:fl, cont:cont, startAdv:startAdv, stopAdv:stopAdv, renderCard:renderCard, reset:function(){idx=0;}});
+});
+
 function tick(){
   clocks.forEach(c => c.d.textContent = fmtClock(c.p.timezone, c.p.format));
   timeds.forEach(t => {
@@ -1033,6 +1084,17 @@ function tick(){
     if (vis && t._vis !== true){ t.d.style.display = 'flex'; retriggerEntrance(t.ent, t.p); }
     else if (!vis && t._vis !== false){ t.d.style.display = 'none'; }
     t._vis = vis;
+  });
+  flowVis.forEach(function(f){
+    var sc = f.fl.schedule||{};
+    if (sc.mode !== 'everyX') return;
+    var cycle = Math.max(1,(sc.everyMinutes||5))*60;
+    var show = Math.max(1,(sc.showSeconds||15));
+    var now = Math.floor(Date.now()/1000);
+    var vis = (now % cycle) < show;
+    if (vis && f._v !== true){ f.cont.style.display='block'; f.reset(); f.renderCard(); f.startAdv(); }
+    else if (!vis && f._v !== false){ f.cont.style.display='none'; f.stopAdv(); }
+    f._v = vis;
   });
 }
 setInterval(tick, 1000); tick();

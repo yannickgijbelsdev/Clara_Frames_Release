@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Type, Clock, Image as ImageIcon, CalendarClock, Radio, Save, Upload, Trash2, ArrowLeft, Loader2, Copy } from "lucide-react";
+import { Type, Clock, Image as ImageIcon, CalendarClock, Radio, Save, Upload, Trash2, ArrowLeft, Loader2, Copy, Film, Plus } from "lucide-react";
 
 const FONTS = ["'Outfit', sans-serif", "'Plus Jakarta Sans', sans-serif", "'JetBrains Mono', monospace", "Arial", "Georgia", "Impact"];
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
@@ -43,6 +43,7 @@ export default function SceneEditor() {
   const [scene, setScene] = useState(null);
   const [sources, setSources] = useState([]);
   const [selId, setSelId] = useState(null);
+  const [selFlowId, setSelFlowId] = useState(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -51,6 +52,23 @@ export default function SceneEditor() {
   }, [id]);
 
   const sel = scene?.elements.find((e) => e.id === selId) || null;
+  const selFlow = scene?.flows?.find((f) => f.id === selFlowId) || null;
+
+  const flowTemplate = () => ({
+    id: uid(), name: "Presenters", x: 120, y: 760, w: 900, h: 200,
+    interval: 5, entrance: "slide-up", entranceDuration: 0.6,
+    schedule: { mode: "always", everyMinutes: 5, showSeconds: 15 },
+    style: { backgroundColor: "#0b1020", color: "#ffffff", borderRadius: 16, padding: 20, fontFamily: FONTS[0], titleSize: 44, subtitleSize: 26 },
+    cards: [{ id: uid(), title: "Jane Doe", subtitle: "Host", image: "" }],
+  });
+  const addFlow = () => { const f = flowTemplate(); setScene((s) => ({ ...s, flows: [...(s.flows || []), f] })); setSelId(null); setSelFlowId(f.id); };
+  const updateFlow = (fid, patch) => setScene((s) => ({ ...s, flows: s.flows.map((f) => f.id === fid ? { ...f, ...patch } : f) }));
+  const updateFlowStyle = (patch) => setScene((s) => ({ ...s, flows: s.flows.map((f) => f.id === selFlowId ? { ...f, style: { ...f.style, ...patch } } : f) }));
+  const updateSchedule = (patch) => setScene((s) => ({ ...s, flows: s.flows.map((f) => f.id === selFlowId ? { ...f, schedule: { ...f.schedule, ...patch } } : f) }));
+  const delFlow = () => { setScene((s) => ({ ...s, flows: s.flows.filter((f) => f.id !== selFlowId) })); setSelFlowId(null); };
+  const addCard = () => setScene((s) => ({ ...s, flows: s.flows.map((f) => f.id === selFlowId ? { ...f, cards: [...f.cards, { id: uid(), title: "Name", subtitle: "Role", image: "" }] } : f) }));
+  const updateCard = (cid, patch) => setScene((s) => ({ ...s, flows: s.flows.map((f) => f.id === selFlowId ? { ...f, cards: f.cards.map((c) => c.id === cid ? { ...c, ...patch } : c) } : f) }));
+  const delCard = (cid) => setScene((s) => ({ ...s, flows: s.flows.map((f) => f.id === selFlowId ? { ...f, cards: f.cards.filter((c) => c.id !== cid) } : f) }));
 
   const updateEl = useCallback((elId, patch) => {
     setScene((s) => ({ ...s, elements: s.elements.map((e) => e.id === elId ? { ...e, ...patch } : e) }));
@@ -68,7 +86,7 @@ export default function SceneEditor() {
   const save = async (silent) => {
     setSaving(true);
     try {
-      await api.put(`/scenes/${id}`, { name: scene.name, width: scene.width, height: scene.height, background: scene.background, elements: scene.elements });
+      await api.put(`/scenes/${id}`, { name: scene.name, width: scene.width, height: scene.height, background: scene.background, elements: scene.elements, flows: scene.flows || [] });
       if (!silent) toast.success("Scene saved");
     } catch (e) { toast.error("Save failed"); }
     setSaving(false);
@@ -99,6 +117,10 @@ export default function SceneEditor() {
                 <t.icon className="h-4 w-4 text-brand-600" />{t.label}
               </button>
             ))}
+            <button data-testid="add-flow" onClick={addFlow}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 border border-brand-200 bg-brand-50/40 transition-colors">
+              <Film className="h-4 w-4 text-brand-600" />Pancarte flow
+            </button>
           </div>
           <div className="mt-5 space-y-2">
             <Label className="text-[11px] uppercase tracking-widest text-slate-400 font-bold">Background</Label>
@@ -142,15 +164,64 @@ export default function SceneEditor() {
         {/* canvas */}
         <div className="bg-slate-100 rounded-3xl clara-soft p-4">
           <div className="rounded-2xl overflow-hidden ring-1 ring-slate-300 shadow-inner">
-            <SceneCanvas scene={scene} editable selectedId={selId} onSelect={setSelId} onUpdate={updateEl} />
+            <SceneCanvas scene={scene} editable selectedId={selId} onSelect={(id) => { setSelId(id); if (id) setSelFlowId(null); }} onUpdate={updateEl}
+              selectedFlowId={selFlowId} onSelectFlow={(fid) => { setSelFlowId(fid); if (fid) setSelId(null); }} onUpdateFlow={updateFlow} />
           </div>
           <p className="text-xs text-slate-400 mt-2 text-center">Canvas {scene.width}×{scene.height} · click an element to edit · drag the corner to resize</p>
         </div>
 
         {/* properties */}
         <div className="bg-white rounded-3xl clara-soft p-4 h-fit">
-          {!sel ? (
-            <p className="text-sm text-slate-400 text-center py-8">Select an element to edit its properties.</p>
+          {selFlow ? (
+            <div className="space-y-3" data-testid="flow-panel">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] uppercase tracking-widest text-slate-400 font-bold">Pancarte flow</span>
+                <button data-testid="delete-flow-btn" onClick={delFlow} className="text-slate-400 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+              </div>
+              <div className="space-y-1.5"><Label>Name</Label><Input value={selFlow.name || ""} onChange={(e) => updateFlow(selFlow.id, { name: e.target.value })} className="rounded-xl text-sm" data-testid="flow-name" /></div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1.5"><Label>Seconds / card</Label><Input type="number" min="1" value={selFlow.interval || 5} onChange={(e) => updateFlow(selFlow.id, { interval: parseInt(e.target.value) || 5 })} className="rounded-xl text-sm" data-testid="flow-interval" /></div>
+                <div className="space-y-1.5"><Label>Entrance</Label>
+                  <Select value={selFlow.entrance || "none"} onValueChange={(v) => updateFlow(selFlow.id, { entrance: v })}>
+                    <SelectTrigger className="rounded-xl" data-testid="flow-entrance"><SelectValue /></SelectTrigger>
+                    <SelectContent>{["none", "fade", "slide-up", "slide-down", "slide-left", "slide-right", "zoom"].map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
+                  </Select></div>
+              </div>
+              <div className="space-y-1.5"><Label>Schedule</Label>
+                <Select value={selFlow.schedule?.mode || "always"} onValueChange={(v) => updateSchedule({ mode: v })}>
+                  <SelectTrigger className="rounded-xl" data-testid="flow-schedule"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="always">Always on (cycle cards)</SelectItem><SelectItem value="everyX">Appear every X minutes</SelectItem></SelectContent>
+                </Select></div>
+              {selFlow.schedule?.mode === "everyX" && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5"><Label>Every (min)</Label><Input type="number" min="1" value={selFlow.schedule?.everyMinutes || 5} onChange={(e) => updateSchedule({ everyMinutes: parseInt(e.target.value) || 5 })} className="rounded-xl text-sm" data-testid="flow-every" /></div>
+                  <div className="space-y-1.5"><Label>Show (sec)</Label><Input type="number" min="1" value={selFlow.schedule?.showSeconds || 15} onChange={(e) => updateSchedule({ showSeconds: parseInt(e.target.value) || 15 })} className="rounded-xl text-sm" data-testid="flow-show" /></div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1.5"><Label>Card color</Label><input type="color" value={selFlow.style?.backgroundColor || "#0b1020"} onChange={(e) => updateFlowStyle({ backgroundColor: e.target.value })} className="w-full h-9 rounded-lg border border-slate-200 cursor-pointer" /></div>
+                <div className="space-y-1.5"><Label>Text color</Label><input type="color" value={selFlow.style?.color || "#ffffff"} onChange={(e) => updateFlowStyle({ color: e.target.value })} className="w-full h-9 rounded-lg border border-slate-200 cursor-pointer" /></div>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Cards ({selFlow.cards?.length || 0})</Label>
+                <button onClick={addCard} data-testid="add-card-btn" className="text-xs text-brand-600 font-medium inline-flex items-center gap-1"><Plus className="h-3 w-3" />Add card</button>
+              </div>
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {(selFlow.cards || []).map((c, i) => (
+                  <div key={c.id} data-testid={`flow-card-${i}`} className="rounded-xl border border-slate-200 p-2 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-slate-400 font-bold shrink-0">#{i + 1}</span>
+                      <Input value={c.title || ""} onChange={(e) => updateCard(c.id, { title: e.target.value })} placeholder="Title" className="rounded-lg text-sm" data-testid={`card-title-${i}`} />
+                      <button onClick={() => delCard(c.id)} className="text-slate-400 hover:text-red-600 shrink-0"><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                    <Input value={c.subtitle || ""} onChange={(e) => updateCard(c.id, { subtitle: e.target.value })} placeholder="Subtitle" className="rounded-lg text-sm" />
+                    <ImageUpload value={c.image} onChange={(url) => updateCard(c.id, { image: url })} testid={`card-img-${i}`} previewClass="h-12" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : !sel ? (
+            <p className="text-sm text-slate-400 text-center py-8">Select an element or flow to edit its properties.</p>
           ) : (
             <div className="space-y-3" data-testid="properties-panel">
               <div className="flex items-center justify-between">
