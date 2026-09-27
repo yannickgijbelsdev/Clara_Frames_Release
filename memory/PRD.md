@@ -67,6 +67,12 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Media Library search + filter (All / Photos / Videos) with live counts.
 - Verified: iter7 3/3 backend tests + full UI wiring pass.
 
+## Implemented (iter 8, 2026-06)
+- Flow Builder — timed rotating "pancartes": a scene can hold FLOWS; each flow is a positioned region cycling through cards (title + subtitle + optional photo), N seconds per card, with an entrance animation.
+- Flow scheduling: 'Always on' (cycle continuously) or 'Every X minutes' (appear for N seconds each cycle, then hide) — driven client-side in the vMix overlay.
+- Editor: 'Pancarte flow' toolbar button; flows are draggable/resizable on the canvas and cycle in live preview; dedicated flow panel (name, seconds/card, entrance, schedule, card+text colors, cards list with add/remove + per-card image upload).
+- Verified: iter8 5/5 backend tests + full UI wiring pass.
+
 ## Known follow-ups (code review, non-blocking)
 - Upload reads full file into memory before size check; consider streaming/max_upload_size.
 - Content-type trusted from client header (no magic-byte sniffing).

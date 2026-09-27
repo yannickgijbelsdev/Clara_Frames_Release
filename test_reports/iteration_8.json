@@ -1,0 +1,26 @@
+{
+  "summary": "Iteration 8: Pancarte Flow Builder end-to-end verification. Backend (pytest 5/5 passing at /app/backend/tests/test_flows.py): POST /api/scenes with flows persists a flow (2 cards, entrance slide-up, everyX schedule 2min/15s) and returns it; GET /api/scenes/{id} returns flows intact with all fields (name, interval, entrance, entranceDuration, schedule.mode/everyMinutes/showSeconds, style, cards[].title/subtitle/image); PUT /api/scenes/{id} updates flow (rename + reduce cards) and persists; scene without flows still saves and returns flows=[] (backward compatible); public overlay HTML /api/public/scene/{token}/overlay contains 'buildCard', 'flowVis', 'SCENE.flows', 'Date.now' (everyX visibility logic), and 'clara-in-up' (entrance keyframe for slide-up). Frontend (Playwright): MFA login OK; add-flow button renders a canvas-flow-{id} pancarte and opens flow-panel (mutually exclusive with properties-panel). All controls present: flow-name, flow-interval, flow-entrance (7 options incl. slide-up/down/left/right), flow-schedule (Always/everyX -> reveals flow-every + flow-show), add-card-btn (adds card-title-1), card-title-0/1 editable, delete-flow-btn. Saving via save-scene-btn + reload persists name='MyFlow', interval='3', 2 cards Alice/Bob and everyX schedule. Selecting a normal element hides flow-panel and shows properties-panel. Delete flow removes the canvas element. Cleanup: scene deleted.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_flows.py",
+    "/app/test_reports/pytest/iter8_flows.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "SceneEditor.jsx is now ~385 lines and mixes element + flow panels; consider extracting FlowPanel into its own component to keep files focused (minor).",
+    "server.py OVERLAY_HTML embeds JS as a large string (~350 lines within template). Consider moving overlay JS to a separate asset served statically for maintainability and easier testing.",
+    "Flow cards image field accepts a URL string only; upload UX handled by ImageUpload — ensure very large card image data URLs don't bloat scene documents in MongoDB (minor)."
+  ],
+  "updated_files": ["/app/backend/tests/test_flows.py"],
+  "success_rate": { "backend": "100%", "frontend": "100%" },
+  "test_credentials": "admin@example.com / admin123, TOTP JBSWY3DPEHPK3PXP",
+  "seed_data_creation": "Created and cleaned up: TEST_Flows_Scene, TEST_NoFlows_Scene (pytest), TEST_Flows_UI (Playwright). All deleted at teardown.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Pancarte flows: add-flow renders canvas-flow-{id}; flow-panel is mutually exclusive with properties-panel. Schedule select options: 'Always' and 'Every X minutes'; everyX reveals flow-every (minutes) and flow-show (seconds). Cards testids: card-title-{i}, card-img-{i}. Overlay HTML contains buildCard/flowVis/SCENE.flows and uses Date.now() for everyX visibility. Scene delete confirm is a browser dialog — accept it. Login navigates to /dashboard (not /scenes); go to /scenes for new-scene-btn."
+}
