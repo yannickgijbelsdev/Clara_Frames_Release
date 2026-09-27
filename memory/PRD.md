@@ -73,7 +73,18 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Editor: 'Pancarte flow' toolbar button; flows are draggable/resizable on the canvas and cycle in live preview; dedicated flow panel (name, seconds/card, entrance, schedule, card+text colors, cards list with add/remove + per-card image upload).
 - Verified: iter8 5/5 backend tests + full UI wiring pass.
 
+## Implemented (iter 9, 2026-06) — Pancartes & Flows restructure
+- Pancartes are now standalone, fully-designable card resources (`db.pancartes`): own canvas width/height, own background (color/image/video + fit + dim overlay) and freely-placed elements (text, image, clock, api_field, timed_text). Dedicated list `/pancartes` + editor `/pancartes/:id` (reuses SceneCanvas + shared ElementInspector). Create/duplicate/delete.
+- Flows are now standalone sequences (`db.flows`): ordered `pancarte_ids`, seconds-per-pancarte `interval`, entrance transition. List `/flows` + editor `/flows/:id` with a pancarte Library (click to add), Sequence (reorder up/down, remove) and a cycling Live preview.
+- Scenes now only PLACE a flow: `scene.flows[i] = {id, flow_id, x, y, w, h, schedule:{mode:'always'|'everyX', everyMinutes, showSeconds}}`. Scene editor flow panel has a 'Which flow' picker + schedule + position; canvas renders the referenced flow's pancartes (scaled, contain) and cycles them.
+- Backend: CRUD `/api/pancartes[/{id}]` and `/api/flows[/{id}]` (workspace-scoped); `expand_scene_flows()` embeds resolved flow + pancarte docs into the public overlay; overlay JS rebuilt to render each pancarte design scaled into its region and cycle by interval (+ everyX schedule); `values.json` now also resolves api sources referenced inside pancartes.
+- Shared frontend modules: `lib/elementDefs.js` (templates/TOOLS/FONTS), `lib/elementRender.jsx` (elBoxStyle/ElementContent/anim+entrance/BackgroundLayer), `components/PancarteView.jsx`, `components/ElementInspector.jsx`.
+- Old embedded-card flow schema removed (per user: existing pancartes discarded). Verified: iter9 backend 4/4 + full frontend journey pass.
+
 ## Known follow-ups (code review, non-blocking)
+- Pancarte/Flow delete is immediate (no confirm dialog) — matches existing Scenes behaviour.
+- FlowEditor/SceneEditor duplicate flow/pancarte fetch + cycling logic; could extract a useFlowCycle hook.
+- expand_scene_flows runs only in public_overlay (private GET /scenes/{id} does not embed _flow/_pancartes; frontend fetches flows+pancartes separately).
 - Upload reads full file into memory before size check; consider streaming/max_upload_size.
 - Content-type trusted from client header (no magic-byte sniffing).
 - No cleanup of orphaned S3 objects when media is replaced/cleared.

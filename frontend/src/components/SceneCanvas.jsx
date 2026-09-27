@@ -6,6 +6,7 @@ function FlowRegion({ placement, flowData, editable, selected, onPointerDownRegi
   const flow = flowData?.flow || null;
   const pancartes = flowData?.pancartes || [];
   const [idx, setIdx] = useState(0);
+  useEffect(() => { setIdx(0); }, [placement.flow_id, pancartes.length]);
   useEffect(() => {
     if (pancartes.length <= 1) return;
     const t = setInterval(() => setIdx((i) => (i + 1) % pancartes.length), Math.max(1, flow?.interval || 5) * 1000);

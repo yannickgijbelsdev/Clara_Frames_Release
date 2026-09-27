@@ -1,0 +1,32 @@
+{
+  "summary": "Iteration 9: Full end-to-end verification of the new Pancartes + Flows restructure. Backend (pytest 4/4 passing in /app/backend/tests/test_pancartes_flows.py): Pancartes CRUD (POST/GET/PUT/DELETE + list scoped by workspace_id + 404), Flows CRUD (create/get/list/reorder-via-PUT/delete), Scene with flows placement persists {id, flow_id, x, y, w, h, schedule.mode/everyMinutes/showSeconds}, and public overlay HTML returns 200. Frontend (Playwright, full journey): MFA login -> /pancartes new -> editor opens at /pancartes/:id -> add text + clock element, change canvas width to 1600x900, change bg-color, save; reload confirms 1600x900 persistence. List shows pancarte + duplicate button creates 3rd card. /flows new -> editor at /flows/:id -> library shows 3 pancartes, click 2 -> sequence with 2 items, change interval to 8, entrance slide-up, reorder via seq-down-0, save; reload confirms interval=8 and 2 seq items. Scenes new -> editor -> add-flow toolbar creates canvas-flow region + flow-panel; flow-select dropdown lists TEST_UI_Flow; selecting renders the pancarte design (clock, text, Jane Doe) scaled inside the region; schedule everyX reveals flow-every + flow-show (3 min / 20 s); save + reload persists everyX/3/20 and 1 canvas-flow region. Public overlay endpoint returns HTML 200 (18389 bytes). All test data cleaned up. Prior iter_8 test_flows.py is stale (targets removed embedded flow schema) but was left in place; new schema fully covered by test_pancartes_flows.py.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Create Pancarte / Create Flow / Create Scene dialogs", "issues": ["Radix DialogContent missing Description/aria-describedby -> a11y warning in console (non-blocking)"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_pancartes_flows.py",
+    "/app/test_reports/pytest/iter9_pancartes_flows.xml"
+  ],
+  "action_items": [
+    "Consider removing/rewriting stale /app/backend/tests/test_flows.py (references removed embedded-flow scene schema and no longer represents the current model).",
+    "Add DialogDescription (or aria-describedby) to Create pancarte/flow/scene dialogs to silence a11y warnings."
+  ],
+  "critical_code_review_comments": [
+    "GET /api/scenes/{id} does NOT run expand_scene_flows(); only public_overlay does. That's fine because the SceneEditor loads /flows + /pancartes separately, but if any future consumer of the private scene endpoint expects _flow/_pancartes it will break. Consider documenting or exposing an ?expand=1 flag.",
+    "Frontend FlowEditor and SceneEditor duplicate the pancartes/flows fetch logic + the LivePreview cycling logic (also present in SceneCanvas.FlowRegion). Consider extracting a useFlowCycle hook.",
+    "SceneCanvas.FlowRegion resets idx to 0 on every render (no useEffect reset on flow_id change). If user swaps flow_id the cycling continues without index reset (minor).",
+    "Pancarte/Flow delete has no confirmation dialog (single click deletes irreversibly). Scenes use browser confirm but pancartes/flows just call remove()."
+  ],
+  "updated_files": ["/app/backend/tests/test_pancartes_flows.py"],
+  "success_rate": { "backend": "100%", "frontend": "100%" },
+  "test_credentials": "admin@example.com / admin123, TOTP JBSWY3DPEHPK3PXP",
+  "seed_data_creation": "All test data prefixed TEST_ and cleaned up after each run (both pytest module teardown and Playwright cleanup step delete every TEST_ pancarte/flow/scene).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "New schema: pancartes (own canvas w/h + background + elements) and flows (interval, entrance, entranceDuration, pancarte_ids) are standalone /api/pancartes and /api/flows resources. Scenes reference a flow via scene.flows[i] = {id, flow_id, x, y, w, h, schedule:{mode:'always'|'everyX', everyMinutes, showSeconds}}. expand_scene_flows runs only inside public_overlay. Frontend testids all match problem statement (new-pancarte-btn, pancarte-name-input, create-pancarte-confirm, pancarte-card-{id}, dup/del/edit-pancarte-{id}, add-{type}, pan-width/height, bg-color, save-pancarte-btn, new-flow-btn, flow-name-input, create-flow-confirm, flow-card-{id}, del/edit-flow-{id}, flow-name-field, flow-interval-field, flow-entrance-field, flow-library, lib-add-{pid}, flow-sequence, seq-item/up/down/remove-{i}, save-flow-btn, add-flow, flow-panel, flow-select, flow-schedule, flow-every, flow-show, delete-flow-btn, canvas-flow-{id}). Scene create dialog does NOT have a create-scene-confirm testid — use role='button' name='Create' or the primary Create button in the dialog."
+}
