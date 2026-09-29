@@ -27,6 +27,7 @@ from bson import ObjectId
 from fastapi import FastAPI, APIRouter, Request, Response, HTTPException, Depends, UploadFile, File
 from fastapi.responses import HTMLResponse, PlainTextResponse, JSONResponse
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
 
@@ -239,6 +240,12 @@ class FlowInput(BaseModel):
     entrance: str = "fade"
     entranceDuration: float = 0.6
     pancarte_ids: List[str] = []
+    workspace_id: Optional[str] = None
+
+class FormInput(BaseModel):
+    name: str
+    description: str = ""
+    fields: List[Dict[str, Any]] = []
     workspace_id: Optional[str] = None
 
 class ChangePassword(BaseModel):
@@ -1328,6 +1335,121 @@ async def public_element_json(token: str, element_id: str):
     return JSONResponse({"id": element_id, "name": p.get("name"), "type": el.get("type"),
                          "value": await resolve_element_value(el)})
 
+# ---------------------------------------------------------------------------
+# Forms (website form builder) + Submissions (messages)
+# ---------------------------------------------------------------------------
+@api_router.get("/forms")
+async def list_forms(workspace_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+    q = {"user_id": user["id"]}
+    if workspace_id:
+        q["workspace_id"] = workspace_id
+    docs = await db.forms.find(q).sort("created_at", -1).to_list(500)
+    for d in docs:
+        d.pop("_id", None)
+    return docs
+
+@api_router.post("/forms")
+async def create_form(body: FormInput, user: dict = Depends(get_current_user)):
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "id": str(uuid.uuid4()), "user_id": user["id"], "workspace_id": body.workspace_id,
+        "name": body.name, "description": body.description, "fields": body.fields,
+        "public_token": uuid.uuid4().hex,
+        "created_at": now, "updated_at": now,
+    }
+    await db.forms.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+@api_router.get("/forms/{fid}")
+async def get_form(fid: str, user: dict = Depends(get_current_user)):
+    doc = await db.forms.find_one({"id": fid, "user_id": user["id"]}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Form not found")
+    return doc
+
+@api_router.put("/forms/{fid}")
+async def update_form(fid: str, body: FormInput, user: dict = Depends(get_current_user)):
+    existing = await db.forms.find_one({"id": fid, "user_id": user["id"]})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Form not found")
+    await db.forms.update_one({"id": fid}, {"$set": {
+        "name": body.name, "description": body.description, "fields": body.fields,
+        "updated_at": datetime.now(timezone.utc).isoformat()}})
+    return await db.forms.find_one({"id": fid}, {"_id": 0})
+
+@api_router.delete("/forms/{fid}")
+async def delete_form(fid: str, user: dict = Depends(get_current_user)):
+    await db.forms.delete_one({"id": fid, "user_id": user["id"]})
+    await db.submissions.delete_many({"form_id": fid, "user_id": user["id"]})
+    return {"ok": True}
+
+@api_router.get("/submissions")
+async def list_submissions(workspace_id: Optional[str] = None, form_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+    q = {"user_id": user["id"]}
+    if workspace_id:
+        q["workspace_id"] = workspace_id
+    if form_id:
+        q["form_id"] = form_id
+    docs = await db.submissions.find(q).sort("created_at", -1).to_list(1000)
+    for d in docs:
+        d.pop("_id", None)
+    return docs
+
+@api_router.get("/submissions/unread-count")
+async def unread_count(workspace_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+    q = {"user_id": user["id"], "read": False}
+    if workspace_id:
+        q["workspace_id"] = workspace_id
+    return {"count": await db.submissions.count_documents(q)}
+
+@api_router.post("/submissions/{sid}/read")
+async def mark_submission_read(sid: str, user: dict = Depends(get_current_user)):
+    await db.submissions.update_one({"id": sid, "user_id": user["id"]}, {"$set": {"read": True}})
+    return {"ok": True}
+
+@api_router.delete("/submissions/{sid}")
+async def delete_submission(sid: str, user: dict = Depends(get_current_user)):
+    await db.submissions.delete_one({"id": sid, "user_id": user["id"]})
+    return {"ok": True}
+
+# ---- Public form endpoints (consumed by external websites, permissive CORS) ----
+@api_router.get("/public/form/{token}")
+async def public_get_form(token: str):
+    form = await db.forms.find_one({"public_token": token}, {"_id": 0})
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+    base = os.environ.get("FRONTEND_URL", "")
+    return {
+        "id": form["id"], "name": form.get("name", ""), "description": form.get("description", ""),
+        "fields": [{
+            "key": f.get("key"), "label": f.get("label", ""), "type": f.get("type", "text"),
+            "required": bool(f.get("required", False)), "options": f.get("options", []),
+        } for f in form.get("fields", [])],
+        "submit_url": f"{base}/api/public/form/{token}/submit",
+    }
+
+@api_router.post("/public/form/{token}/submit")
+async def public_submit_form(token: str, payload: Dict[str, Any]):
+    form = await db.forms.find_one({"public_token": token})
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+    data = payload.get("data") if isinstance(payload, dict) and isinstance(payload.get("data"), dict) else payload
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=422, detail="Invalid payload")
+    for f in form.get("fields", []):
+        if f.get("required"):
+            v = data.get(f.get("key"))
+            if v is None or v == "" or v == []:
+                raise HTTPException(status_code=422, detail=f"Missing required field: {f.get('label') or f.get('key')}")
+    sub = {
+        "id": str(uuid.uuid4()), "form_id": form["id"], "user_id": form["user_id"],
+        "workspace_id": form.get("workspace_id"), "data": data, "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.submissions.insert_one(sub)
+    return {"ok": True, "id": sub["id"]}
+
 @api_router.get("/")
 async def root():
     return {"message": "vMix Overlay Studio API"}
@@ -1341,6 +1463,8 @@ async def startup():
     await db.sources.create_index("user_id")
     await db.scenes.create_index("public_token", unique=True)
     await db.workspaces.create_index("user_id")
+    await db.forms.create_index("public_token")
+    await db.submissions.create_index([("user_id", 1), ("workspace_id", 1), ("read", 1)])
     # seed admin with MFA enabled + known secret (for automated testing)
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@example.com")
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
@@ -1365,6 +1489,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class PublicFormCORSMiddleware(BaseHTTPMiddleware):
+    """Allow any website to fetch/submit public forms (no credentials)."""
+    async def dispatch(self, request, call_next):
+        if request.url.path.startswith("/api/public/form/"):
+            if request.method == "OPTIONS":
+                return Response(status_code=200, headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                    "Access-Control-Allow-Headers": "*",
+                    "Access-Control-Max-Age": "86400",
+                })
+            response = await call_next(request)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            return response
+        return await call_next(request)
+
+app.add_middleware(PublicFormCORSMiddleware)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

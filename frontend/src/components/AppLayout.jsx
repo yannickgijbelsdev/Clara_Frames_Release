@@ -1,6 +1,7 @@
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import api from "@/lib/api";
 import { Logo } from "@/components/Logo";
 import { TopLoadingBar } from "@/components/TopLoadingBar";
 import { PrimaryButton, SecondaryButton } from "@/components/PrimaryButton";
@@ -19,13 +20,26 @@ export default function AppLayout({ children, title, subtitle, actions }) {
   const { list, currentWs, setCurrent, createWs } = useWorkspace();
   const [newEnvOpen, setNewEnvOpen] = useState(false);
   const [envName, setEnvName] = useState("");
+  const [unread, setUnread] = useState(0);
   const initials = (user?.name || user?.email || "U").slice(0, 1).toUpperCase();
+
+  useEffect(() => {
+    if (!currentWs?.id) return;
+    let alive = true;
+    const fetchUnread = () => api.get(`/submissions/unread-count?workspace_id=${currentWs.id}`)
+      .then(({ data }) => { if (alive) setUnread(data.count || 0); }).catch(() => {});
+    fetchUnread();
+    const t = setInterval(fetchUnread, 20000);
+    return () => { alive = false; clearInterval(t); };
+  }, [currentWs?.id, location.pathname]);
 
   const navItems = [
     { to: "/dashboard", label: "Dashboard" },
     { to: "/scenes", label: "Scenes" },
     { to: "/pancartes", label: "Pancartes" },
     { to: "/flows", label: "Flows" },
+    { to: "/forms", label: "Forms" },
+    { to: "/messages", label: "Messages", badge: unread },
     { to: "/sources", label: "API Sources" },
     { to: "/media", label: "Media" },
     { to: "/help", label: "vMix Help" },
@@ -80,7 +94,7 @@ export default function AppLayout({ children, title, subtitle, actions }) {
           </DropdownMenu>
 
           <nav className="hidden xl:flex items-center gap-0.5 ml-3 flex-1">
-            {navItems.map(({ to, label }) => {
+            {navItems.map(({ to, label, badge }) => {
               const active = location.pathname === to || location.pathname.startsWith(to + "/");
               return (
                 <NavLink key={to} to={to} data-testid={`nav-${label.toLowerCase().replace(/\s+/g, "-")}`}
@@ -90,7 +104,12 @@ export default function AppLayout({ children, title, subtitle, actions }) {
                       className="absolute inset-0 bg-slate-900 rounded-full shadow-lg shadow-slate-900/25"
                       transition={{ type: "spring", stiffness: 400, damping: 34 }} />
                   )}
-                  <span className={`relative z-10 ${active ? "text-white" : "text-slate-500"}`}>{label}</span>
+                  <span className={`relative z-10 flex items-center gap-1.5 ${active ? "text-white" : "text-slate-500"}`}>
+                    {label}
+                    {badge > 0 && (
+                      <span data-testid="messages-unread-badge" className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${active ? "bg-white text-slate-900" : "bg-brand-600 text-white"}`}>{badge > 99 ? "99+" : badge}</span>
+                    )}
+                  </span>
                 </NavLink>
               );
             })}
@@ -122,10 +141,11 @@ export default function AppLayout({ children, title, subtitle, actions }) {
         </div>
 
         <nav className="xl:hidden flex items-center gap-1 px-4 pb-3 overflow-x-auto">
-          {navItems.map(({ to, label }) => (
+          {navItems.map(({ to, label, badge }) => (
             <NavLink key={to} to={to}
-              className={({ isActive }) => `flex items-center px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap ${isActive ? "bg-slate-900 text-white" : "text-slate-600 bg-slate-100"}`}>
+              className={({ isActive }) => `flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap ${isActive ? "bg-slate-900 text-white" : "text-slate-600 bg-slate-100"}`}>
               {label}
+              {badge > 0 && <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-bold bg-brand-600 text-white">{badge > 99 ? "99+" : badge}</span>}
             </NavLink>
           ))}
         </nav>

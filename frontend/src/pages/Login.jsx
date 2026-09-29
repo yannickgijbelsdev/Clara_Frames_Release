@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import api, { apiErr } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -79,7 +79,6 @@ export default function Login() {
             <PrimaryButton data-testid="login-submit" type="submit" disabled={loading} className="w-full justify-center">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Continue"}
             </PrimaryButton>
-            <p className="text-sm text-slate-500 text-center">No account? <Link to="/register" className="text-brand-600 font-medium">Create one</Link></p>
           </form>
         )}
 

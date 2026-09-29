@@ -13,6 +13,9 @@ import Pancartes from "@/pages/Pancartes";
 import PancarteEditor from "@/pages/PancarteEditor";
 import Flows from "@/pages/Flows";
 import FlowEditor from "@/pages/FlowEditor";
+import Forms from "@/pages/Forms";
+import FormEditor from "@/pages/FormEditor";
+import Messages from "@/pages/Messages";
 import ExportPage from "@/pages/ExportPage";
 import Sources from "@/pages/Sources";
 import MediaLibrary from "@/pages/MediaLibrary";
@@ -51,6 +54,9 @@ function App() {
               <Route path="/pancartes/:id" element={<Protected><PancarteEditor /></Protected>} />
               <Route path="/flows" element={<Protected><Flows /></Protected>} />
               <Route path="/flows/:id" element={<Protected><FlowEditor /></Protected>} />
+              <Route path="/forms" element={<Protected><Forms /></Protected>} />
+              <Route path="/forms/:id" element={<Protected><FormEditor /></Protected>} />
+              <Route path="/messages" element={<Protected><Messages /></Protected>} />
               <Route path="/sources" element={<Protected><Sources /></Protected>} />
               <Route path="/media" element={<Protected><MediaLibrary /></Protected>} />
               <Route path="/settings" element={<Protected><Settings /></Protected>} />
