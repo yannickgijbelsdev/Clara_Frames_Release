@@ -1,0 +1,29 @@
+{
+  "summary": "Tested new Forms + Messages features end-to-end. Backend: 8/8 pytest cases passed (forms CRUD, public schema GET with CORS, valid submit 200, missing-required 422, OPTIONS preflight CORS, unread-count, mark-read, delete). Frontend: login page has no register link; Forms/Messages nav visible; unread badge (messages-unread-badge=1) appears after public submit; Forms CRUD flow works (create -> editor -> add/type=select+options/required+showInList toggles/reorder/save/reload persists 4 fields/delete); Website integration URL boxes + copy testids present; public GET schema via page.request returned 4 fields; POST missing required -> 422; POST valid -> 200; Messages inbox shows only showInList fields (Name, Email) with Message/priority hidden; More details reveals hidden fields; form filter dropdown lists all forms; delete message removes card; regression pass for Scenes/Pancartes/Flows.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "FormEditor", "issue": "Auto-slug key from label does NOT work when a brand-new field is added: newly added field has key='field_{n+1}' (e.g. field_4) while slug(label)='new_field', so autoKey condition (!f.key || f.key === slug(f.label)) is false and key never rewrites when the user edits the label. Only the pre-seeded default fields (name/email/message) exhibit the documented auto-slug behavior. Fix: initialize new field with key=slug(label) or treat the placeholder pattern /^field_\\d+$/ as unset for auto-slug purposes.", "selector": "[data-testid='field-key-{i}']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Unread badge live-update", "issue": "Badge does not decrement immediately when the message is opened/read from the Messages page itself; it only refreshes on next route change or the 20s poll. This matches the note in the request so it is acceptable, but a UX improvement would be to also refetch unread-count after markRead/toggle/delete inside Messages.jsx.", "affected_selectors": ["[data-testid='messages-unread-badge']"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_forms_messages.py", "/app/test_reports/pytest/forms_messages.xml"],
+  "action_items": [
+    "Optional: Fix FormEditor auto-slug so newly added fields also get key auto-derived from label (treat placeholder key field_<n> as empty).",
+    "Optional UX: refetch /submissions/unread-count from Messages.jsx after markRead / toggle / delete so the badge updates without navigating away."
+  ],
+  "critical_code_review_comments": [
+    "FormEditor onLabelChange autoKey logic misses the 'newly added field' case because initial key 'field_<n>' never equals slug(label).",
+    "Messages.jsx keeps its own local subs state and mutates read=true optimistically, but the AppLayout unread badge is not notified until route change / 20s poll -> consider a shared context or event to sync."
+  ],
+  "updated_files": ["/app/backend/tests/test_forms_messages.py"],
+  "success_rate": {"backend": "100%", "frontend": "100% (with 1 minor UX bug)"},
+  "test_credentials": "admin@example.com / admin123 + TOTP JBSWY3DPEHPK3PXP (used).",
+  "seed_data_creation": "Created/deleted a TEST form + one submission via public API during testing; cleaned up.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend forms/messages fully covered by /app/backend/tests/test_forms_messages.py (8 tests, all pass). UI flows verified with Playwright including the browser-context public GET/POST via page.request (avoid urllib in this preview env — returns 403 for unauth'd non-browser UAs on some routes). Known minor bug: FormEditor new-field auto-slug from label."
+}
