@@ -1522,7 +1522,7 @@ async def public_submit_form(token: str, payload: Dict[str, Any], request: Reque
 
 @api_router.get("/")
 async def root():
-    return {"message": "vMix Overlay Studio API"}
+    return {"message": "Clara Frames API"}
 
 # ---------------------------------------------------------------------------
 # Startup

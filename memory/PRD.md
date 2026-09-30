@@ -88,6 +88,14 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Permanent admin seeded at startup: yannick.gijbels@koodh.com / KYLovie13monx (role admin, create-if-missing, mfa_enabled=false so first login forces the user's own MFA setup via QR).
 - Verified: iter10 backend 8/8 + full frontend pass; auth seeding verified via curl + DB (role=admin, $2b$ bcrypt, mfa_setup on first login). Fixed 2 minor UX items (new-field auto-slug, live badge update).
 
+## Implemented (iter 12, 2026-06) — Song-pick form field
+- New form field type `song_pick`: visitors pick songs live from the iTunes catalog (search by title/artist) with cover art + ~30s audio preview. Per field the admin chooses "1 song" or "Top 5 (ranked, order preserved)".
+- Backend: public iTunes proxy `GET /api/public/itunes/search?term=&limit=` -> [{id,title,artist,album,artwork(200x200),preview}]; public form schema now returns `song_search_url` + per-field `max`/`mode`; submit caps song arrays to max (order kept); PublicFormCORSMiddleware broadened to all `/api/public/*`.
+- Frontend: reusable `SongPicker` (search/select/reorder/play) used as an inline preview in FormEditor; `SongList` renders chosen songs (cover + title + artist + play) in Messages.
+- Website integration panel simplified to ONE prominent API URL (the schema GET) whose response contains fields + submit_url + song_search_url + honeypot_field — one URL to share with any site / Emergent project.
+- Also: renamed old "vMix Overlay Studio" strings (TOTP issuer -> Clara Frames earlier; root API message -> Clara Frames API). Removed all Emergent assets/tracking from the frontend (index.html PostHog+badge+meta; koodh logo/login-bg now local imports; deleted unused constants).
+- Verified: iter12 backend 7/7 + full frontend flow pass (no defects).
+
 ## Known follow-ups (code review, non-blocking)
 - Pancarte/Flow delete is immediate (no confirm dialog) — matches existing Scenes behaviour.
 - FlowEditor/SceneEditor duplicate flow/pancarte fetch + cycling logic; could extract a useFlowCycle hook.

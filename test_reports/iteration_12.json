@@ -1,0 +1,20 @@
+{
+  "summary": "Full end-to-end verification of the new song_pick form-field feature (Clara Frames). Backend: 7/7 pytest cases pass (iTunes proxy returns {id,title,artist,artwork,preview} with 200x200 covers + previews; empty-term returns []; CORS open on /api/public/*; public schema exposes song_search_url + honeypot_field + per-field max/mode; POST with 6 top5 songs is capped to 5 in original order; required song with [] returns 422; single-song POST persists). Frontend: FormEditor add-field -> type=song_pick -> mode=Top 5 renders inline SongPicker; iTunes search 'coldplay' returned 12 results; add/remove/reorder (Yellow->Viva La Vida after ArrowDown) and play preview all work; Save + reload persists type='song_pick', mode='Top 5 (ranked)'; single prominent Website-integration API URL with copy-schema-url present; page.request GET of that URL returns fields (top_songs.max=5,mode=top5) + submit_url + song_search_url + honeypot_field; GET song_search_url?term=coldplay works; POST with 6 songs to submit_url returned 200 and Messages shows exactly 5 songs (UI Song 0..4) with cover images + play buttons in ranked order (play works, audio plays); unread badge visible; login page still has no register link.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_song_pick.py", "/app/test_reports/pytest/song_pick.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Cosmetic: /api/ root endpoint at server.py:1525 still returns 'vMix Overlay Studio API' — rename to 'Clara Frames API' for brand consistency (carried over from prior iteration).",
+    "SongPicker cleanup: usePreview() sets ref.current=null on unmount but does not remove the 'ended' listener; harmless because the Audio element is garbage-collected, but tidy would be to store the handler and removeEventListener.",
+    "FormEditor: schemaUrl uses BACKEND (from lib/api) while server-returned submit_url uses FRONTEND_URL env — both currently match, but if FRONTEND_URL diverges from REACT_APP_BACKEND_URL the copy-and-share URL and the submit_url in the schema could point at different hosts. Consider deriving both from the same value or documenting the requirement."
+  ],
+  "updated_files": ["/app/backend/tests/test_song_pick.py"],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100%"},
+  "test_credentials": "admin@example.com / admin123 + TOTP JBSWY3DPEHPK3PXP (consumed).",
+  "seed_data_creation": "Created TEST_SongPickUI form + one submission via UI/page.request during flow; deleted TEST_ form afterwards (cascade removes its submission).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "song_pick feature covered end-to-end at /app/backend/tests/test_song_pick.py (iTunes live, so requires outbound HTTPS to itunes.apple.com — works from this pod). FormEditor testids: field-type-{i}, field-songmode-{i}, field-songpreview-{i}, field-songpreview-{i}-search, song-add-{songId}, song-sel-{n}, song-play-{id}, copy-schema-url. Reorder buttons in a selected row don't have dedicated testids; use the button children of [data-testid='song-sel-{i}'] (order: play, up, down, remove). Messages SongList also emits song-play-{id} testids.",
+  "rca of the issue": "N/A — no defects found."
+}
