@@ -8,6 +8,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ShieldCheck, Loader2 } from "lucide-react";
+import loginBg from "@/assets/koodh-bear-multiple.png";
 
 export default function Login() {
   const nav = useNavigate();
@@ -51,7 +52,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center px-4 overflow-hidden"
-      style={{ backgroundColor: "#e9eaec", backgroundImage: "url('https://customer-assets-v7afamib.emergentagent.net/job_overlay-settings-hub/artifacts/lj18iq0v_KOODH_BEAR_MULTIPLE.png')", backgroundSize: "cover", backgroundPosition: "center" }}>
+      style={{ backgroundColor: "#e9eaec", backgroundImage: `url(${loginBg})`, backgroundSize: "cover", backgroundPosition: "center" }}>
       <div className="absolute inset-0 bg-[#F5F6F8]/30 backdrop-blur-[1px]" />
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4 }}
         className="relative z-10 w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl clara-soft ring-1 ring-white/60 p-8">

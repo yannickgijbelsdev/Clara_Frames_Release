@@ -24,6 +24,10 @@ export default function AppLayout({ children, title, subtitle, actions }) {
   const initials = (user?.name || user?.email || "U").slice(0, 1).toUpperCase();
 
   useEffect(() => {
+    document.title = title ? `Clara Frames | ${title}` : "Clara Frames";
+  }, [title]);
+
+  useEffect(() => {
     if (!currentWs?.id) return;
     let alive = true;
     const fetchUnread = () => api.get(`/submissions/unread-count?workspace_id=${currentWs.id}`)
