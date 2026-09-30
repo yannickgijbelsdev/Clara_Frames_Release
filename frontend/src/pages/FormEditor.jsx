@@ -46,7 +46,7 @@ export default function FormEditor() {
 
   const onLabelChange = (i, label) => {
     const f = fields[i];
-    const autoKey = !f.key || f.key === slug(f.label);
+    const autoKey = !f.key || f.key === slug(f.label) || /^field_\d+$/.test(f.key);
     updateField(i, autoKey ? { label, key: slug(label) } : { label });
   };
 

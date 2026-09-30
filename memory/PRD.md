@@ -81,6 +81,13 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Shared frontend modules: `lib/elementDefs.js` (templates/TOOLS/FONTS), `lib/elementRender.jsx` (elBoxStyle/ElementContent/anim+entrance/BackgroundLayer), `components/PancarteView.jsx`, `components/ElementInspector.jsx`.
 - Old embedded-card flow schema removed (per user: existing pancartes discarded). Verified: iter9 backend 4/4 + full frontend journey pass.
 
+## Implemented (iter 10-11, 2026-06) — Forms & Messages + auth tweaks
+- Removed the "Create one" registration link from the login page (registration API left intact per user).
+- Forms builder (`db.forms`): any logged-in user builds a form with custom fields (label, auto-slug key, type text/email/number/tel/textarea/select/checkbox, required toggle, and a "Show in Messages list" toggle). List `/forms` + editor `/forms/:id`. Public integration: GET `/api/public/form/{token}` returns the field schema, POST `/api/public/form/{token}/submit` accepts answers (required-field validation, stores submission). `PublicFormCORSMiddleware` opens CORS (ACAO:*) on `/api/public/form/*` so any external website can fetch + submit.
+- Messages inbox (`db.submissions`): `/messages` lists submitted answers newest-first; only fields with showInList appear directly, the rest are behind a per-message "More details" button; mark read / delete; form filter dropdown. Unread counter badge on the Messages nav item (polls `/submissions/unread-count`, plus live refresh via a `submissions-changed` window event after read/delete).
+- Permanent admin seeded at startup: yannick.gijbels@koodh.com / KYLovie13monx (role admin, create-if-missing, mfa_enabled=false so first login forces the user's own MFA setup via QR).
+- Verified: iter10 backend 8/8 + full frontend pass; auth seeding verified via curl + DB (role=admin, $2b$ bcrypt, mfa_setup on first login). Fixed 2 minor UX items (new-field auto-slug, live badge update).
+
 ## Known follow-ups (code review, non-blocking)
 - Pancarte/Flow delete is immediate (no confirm dialog) — matches existing Scenes behaviour.
 - FlowEditor/SceneEditor duplicate flow/pancarte fetch + cycling logic; could extract a useFlowCycle hook.

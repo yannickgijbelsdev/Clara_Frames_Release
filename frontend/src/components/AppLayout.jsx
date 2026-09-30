@@ -30,7 +30,8 @@ export default function AppLayout({ children, title, subtitle, actions }) {
       .then(({ data }) => { if (alive) setUnread(data.count || 0); }).catch(() => {});
     fetchUnread();
     const t = setInterval(fetchUnread, 20000);
-    return () => { alive = false; clearInterval(t); };
+    window.addEventListener("submissions-changed", fetchUnread);
+    return () => { alive = false; clearInterval(t); window.removeEventListener("submissions-changed", fetchUnread); };
   }, [currentWs?.id, location.pathname]);
 
   const navItems = [

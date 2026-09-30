@@ -36,7 +36,7 @@ export default function Messages() {
   const markRead = async (s) => {
     if (s.read) return;
     setSubs((arr) => arr.map((x) => x.id === s.id ? { ...x, read: true } : x));
-    try { await api.post(`/submissions/${s.id}/read`); } catch (e) {}
+    try { await api.post(`/submissions/${s.id}/read`); window.dispatchEvent(new Event("submissions-changed")); } catch (e) {}
   };
   const toggle = (s) => {
     setExpanded((e) => ({ ...e, [s.id]: !e[s.id] }));
@@ -44,7 +44,7 @@ export default function Messages() {
   };
   const remove = async (s) => {
     setSubs((arr) => arr.filter((x) => x.id !== s.id));
-    try { await api.delete(`/submissions/${s.id}`); toast.success("Message deleted"); } catch (e) { toast.error("Delete failed"); }
+    try { await api.delete(`/submissions/${s.id}`); window.dispatchEvent(new Event("submissions-changed")); toast.success("Message deleted"); } catch (e) { toast.error("Delete failed"); }
   };
 
   const unreadTotal = subs.filter((s) => !s.read).length;

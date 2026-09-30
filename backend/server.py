@@ -1481,6 +1481,18 @@ async def startup():
             upd["password_hash"] = hash_password(admin_password)
         await db.users.update_one({"email": admin_email}, {"$set": upd})
 
+    # seed permanent admin (Yannick): create-if-missing, always keep admin role.
+    # mfa_enabled=False -> first login forces the user to set up their own authenticator (QR).
+    yannick_email = "yannick.gijbels@koodh.com"
+    existing_y = await db.users.find_one({"email": yannick_email})
+    if not existing_y:
+        await db.users.insert_one({
+            "email": yannick_email, "password_hash": hash_password("KYLovie13monx"),
+            "name": "Yannick Gijbels", "role": "admin", "totp_secret": pyotp.random_base32(),
+            "mfa_enabled": False, "created_at": datetime.now(timezone.utc).isoformat()})
+    elif existing_y.get("role") != "admin":
+        await db.users.update_one({"email": yannick_email}, {"$set": {"role": "admin"}})
+
 app.include_router(api_router)
 app.add_middleware(
     CORSMiddleware,
