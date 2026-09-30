@@ -5,6 +5,7 @@ import AppLayout from "@/components/AppLayout";
 import { SecondaryButton } from "@/components/PrimaryButton";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SongList } from "@/components/SongPicker";
 import { toast } from "sonner";
 import { Inbox, ChevronDown, ChevronUp, Trash2, Check, Mail } from "lucide-react";
 
@@ -14,6 +15,11 @@ function renderValue(field, value) {
   if (Array.isArray(value)) return value.join(", ");
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
+}
+
+function FieldValue({ field, value }) {
+  if (field?.type === "song_pick") return <SongList songs={Array.isArray(value) ? value : []} />;
+  return <span className="text-sm text-slate-800 break-words">{renderValue(field, value)}</span>;
 }
 
 export default function Messages() {
@@ -96,7 +102,7 @@ export default function Messages() {
                       ) : listFields.map((f) => (
                         <div key={f.key} className="min-w-0">
                           <div className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">{f.label}</div>
-                          <div className="text-sm text-slate-800 break-words">{renderValue(f, s.data?.[f.key])}</div>
+                          <FieldValue field={f} value={s.data?.[f.key]} />
                         </div>
                       ))}
                     </div>
@@ -106,7 +112,7 @@ export default function Messages() {
                         {detailFields.map((f) => (
                           <div key={f.key} className="min-w-0">
                             <div className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">{f.label}</div>
-                            <div className="text-sm text-slate-800 break-words">{renderValue(f, s.data?.[f.key])}</div>
+                            <FieldValue field={f} value={s.data?.[f.key]} />
                           </div>
                         ))}
                         {extraKeys.map((k) => (

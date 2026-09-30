@@ -9,9 +9,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Save, ArrowLeft, Loader2, Plus, Trash2, ArrowUp, ArrowDown, Copy, Eye, EyeOff, Link2 } from "lucide-react";
+import { Save, ArrowLeft, Loader2, Plus, Trash2, ArrowUp, ArrowDown, Copy, Eye, EyeOff, Link2, Music } from "lucide-react";
+import SongPicker from "@/components/SongPicker";
 
-const FIELD_TYPES = ["text", "email", "number", "tel", "textarea", "select", "checkbox"];
+const FIELD_TYPES = ["text", "email", "number", "tel", "textarea", "select", "checkbox", "song_pick"];
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
 const slug = (s) => (s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "field";
 
@@ -32,6 +33,7 @@ export default function FormEditor() {
   const nav = useNavigate();
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [preview, setPreview] = useState({});
 
   useEffect(() => {
     api.get(`/forms/${id}`).then(({ data }) => setForm(data)).catch(() => { toast.error("Form not found"); nav("/forms"); });
@@ -125,7 +127,20 @@ export default function FormEditor() {
                         <div className="space-y-1"><Label className="text-[10px] uppercase text-slate-400">Options (comma separated)</Label>
                           <Input value={(f.options || []).join(", ")} onChange={(e) => updateField(i, { options: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} className="rounded-lg text-sm" data-testid={`field-options-${i}`} placeholder="Option A, Option B" /></div>
                       )}
+                      {f.type === "song_pick" && (
+                        <div className="space-y-1"><Label className="text-[10px] uppercase text-slate-400">How many songs</Label>
+                          <Select value={f.mode === "top5" ? "top5" : "single"} onValueChange={(v) => updateField(i, { mode: v, max: v === "top5" ? 5 : 1 })}>
+                            <SelectTrigger className="rounded-lg" data-testid={`field-songmode-${i}`}><SelectValue /></SelectTrigger>
+                            <SelectContent><SelectItem value="single">1 song</SelectItem><SelectItem value="top5">Top 5 (ranked)</SelectItem></SelectContent>
+                          </Select></div>
+                      )}
                     </div>
+                    {f.type === "song_pick" && (
+                      <div className="rounded-xl bg-brand-50/40 border border-brand-100 p-2.5">
+                        <div className="text-[10px] uppercase tracking-widest text-brand-600 font-bold mb-1.5 flex items-center gap-1"><Music className="h-3 w-3" />Try the picker (preview)</div>
+                        <SongPicker max={f.mode === "top5" ? 5 : 1} value={preview[f.id] || []} onChange={(v) => setPreview((p) => ({ ...p, [f.id]: v }))} testid={`field-songpreview-${i}`} />
+                      </div>
+                    )}
                     <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-1">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <Switch checked={!!f.required} onCheckedChange={(v) => updateField(i, { required: v })} data-testid={`field-required-${i}`} />
@@ -147,13 +162,27 @@ export default function FormEditor() {
         <div className="space-y-4">
           <div className="bg-white rounded-3xl clara-soft p-5 space-y-4">
             <div className="flex items-center gap-2 text-slate-900"><Link2 className="h-4 w-4 text-brand-600" /><span className="font-display font-semibold">Website integration</span></div>
-            <p className="text-xs text-slate-500 leading-relaxed">Your website fetches the fields from the schema URL (GET), renders the inputs + a submit button, then POSTs the answers to the submit URL. Save the form first so changes are live.</p>
-            <UrlBox label="Fields schema (GET)" url={schemaUrl} testid="copy-schema-url" />
-            <UrlBox label="Submit answers (POST JSON)" url={submitUrl} testid="copy-submit-url" />
-            <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
-              <div className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1.5">Example POST body</div>
-              <pre className="text-[11px] font-mono text-slate-600 whitespace-pre-wrap break-all">{JSON.stringify(Object.fromEntries((fields.length ? fields : [{ key: "name" }]).map((f) => [f.key, ""])), null, 2)}</pre>
+            <p className="text-xs text-slate-500 leading-relaxed">Give this <b>one</b> API URL to any website or Emergent project. A GET request returns everything: which fields to show, where to submit, and (for song fields) the live search URL. Save the form first so changes are live.</p>
+            <div className="space-y-1">
+              <Label className="text-[11px] uppercase tracking-widest text-brand-600 font-bold">Your API URL (GET)</Label>
+              <div className="flex items-center gap-1.5">
+                <code className="flex-1 min-w-0 truncate text-[12px] font-mono bg-slate-900 text-slate-100 rounded-lg px-2.5 py-2.5">{schemaUrl}</code>
+                <button data-testid="copy-schema-url" onClick={() => { navigator.clipboard.writeText(schemaUrl); toast.success("API URL copied"); }} className="h-9 w-9 shrink-0 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"><Copy className="h-4 w-4" /></button>
+              </div>
             </div>
+            <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 space-y-1.5">
+              <div className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">The response includes</div>
+              <ul className="text-[11px] text-slate-600 space-y-0.5 list-disc pl-4">
+                <li><code className="font-mono">fields</code> — the fields to render (key, label, type, required, options; for songs: max + mode)</li>
+                <li><code className="font-mono">submit_url</code> — POST the answers here as JSON</li>
+                <li><code className="font-mono">song_search_url</code> — GET <code className="font-mono">?term=</code> for live song search (cover + preview)</li>
+                <li><code className="font-mono">honeypot_field</code> — add this hidden input for spam protection</li>
+              </ul>
+            </div>
+            <details className="text-xs">
+              <summary className="cursor-pointer text-slate-500 font-medium">Show example POST body <code className="font-mono text-[10px]">{submitUrl.replace(schemaUrl.split("/api")[0], "")}</code></summary>
+              <pre className="mt-2 text-[11px] font-mono text-slate-600 whitespace-pre-wrap break-all bg-slate-50 border border-slate-100 rounded-lg p-2">{JSON.stringify(Object.fromEntries((fields.length ? fields : [{ key: "name" }]).map((f) => [f.key, f.type === "song_pick" ? [{ id: "…", title: "…", artist: "…", artwork: "…", preview: "…" }] : ""])), null, 2)}</pre>
+            </details>
             <div className="rounded-xl bg-amber-50 border border-amber-100 p-3">
               <div className="text-[10px] uppercase tracking-widest text-amber-600 font-bold mb-1.5">Spam protection</div>
               <p className="text-[11px] text-slate-600 leading-relaxed">Add a hidden input named <code className="font-mono bg-white px-1 rounded">_gotcha</code> to your form and keep it empty. Bots that fill it are silently ignored. Submissions are also rate-limited per visitor.</p>

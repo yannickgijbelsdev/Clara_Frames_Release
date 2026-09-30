@@ -1442,15 +1442,49 @@ async def public_get_form(token: str):
     if not form:
         raise HTTPException(status_code=404, detail="Form not found")
     base = os.environ.get("FRONTEND_URL", "")
-    return {
-        "id": form["id"], "name": form.get("name", ""), "description": form.get("description", ""),
-        "fields": [{
+    def field_out(f):
+        o = {
             "key": f.get("key"), "label": f.get("label", ""), "type": f.get("type", "text"),
             "required": bool(f.get("required", False)), "options": f.get("options", []),
-        } for f in form.get("fields", [])],
+        }
+        if f.get("type") == "song_pick":
+            o["max"] = int(f.get("max", 1) or 1)
+            o["mode"] = f.get("mode", "single")
+        return o
+    return {
+        "id": form["id"], "name": form.get("name", ""), "description": form.get("description", ""),
+        "fields": [field_out(f) for f in form.get("fields", [])],
         "submit_url": f"{base}/api/public/form/{token}/submit",
+        "song_search_url": f"{base}/api/public/itunes/search",
         "honeypot_field": HONEYPOT_FIELD,
     }
+
+@api_router.get("/public/itunes/search")
+async def public_itunes_search(term: str = "", limit: int = 12):
+    """Live song search proxy (iTunes). Returns cover + 30s preview per track. Open CORS."""
+    term = (term or "").strip()
+    if not term:
+        return JSONResponse([])
+    limit = max(1, min(int(limit or 12), 25))
+    url = "https://itunes.apple.com/search"
+    params = {"term": term, "media": "music", "entity": "song", "limit": limit}
+    try:
+        r = await asyncio.to_thread(requests.get, url, params=params, timeout=10)
+        results = r.json().get("results", [])
+    except Exception:
+        return JSONResponse([])
+    out = []
+    for t in results:
+        art = t.get("artworkUrl100") or t.get("artworkUrl60") or ""
+        out.append({
+            "id": str(t.get("trackId") or t.get("collectionId") or ""),
+            "title": t.get("trackName", ""),
+            "artist": t.get("artistName", ""),
+            "album": t.get("collectionName", ""),
+            "artwork": art.replace("100x100bb", "200x200bb") if art else "",
+            "preview": t.get("previewUrl", ""),
+        })
+    return JSONResponse(out)
 
 @api_router.post("/public/form/{token}/submit")
 async def public_submit_form(token: str, payload: Dict[str, Any], request: Request):
@@ -1470,10 +1504,14 @@ async def public_submit_form(token: str, payload: Dict[str, Any], request: Reque
     # Drop internal/honeypot keys (real field keys never start with "_").
     data = {k: v for k, v in data.items() if not str(k).startswith("_")}
     for f in form.get("fields", []):
+        key = f.get("key")
+        # Cap song_pick selections to the configured max, keep order.
+        if f.get("type") == "song_pick" and isinstance(data.get(key), list):
+            data[key] = data[key][:int(f.get("max", 1) or 1)]
         if f.get("required"):
-            v = data.get(f.get("key"))
+            v = data.get(key)
             if v is None or v == "" or v == []:
-                raise HTTPException(status_code=422, detail=f"Missing required field: {f.get('label') or f.get('key')}")
+                raise HTTPException(status_code=422, detail=f"Missing required field: {f.get('label') or key}")
     sub = {
         "id": str(uuid.uuid4()), "form_id": form["id"], "user_id": form["user_id"],
         "workspace_id": form.get("workspace_id"), "data": data, "read": False,
@@ -1538,7 +1576,7 @@ app.add_middleware(
 class PublicFormCORSMiddleware(BaseHTTPMiddleware):
     """Allow any website to fetch/submit public forms (no credentials)."""
     async def dispatch(self, request, call_next):
-        if request.url.path.startswith("/api/public/form/"):
+        if request.url.path.startswith("/api/public/"):
             if request.method == "OPTIONS":
                 return Response(status_code=200, headers={
                     "Access-Control-Allow-Origin": "*",
