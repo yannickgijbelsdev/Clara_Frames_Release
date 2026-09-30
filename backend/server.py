@@ -1414,6 +1414,28 @@ async def delete_submission(sid: str, user: dict = Depends(get_current_user)):
     return {"ok": True}
 
 # ---- Public form endpoints (consumed by external websites, permissive CORS) ----
+HONEYPOT_FIELD = "_gotcha"
+RATE_LIMIT_MAX = 8            # max submissions ...
+RATE_LIMIT_WINDOW = 60       # ... per this many seconds, per IP + form
+_submit_hits: Dict[str, List[float]] = {}
+
+def _client_ip(request: Request) -> str:
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+def _rate_limited(key: str) -> bool:
+    import time as _t
+    now = _t.monotonic()
+    hits = [t for t in _submit_hits.get(key, []) if now - t < RATE_LIMIT_WINDOW]
+    if len(hits) >= RATE_LIMIT_MAX:
+        _submit_hits[key] = hits
+        return True
+    hits.append(now)
+    _submit_hits[key] = hits
+    return False
+
 @api_router.get("/public/form/{token}")
 async def public_get_form(token: str):
     form = await db.forms.find_one({"public_token": token}, {"_id": 0})
@@ -1427,16 +1449,26 @@ async def public_get_form(token: str):
             "required": bool(f.get("required", False)), "options": f.get("options", []),
         } for f in form.get("fields", [])],
         "submit_url": f"{base}/api/public/form/{token}/submit",
+        "honeypot_field": HONEYPOT_FIELD,
     }
 
 @api_router.post("/public/form/{token}/submit")
-async def public_submit_form(token: str, payload: Dict[str, Any]):
+async def public_submit_form(token: str, payload: Dict[str, Any], request: Request):
     form = await db.forms.find_one({"public_token": token})
     if not form:
         raise HTTPException(status_code=404, detail="Form not found")
     data = payload.get("data") if isinstance(payload, dict) and isinstance(payload.get("data"), dict) else payload
     if not isinstance(data, dict):
         raise HTTPException(status_code=422, detail="Invalid payload")
+    # Honeypot: real users leave the hidden field empty; bots fill it.
+    # Pretend success (so bots don't retry) but store nothing.
+    if data.get(HONEYPOT_FIELD):
+        return {"ok": True, "id": None}
+    # Simple rate limit per IP + form.
+    if _rate_limited(f"{_client_ip(request)}:{token}"):
+        raise HTTPException(status_code=429, detail="Too many submissions, please try again later")
+    # Drop internal/honeypot keys (real field keys never start with "_").
+    data = {k: v for k, v in data.items() if not str(k).startswith("_")}
     for f in form.get("fields", []):
         if f.get("required"):
             v = data.get(f.get("key"))

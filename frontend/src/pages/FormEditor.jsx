@@ -154,6 +154,10 @@ export default function FormEditor() {
               <div className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-1.5">Example POST body</div>
               <pre className="text-[11px] font-mono text-slate-600 whitespace-pre-wrap break-all">{JSON.stringify(Object.fromEntries((fields.length ? fields : [{ key: "name" }]).map((f) => [f.key, ""])), null, 2)}</pre>
             </div>
+            <div className="rounded-xl bg-amber-50 border border-amber-100 p-3">
+              <div className="text-[10px] uppercase tracking-widest text-amber-600 font-bold mb-1.5">Spam protection</div>
+              <p className="text-[11px] text-slate-600 leading-relaxed">Add a hidden input named <code className="font-mono bg-white px-1 rounded">_gotcha</code> to your form and keep it empty. Bots that fill it are silently ignored. Submissions are also rate-limited per visitor.</p>
+            </div>
             <p className="text-[11px] text-slate-400">Answers arrive in the <b>Messages</b> page. CORS is open so any site can submit.</p>
           </div>
         </div>
