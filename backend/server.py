@@ -40,7 +40,7 @@ db = client[os.environ['DB_NAME']]
 
 JWT_SECRET = os.environ['JWT_SECRET']
 JWT_ALGORITHM = "HS256"
-ISSUER = "vMix Overlay Studio"
+ISSUER = "Clara Frames"
 
 # S3 / object storage (Hetzner, public-read)
 S3_ENDPOINT = os.environ.get("S3_ENDPOINT", "")
