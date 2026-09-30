@@ -1,0 +1,18 @@
+{
+  "summary": "Verified TOTP issuer bug fix: otpauth_url returned by /api/auth/register (new email), /api/auth/login (mfa_setup_required path for yannick.gijbels@koodh.com), and /api/auth/2fa/reset (authenticated admin) all use issuer 'Clara Frames' with label prefix 'Clara Frames:' and query issuer=Clara Frames. No 'vMix Overlay Studio' string present in any otpauth_url. Regression: admin MFA end-to-end login (login -> mfa_ticket -> /api/auth/mfa/verify with TOTP -> httpOnly cookie set) works. All 4 pytest tests pass. Admin TOTP secret restored to JBSWY3DPEHPK3PXP after 2fa/reset test to keep credentials stable.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_totp_issuer.py", "/app/test_reports/pytest/totp_issuer.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Cosmetic: /app/backend/server.py line 1487 root endpoint still returns 'vMix Overlay Studio API' message string. Not part of the TOTP issuer bug, but worth renaming to 'Clara Frames API' for consistency."
+  ],
+  "updated_files": ["/app/backend/tests/test_totp_issuer.py"],
+  "success_rate": {"backend": "100%", "frontend": "n/a"},
+  "test_credentials": "admin@example.com/admin123 (TOTP secret JBSWY3DPEHPK3PXP); yannick.gijbels@koodh.com/KYLovie13monx (setup pending, not consumed).",
+  "seed_data_creation": "Ephemeral throwaway account per register test (test_totp_<uuid>@example.com). Not cleaned up (no delete endpoint used); low volume.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "TOTP issuer='Clara Frames' verified across register, login-setup, and 2fa-reset. Note: /api/auth/mfa/verify expects {mfa_ticket, code} (not {email, code}). 2fa/reset rotates the TOTP secret; test restores admin secret via direct Mongo update to keep JBSWY3DPEHPK3PXP valid for future runs.",
+  "rca of the issue": "ISSUER constant in /app/backend/server.py was 'vMix Overlay Studio'; changed to 'Clara Frames' (line 43). Confirmed pyotp.provisioning_uri emits otpauth://totp/Clara%20Frames:<email>?...&issuer=Clara%20Frames in all three code paths (lines 295, 318, 372)."
+}
