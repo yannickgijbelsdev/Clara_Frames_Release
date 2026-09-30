@@ -16,6 +16,7 @@ import FlowEditor from "@/pages/FlowEditor";
 import Forms from "@/pages/Forms";
 import FormEditor from "@/pages/FormEditor";
 import Messages from "@/pages/Messages";
+import PublicForm from "@/pages/PublicForm";
 import ExportPage from "@/pages/ExportPage";
 import Sources from "@/pages/Sources";
 import MediaLibrary from "@/pages/MediaLibrary";
@@ -45,6 +46,7 @@ function App() {
           <WorkspaceProvider>
             <Routes>
               <Route path="/login" element={<Public><Login /></Public>} />
+              <Route path="/f/:token" element={<PublicForm />} />
               <Route path="/register" element={<Public><Register /></Public>} />
               <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
               <Route path="/scenes" element={<Protected><Scenes /></Protected>} />

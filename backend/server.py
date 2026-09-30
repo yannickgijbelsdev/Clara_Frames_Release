@@ -1450,6 +1450,8 @@ async def public_get_form(token: str):
         if f.get("type") == "song_pick":
             o["max"] = int(f.get("max", 1) or 1)
             o["mode"] = f.get("mode", "single")
+            o["search_url"] = f"{base}/api/public/itunes/search"
+            o["result_fields"] = ["id", "title", "artist", "artwork", "preview"]
         return o
     return {
         "id": form["id"], "name": form.get("name", ""), "description": form.get("description", ""),
