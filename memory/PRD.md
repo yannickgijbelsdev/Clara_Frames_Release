@@ -96,6 +96,12 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Also: renamed old "vMix Overlay Studio" strings (TOTP issuer -> Clara Frames earlier; root API message -> Clara Frames API). Removed all Emergent assets/tracking from the frontend (index.html PostHog+badge+meta; koodh logo/login-bg now local imports; deleted unused constants).
 - Verified: iter12 backend 7/7 + full frontend flow pass (no defects).
 
+## Implemented (iter 13, 2026-06) — Hosted form page + song fix
+- Root cause of "song not in Messages / no play+add buttons": the user built their own site from the raw JSON API, which can't render interactive controls.
+- NEW hosted, embeddable form page at `/f/{public_token}` (public, no auth): renders the full working form for every field type incl. the `song_pick` picker (iTunes search -> results each with a play-preview button + a "+" add button; selected songs shown ranked with cover), hidden honeypot, submits to the form, success screen. Link it or iframe it.
+- Schema now self-describes `song_pick` fields with `search_url` + `result_fields`; FormEditor integration panel surfaces the ready-to-use form page URL (copy-formpage-url) alongside the API URL.
+- Messages renders submitted songs as cover + title + artist + play (SongList). Verified iter13: backend 5/5 + frontend 100%, no defects.
+
 ## Known follow-ups (code review, non-blocking)
 - Pancarte/Flow delete is immediate (no confirm dialog) — matches existing Scenes behaviour.
 - FlowEditor/SceneEditor duplicate flow/pancarte fetch + cycling logic; could extract a useFlowCycle hook.

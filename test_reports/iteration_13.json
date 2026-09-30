@@ -1,0 +1,20 @@
+{
+  "summary": "End-to-end verification of the hosted public form page (/f/{public_token}) + Messages rendering fix. Backend: 5/5 pytest cases pass (public schema exposes new song_pick keys search_url + result_fields; /f/{token} SPA HTML served without auth; POST with required song empty -> 422; full submit with a song persists and admin GET /api/submissions returns cover+title+artist+preview intact; regression on text/email/number/tel/textarea/select/checkbox still works). Frontend E2E: opened /f/{token} in a fresh incognito browser context (no auth cookies) -> data-testid=public-form rendered; pf-naam and pf-plaat-search present; submit while required song empty triggered public-form-error (server 422); search 'coldplay' returned 12 results with 12 song-add-{id} + 12 song-play-{id} buttons; add -> song-sel-0 with cover <img src=https://...> + play button; public-form-submit -> public-form-success shown. In Messages: submission 'Alice/Yellow/Coldplay' rendered with cover img + working song-play-{id} button (screenshot confirms). FormEditor integration panel: copy-formpage-url and copy-schema-url present and /f/{token} URL surfaced.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_public_form_page.py", "/app/test_reports/pytest/iter13_public_form.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "PublicForm.jsx: submit_url comes from schema (server-side FRONTEND_URL env). If REACT_APP_BACKEND_URL and FRONTEND_URL diverge, the hosted page will POST to a different host than the one that served the page — carried over from prior iteration.",
+    "PublicForm.jsx: the /f/{token} page currently only shows 'This form does not exist.' or the form; there is no explicit HTTP 404 status for crawlers/monitoring. Optional SEO/robots-noindex meta not set on the public page.",
+    "server.py: /api/ root still returns 'vMix Overlay Studio API' (branding leftover)."
+  ],
+  "updated_files": ["/app/backend/tests/test_public_form_page.py", "/app/test_reports/iteration_13.json"],
+  "success_rate": {"backend": "100% (5/5)", "frontend": "100%"},
+  "test_credentials": "admin@example.com / admin123 + TOTP JBSWY3DPEHPK3PXP",
+  "seed_data_creation": "Created TEST_HostedFormPage_UI + TEST_PublicFormPage + TEST_ScalarRegression forms and their submissions during the run; all deleted afterwards.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Hosted form page testids: public-form, pf-{key}, pf-{key}-search, song-add-{id}, song-play-{id}, song-sel-{n}, song-remove-{n}, public-form-submit, public-form-success, public-form-error. Server exposes new per-field keys search_url + result_fields on song_pick fields plus top-level song_search_url/submit_url/honeypot_field. FormEditor testids: copy-formpage-url + copy-schema-url. Public /f/:token route requires no auth; use a fresh browser context or requests.Session with no cookies. iTunes proxy is live.",
+  "rca of the issue": "Original bug ('plaat did not show up in Messages' + 'no play/+ button on the form') root cause was that the user had built their own form UI from the raw JSON schema — it can't render play/add controls. Fix delivered by main agent: hosted /f/{token} SPA page that renders the full form (incl. SongPicker with play + add buttons), schema now self-describes song_pick fields via search_url/result_fields, and Messages renders the persisted song object as cover img + title + artist + play button. All three angles verified end-to-end in this iteration."
+}
