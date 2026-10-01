@@ -1,0 +1,27 @@
+{
+  "summary": "Verified Clara Frames song_pick normalization (robustness fix) end-to-end. Backend pytest 4/4 passed: (a) JSON-stringified array payload is parsed and stored as a real array, (b) single raw-iTunes object is wrapped into a 1-item array (raw keys trackName/artistName/artworkUrl100/previewUrl retained), (c) normal array is capped to field.max (top5 cap verified 10->5), and required-empty song still returns 422. Frontend Messages UI confirmed via Playwright: all 3 variants (StringifiedUser 'Clocks', RawItunesUser 'Fix You', NormalArrayUser 'Yellow') render with cover <img src=https://is1-ssl.mzstatic.com/.../200x200bb.jpg>, title + 'Coldplay' artist, and song-play-{id} button — NOT an empty '—'. Regression: hosted /f/{token} end-to-end still works (public-form rendered, pf-song-search returned 12 results with song-add-{id}, submit -> public-form-success). Required empty song returns 422 (backend). ALL_OK=True.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_song_normalize.py",
+    "/app/test_reports/pytest/iter14_song_normalize.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py public_submit_form: normalization is correct and tolerant (string->json, dict->wrap, cap to max). Minor: json is imported inside the loop via 'import json as _j'; consider moving to module-level for clarity (not a bug).",
+    "server.py public_submit_form: non-list song_pick values that fail to parse (e.g. plain string 'hello') pass through unchanged and then only the required check catches empty/None — a non-empty garbage string on a song_pick field will be stored as a string. Frontend toSongs() handles it defensively, but backend could coerce unknown shapes to [] for stricter contract.",
+    "SongPicker normSong: good tolerance for both internal and raw iTunes keys. Falls back to '' preview — PlayButton still renders but is a no-op if no preview URL (acceptable).",
+    "Messages toSongs: handles string/object/array; good."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_song_normalize.py",
+    "/app/test_reports/iteration_14.json"
+  ],
+  "success_rate": {"backend": "100% (4/4 new + prior passing)", "frontend": "100%"},
+  "test_credentials": "admin@example.com / admin123 + TOTP JBSWY3DPEHPK3PXP",
+  "seed_data_creation": "TEST_SongNormalize (backend pytest, auto-cleaned) and TEST_SongNormUI (UI run, deleted after assertions). All submissions cascade-deleted with the form.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Song normalization robustness is stable. Public submit accepts: real array, single object (incl. raw iTunes keys), JSON-stringified array. Messages SongList uses normSong() mapping id/trackId, title/trackName, artist/artistName, artwork/artworkUrl100|60/artworkUrl, preview/previewUrl. Testids: message-card-{id}, message-more-{id}, song-play-{id}, public-form, pf-{key}-search, song-add-{id}, public-form-submit, public-form-success, public-form-error. Prefer a fresh browser context for /f/{token} to avoid auth cookies.",
+  "rca of the issue": "Original bug: user's self-built external form was POSTing song_pick as either a JSON-stringified array or a raw iTunes object; previous backend code only validated 'required' and stored the value as-is, and Messages assumed an array of {title,artist,...}. Result: cell showed '—'. Fix (verified): (1) backend normalizes song_pick values before required check: strings starting with [ or { are JSON-parsed, dicts are wrapped as [dict], arrays are capped to field.max; (2) frontend normSong maps both our keys and raw iTunes keys; (3) Messages toSongs coerces string/object to array before passing to SongList."
+}

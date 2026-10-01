@@ -102,6 +102,12 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Schema now self-describes `song_pick` fields with `search_url` + `result_fields`; FormEditor integration panel surfaces the ready-to-use form page URL (copy-formpage-url) alongside the API URL.
 - Messages renders submitted songs as cover + title + artist + play (SongList). Verified iter13: backend 5/5 + frontend 100%, no defects.
 
+## Fixed (iter 14, 2026-06) — song_pick robustness (live-site empty song)
+- Symptom: a user's self-built external form posted song_pick answers but the song showed empty ("—") in Messages (text fields worked). Production DB not inspectable from preview (deployer RCA blocked by a platform deploy-scoping error: "v3 deployment not found" for the job id).
+- Root causes addressed defensively: integrator may send the song as a JSON-stringified array, a single object, or raw iTunes-keyed objects (trackName/artistName/artworkUrl100/previewUrl).
+- Fix: backend `public_submit_form` normalizes song_pick values to a clean array (parse JSON string, wrap single dict, cap to max) before the required check; frontend `SongList.normSong()` maps both our keys and raw iTunes keys; Messages `toSongs()` coerces string/object to array. Verified iter14 backend 4/4 + frontend 100%.
+- REMAINING user action: the fix must be REDEPLOYED to take effect on the live site; and if still empty after redeploy, it's a field-key mismatch (POST must use the field's exact `key`; unknown keys appear under Messages "More details").
+
 ## Known follow-ups (code review, non-blocking)
 - Pancarte/Flow delete is immediate (no confirm dialog) — matches existing Scenes behaviour.
 - FlowEditor/SceneEditor duplicate flow/pancarte fetch + cycling logic; could extract a useFlowCycle hook.
