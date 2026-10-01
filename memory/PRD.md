@@ -108,6 +108,12 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Fix: backend `public_submit_form` normalizes song_pick values to a clean array (parse JSON string, wrap single dict, cap to max) before the required check; frontend `SongList.normSong()` maps both our keys and raw iTunes keys; Messages `toSongs()` coerces string/object to array. Verified iter14 backend 4/4 + frontend 100%.
 - REMAINING user action: the fix must be REDEPLOYED to take effect on the live site; and if still empty after redeploy, it's a field-key mismatch (POST must use the field's exact `key`; unknown keys appear under Messages "More details").
 
+## Fixed (iter 15, 2026-06) — public form checkbox not checkable
+- Symptom: a checkbox field on the hosted public form (/f/{token}) could not be checked.
+- Root cause: it rendered as a radix Switch wrapped INSIDE a <label> -> a real tap double-toggled (label htmlFor click + control click) = net no change.
+- Fix: replaced with a real radix Checkbox at data-testid pf-{key} + a SIBLING <label htmlFor=pf-{key}> (top Label suppressed for checkbox to avoid duplicate). Single toggle; checked/unchecked persists as Yes/No in Messages. Verified iter15 backend 9/9 + frontend 100%.
+- Needs REDEPLOY to take effect on the live site; self-built external forms must POST the checkbox as a boolean under the field key.
+
 ## Known follow-ups (code review, non-blocking)
 - Pancarte/Flow delete is immediate (no confirm dialog) — matches existing Scenes behaviour.
 - FlowEditor/SceneEditor duplicate flow/pancarte fetch + cycling logic; could extract a useFlowCycle hook.

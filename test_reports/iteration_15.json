@@ -1,0 +1,27 @@
+{
+  "summary": "Verified the checkbox bug fix on the hosted public form (/f/{token}) end-to-end. Backend: 9/9 pytest passed (new test_checkbox_field.py 4/4 + regression test_public_form_page.py 5/5). Public schema exposes checkbox field with proper label; public submit stores True as truthy and False as falsy. Frontend (fresh context, no auth): checkbox renders as a real radix Checkbox at [data-testid=pf-opgebeld] with associated <label htmlFor=pf-opgebeld>. State transitions: unchecked -> (label click) -> data-state=checked -> (box click) -> unchecked -> (label click) -> checked, each click is a SINGLE toggle (no double-toggle regression). Submit CHECKED -> public-form-success. Admin Messages view: TEST_UICheckbox form shows 'IK WIL OPGEBELD WORDEN: Yes' for the checked submission and 'No' for the unchecked submission (renderValue mapping confirmed). Regression: song_pick messages (Yannick -> Yellow / Coldplay with cover + play button) still render; honeypot_field still present in /api/public/form/{token} schema; required text + scalar fields still work (test_public_submit_regression_scalar_fields covers text/email/number/tel/textarea/select/checkbox round-trip).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_checkbox_field.py",
+    "/app/backend/tests/test_public_form_page.py",
+    "/app/test_reports/pytest/iter15_checkbox.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "PublicForm.jsx: Checkbox block correctly uses <Checkbox id=pf-{key}/> + separate <label htmlFor=pf-{key}>, and the top <Label> is suppressed for checkbox type to avoid duplicate label text. onCheckedChange coerces to bool via !!v. Clean fix.",
+    "Messages.jsx renderValue: handles 'checkbox' via field?.type check and maps truthy (true/'true'/'on'/1) -> 'Yes', else 'No'. Note: for extraKeys (unknown schema keys) renderValue is called with field=null, so a stored true would render as the raw string 'true' instead of 'Yes' — low-impact since checkbox keys will be in the form schema, but worth noting.",
+    "Backend public_submit_form stores booleans as-is; no coercion of 'on'/'true' strings. Safe because the frontend sends real booleans via onCheckedChange."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_checkbox_field.py",
+    "/app/test_reports/iteration_15.json"
+  ],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100%"},
+  "test_credentials": "admin@example.com / admin123 + TOTP JBSWY3DPEHPK3PXP",
+  "seed_data_creation": "TEST_UICheckbox form + 2 submissions (checked/unchecked) created; form deleted post-test (cascades submissions). TEST_CheckboxField + TEST_ScalarRegression pytest fixtures teardown via DELETE.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Checkbox fix is stable. Testids: pf-{key} (both the Checkbox button and label[for=pf-{key}]), public-form-submit, public-form-success. Radix Checkbox exposes state via data-state=checked|unchecked and aria-checked. For Messages Yes/No mapping ensure checkbox field has showInList=true so it appears on card preview (listFields path uses FieldValue -> renderValue with field.type='checkbox').",
+  "rca of the issue": "Original bug: the checkbox field was rendered as a radix Switch wrapped INSIDE a <label>. On tap, both the <label htmlFor> click and the Switch's own click handler fired -> net no state change (double toggle). Fix (verified): replaced Switch with radix Checkbox at [data-testid=pf-{key}] and moved the <label htmlFor=pf-{key}> to be a SIBLING (not wrapper), suppressing the top <Label> for checkbox type to avoid duplicate label. Each click now produces exactly one state change, label-click and box-click both toggle correctly, and True/False persists end-to-end as 'Yes'/'No' in Messages."
+}
