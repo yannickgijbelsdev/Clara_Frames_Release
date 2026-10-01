@@ -6,7 +6,7 @@ import { PrimaryButton } from "@/components/PrimaryButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import SongPicker from "@/components/SongPicker";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
@@ -75,7 +75,7 @@ export default function PublicForm() {
               </div>
               {(schema.fields || []).map((f) => (
                 <div key={f.key} className="space-y-1.5">
-                  <Label>{f.label}{f.required && <span className="text-rose-500"> *</span>}</Label>
+                  {f.type !== "checkbox" && <Label>{f.label}{f.required && <span className="text-rose-500"> *</span>}</Label>}
                   {["text", "email", "number", "tel"].includes(f.type) && (
                     <Input type={f.type === "tel" ? "tel" : f.type} value={values[f.key] || ""} onChange={(e) => setVal(f.key, e.target.value)} className="rounded-xl" data-testid={`pf-${f.key}`} />
                   )}
@@ -89,7 +89,10 @@ export default function PublicForm() {
                     </Select>
                   )}
                   {f.type === "checkbox" && (
-                    <label className="flex items-center gap-2 cursor-pointer"><Switch checked={!!values[f.key]} onCheckedChange={(v) => setVal(f.key, v)} data-testid={`pf-${f.key}`} /><span className="text-sm text-slate-600">Yes</span></label>
+                    <div className="flex items-center gap-2.5 pt-1">
+                      <Checkbox id={`pf-${f.key}`} checked={!!values[f.key]} onCheckedChange={(v) => setVal(f.key, !!v)} className="h-5 w-5" data-testid={`pf-${f.key}`} />
+                      <label htmlFor={`pf-${f.key}`} className="text-sm text-slate-700 cursor-pointer select-none">{f.label}{f.required && <span className="text-rose-500"> *</span>}</label>
+                    </div>
                   )}
                   {f.type === "song_pick" && (
                     <SongPicker max={f.max || 1} value={values[f.key] || []} onChange={(v) => setVal(f.key, v)} testid={`pf-${f.key}`} />
