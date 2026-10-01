@@ -34,23 +34,39 @@ export function PlayButton({ id, url, playing, toggle, size = "h-8 w-8" }) {
   );
 }
 
-// Read-only display of chosen songs (used in Messages)
+// Read-only display of chosen songs (used in Messages). Tolerant of our keys
+// (title/artist/artwork/preview) and raw iTunes keys (trackName/artistName/...).
+function normSong(s) {
+  if (typeof s === "string") return { title: s, artist: "", artwork: "", preview: "" };
+  s = s || {};
+  return {
+    id: s.id || s.trackId || "",
+    title: s.title || s.trackName || s.name || "",
+    artist: s.artist || s.artistName || "",
+    artwork: s.artwork || s.artworkUrl100 || s.artworkUrl60 || s.artworkUrl || "",
+    preview: s.preview || s.previewUrl || "",
+  };
+}
+
 export function SongList({ songs = [] }) {
   const { playing, toggle } = usePreview();
   if (!Array.isArray(songs) || songs.length === 0) return <span className="text-sm text-slate-400">—</span>;
   return (
     <div className="space-y-1.5">
-      {songs.map((s, i) => (
-        <div key={(s.id || "") + i} className="flex items-center gap-2.5">
-          <span className="text-[11px] font-bold text-slate-400 w-4 text-right shrink-0">{i + 1}</span>
-          {s.artwork ? <img src={s.artwork} alt="" className="h-9 w-9 rounded-md object-cover shrink-0" /> : <span className="h-9 w-9 rounded-md bg-slate-100 flex items-center justify-center shrink-0"><Music className="h-4 w-4 text-slate-400" /></span>}
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium text-slate-800 truncate">{s.title || "Unknown"}</div>
-            <div className="text-xs text-slate-400 truncate">{s.artist || ""}</div>
+      {songs.map((raw, i) => {
+        const s = normSong(raw);
+        return (
+          <div key={(s.id || "") + i} className="flex items-center gap-2.5">
+            <span className="text-[11px] font-bold text-slate-400 w-4 text-right shrink-0">{i + 1}</span>
+            {s.artwork ? <img src={s.artwork} alt="" className="h-9 w-9 rounded-md object-cover shrink-0" /> : <span className="h-9 w-9 rounded-md bg-slate-100 flex items-center justify-center shrink-0"><Music className="h-4 w-4 text-slate-400" /></span>}
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium text-slate-800 truncate">{s.title || "Unknown"}</div>
+              <div className="text-xs text-slate-400 truncate">{s.artist || ""}</div>
+            </div>
+            <PlayButton id={s.id || `s${i}`} url={s.preview} playing={playing} toggle={toggle} />
           </div>
-          <PlayButton id={s.id || `s${i}`} url={s.preview} playing={playing} toggle={toggle} />
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

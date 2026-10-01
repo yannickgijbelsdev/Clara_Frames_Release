@@ -17,8 +17,19 @@ function renderValue(field, value) {
   return String(value);
 }
 
+function toSongs(v) {
+  if (Array.isArray(v)) return v;
+  if (typeof v === "string") {
+    const t = v.trim();
+    if (t.startsWith("[") || t.startsWith("{")) { try { const p = JSON.parse(t); return Array.isArray(p) ? p : [p]; } catch (e) {} }
+    return t ? [t] : [];
+  }
+  if (v && typeof v === "object") return [v];
+  return [];
+}
+
 function FieldValue({ field, value }) {
-  if (field?.type === "song_pick") return <SongList songs={Array.isArray(value) ? value : []} />;
+  if (field?.type === "song_pick") return <SongList songs={toSongs(value)} />;
   return <span className="text-sm text-slate-800 break-words">{renderValue(field, value)}</span>;
 }
 

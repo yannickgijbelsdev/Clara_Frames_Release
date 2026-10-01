@@ -1507,9 +1507,20 @@ async def public_submit_form(token: str, payload: Dict[str, Any], request: Reque
     data = {k: v for k, v in data.items() if not str(k).startswith("_")}
     for f in form.get("fields", []):
         key = f.get("key")
-        # Cap song_pick selections to the configured max, keep order.
-        if f.get("type") == "song_pick" and isinstance(data.get(key), list):
-            data[key] = data[key][:int(f.get("max", 1) or 1)]
+        # Normalize song_pick values so stored data is always a clean array (be tolerant
+        # of integrators who send a JSON string or a single object), then cap to max.
+        if f.get("type") == "song_pick":
+            v = data.get(key)
+            if isinstance(v, str) and v.strip().startswith(("[", "{")):
+                try:
+                    import json as _j
+                    v = _j.loads(v)
+                except Exception:
+                    pass
+            if isinstance(v, dict):
+                v = [v]
+            if isinstance(v, list):
+                data[key] = v[:int(f.get("max", 1) or 1)]
         if f.get("required"):
             v = data.get(key)
             if v is None or v == "" or v == []:
