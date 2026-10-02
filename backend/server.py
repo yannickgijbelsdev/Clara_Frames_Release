@@ -598,7 +598,12 @@ async def resolve_source_values(source: dict) -> Dict[str, Any]:
             raw = source.get("last_raw")
     values = {}
     for f in source.get("fields", []):
+        if not (f.get("key") or "").strip():
+            continue
         values[f["key"]] = _resolve_path(raw, f.get("path", ""))
+    # Plain-text (non-JSON) APIs are wrapped as {"_text": ...}; always expose as "text"
+    if isinstance(raw, dict) and set(raw.keys()) == {"_text"}:
+        values.setdefault("text", raw.get("_text", ""))
     return values
 
 def _prep_builtin(body: SourceInput) -> dict:
@@ -615,7 +620,12 @@ def _prep_builtin(body: SourceInput) -> dict:
         return {"url": url, "fields": fields, "latitude": lat, "longitude": lon}
     if body.type == "builtin_time":
         return {"url": "", "fields": [], "timezone": body.timezone or "Europe/Brussels"}
-    return {"url": body.url, "fields": [f.model_dump() for f in body.fields]}
+    fields = [f.model_dump() for f in body.fields]
+    has_mapping = any((f.get("key") or "").strip() for f in fields)
+    if not has_mapping:
+        # Plain-text API (e.g. now-playing.txt): expose the whole response as "text"
+        fields = [{"key": "text", "label": "Response text", "path": "_text"}]
+    return {"url": body.url, "fields": fields}
 
 @api_router.get("/sources")
 async def list_sources(workspace_id: Optional[str] = None, user: dict = Depends(get_current_user)):

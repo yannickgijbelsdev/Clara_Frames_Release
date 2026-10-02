@@ -114,6 +114,13 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Fix: replaced with a real radix Checkbox at data-testid pf-{key} + a SIBLING <label htmlFor=pf-{key}> (top Label suppressed for checkbox to avoid duplicate). Single toggle; checked/unchecked persists as Yes/No in Messages. Verified iter15 backend 9/9 + frontend 100%.
 - Needs REDEPLOY to take effect on the live site; self-built external forms must POST the checkbox as a boolean under the field key.
 
+## 2026-10-02 — Plain-text API sources (now-playing.txt) fix
+- Symptom: a plain-text API source (e.g. https://clr.koodh.com/api/rds/grk/now-playing.txt) tested OK but the API-field element stayed EMPTY in scene/overlay.
+- Root cause: non-JSON responses are wrapped as {"_text": ...}; with no field mapping the source exposed no fields, so the api_field element had nothing to bind to.
+- Fix (backend server.py): (1) _prep_builtin auto-creates field {key:"text", path:"_text"} when a custom source has no mapping; (2) resolve_source_values skips blank-key fields and always exposes "text" for {"_text":...} responses (safety net for existing sources).
+- Fix (frontend): ElementInspector field dropdown filters blank keys and falls back to a selectable "text" option; Sources.jsx hint tells users to leave mappings empty for plain-text APIs.
+- Verified e2e in preview: source test, /values.json, /element/{id}.txt and /data.json all return the live song. NEEDS REDEPLOY for the live site.
+
 ## Known follow-ups (code review, non-blocking)
 - Pancarte/Flow delete is immediate (no confirm dialog) — matches existing Scenes behaviour.
 - FlowEditor/SceneEditor duplicate flow/pancarte fetch + cycling logic; could extract a useFlowCycle hook.

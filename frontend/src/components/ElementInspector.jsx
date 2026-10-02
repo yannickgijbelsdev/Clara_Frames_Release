@@ -8,7 +8,8 @@ import { Trash2 } from "lucide-react";
 import { FONTS } from "@/lib/elementDefs";
 
 export default function ElementInspector({ sel, sources = [], updateProps, updateStyle, updateEl, delEl, footer = null }) {
-  const srcFields = sources.find((s) => s.id === sel?.props?.sourceId)?.fields || [];
+  const rawFields = (sources.find((s) => s.id === sel?.props?.sourceId)?.fields || []).filter((f) => (f.key || "").trim());
+  const srcFields = rawFields.length ? rawFields : [{ key: "text", label: "Response text" }];
   return (
     <div className="space-y-3" data-testid="properties-panel">
       <div className="flex items-center justify-between">

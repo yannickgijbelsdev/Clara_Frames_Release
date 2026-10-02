@@ -142,7 +142,7 @@ export default function Sources() {
                       </div>
                     ))}
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1.5">Path uses dot / index notation, e.g. <code className="font-mono">current.temperature_2m</code> or <code className="font-mono">results.0.name</code></p>
+                  <p className="text-[11px] text-slate-400 mt-1.5">Path uses dot / index notation, e.g. <code className="font-mono">current.temperature_2m</code> or <code className="font-mono">results.0.name</code>. For a plain-text API (e.g. a now-playing <code className="font-mono">.txt</code>) leave the mappings empty — the full response is exposed automatically as the <code className="font-mono">text</code> field.</p>
                 </div>
               </>
             )}
