@@ -36,8 +36,27 @@ export default function ElementInspector({ sel, sources = [], updateProps, updat
       )}
 
       {sel.type === "image" && (
-        <div className="space-y-1.5"><Label>Image / logo</Label>
-          <ImageUpload value={sel.props.src} onChange={(url) => updateProps({ src: url })} testid="prop-src" /></div>
+        <>
+          <div className="space-y-1.5"><Label>Image / logo</Label>
+            <ImageUpload value={sel.props.src} onChange={(url) => updateProps({ src: url })} testid="prop-src" /></div>
+          <div className="space-y-1.5"><Label>Live source (optional)</Label>
+            <Select value={sel.props.sourceId || "none"} onValueChange={(v) => updateProps({ sourceId: v === "none" ? "" : v, fieldKey: v === "none" ? "" : (sel.props.fieldKey || "artwork") })}>
+              <SelectTrigger className="rounded-xl" data-testid="prop-img-source"><SelectValue placeholder="Static image" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Static image</SelectItem>
+                {sources.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+              </SelectContent>
+            </Select></div>
+          {sel.props.sourceId && (
+            <div className="space-y-1.5"><Label>Image field</Label>
+              <Select value={sel.props.fieldKey || ""} onValueChange={(v) => updateProps({ fieldKey: v })}>
+                <SelectTrigger className="rounded-xl" data-testid="prop-img-field"><SelectValue placeholder="Choose field" /></SelectTrigger>
+                <SelectContent>{srcFields.map((f) => <SelectItem key={f.key} value={f.key}>{f.key}</SelectItem>)}</SelectContent>
+              </Select>
+              <p className="text-[11px] text-slate-400">Live beeld-URL, bv. het veld <code className="font-mono">artwork</code> van "Nu Speelt".</p>
+            </div>
+          )}
+        </>
       )}
 
       {sel.type === "timed_text" && (

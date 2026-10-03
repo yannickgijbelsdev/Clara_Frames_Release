@@ -37,7 +37,7 @@ export default function PancarteView({ pancarte, sourceValues, animate = false }
         {bg.overlayColor && (bg.overlayOpacity ?? 0) > 0 && (
           <div style={{ position: "absolute", inset: 0, background: bg.overlayColor, opacity: bg.overlayOpacity, pointerEvents: "none" }} />
         )}
-        {(pancarte.elements || []).map((el) => (
+        {(pancarte.elements || []).filter((el) => !el.hidden).map((el) => (
           <div key={el.id} style={elBoxStyle(el)}>
             <div style={{ width: "100%", height: "100%", display: "flex", justifyContent: "inherit", alignItems: "inherit", ...(animate ? entranceStyle(el) : {}) }}>
               <div style={{ width: "100%", height: "100%", display: "flex", justifyContent: "inherit", alignItems: "inherit", ...(animate ? animStyle(el) : {}) }}>

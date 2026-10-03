@@ -7,7 +7,7 @@ import { useWorkspace } from "@/context/WorkspaceContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SongList } from "@/components/SongPicker";
 import { toast } from "sonner";
-import { Inbox, ChevronDown, ChevronUp, Trash2, Check, Mail } from "lucide-react";
+import { Inbox, ChevronDown, ChevronUp, Trash2, Check, Mail, Radio, X } from "lucide-react";
 
 function renderValue(field, value) {
   if (value === undefined || value === null || value === "") return "—";
@@ -28,8 +28,8 @@ function toSongs(v) {
   return [];
 }
 
-function FieldValue({ field, value }) {
-  if (field?.type === "song_pick") return <SongList songs={toSongs(value)} />;
+function FieldValue({ field, value, onLive }) {
+  if (field?.type === "song_pick") return <SongList songs={toSongs(value)} onLive={onLive} />;
   return <span className="text-sm text-slate-800 break-words">{renderValue(field, value)}</span>;
 }
 
@@ -39,13 +39,36 @@ export default function Messages() {
   const [subs, setSubs] = useState([]);
   const [filter, setFilter] = useState("all");
   const [expanded, setExpanded] = useState({});
+  const [live, setLive] = useState(null);
 
+  const loadLive = () => {
+    if (!current) return;
+    api.get(`/sources/live?workspace_id=${current}`)
+      .then(({ data }) => { const l = data?.live; setLive(l && (l.title || l.text) ? l : null); })
+      .catch(() => {});
+  };
   const load = () => {
     if (!current) return;
     api.get(`/forms?workspace_id=${current}`).then(({ data }) => setForms(data)).catch(() => {});
     api.get(`/submissions?workspace_id=${current}`).then(({ data }) => setSubs(data)).catch(() => {});
+    loadLive();
   };
   useEffect(() => { load(); }, [current]);
+
+  const sendLive = async (song) => {
+    try {
+      const { data } = await api.post(`/sources/live`, {
+        workspace_id: current, title: song.title || "", artist: song.artist || "",
+        artwork: song.artwork || "", preview: song.preview || "",
+      });
+      setLive(data.live);
+      toast.success("Live gezet in de overlay");
+    } catch (e) { toast.error("Live zetten mislukt"); }
+  };
+  const clearLive = async () => {
+    try { await api.delete(`/sources/live?workspace_id=${current}`); setLive(null); toast.success("Live leeggemaakt"); }
+    catch (e) { toast.error("Leegmaken mislukt"); }
+  };
 
   const formsById = useMemo(() => Object.fromEntries(forms.map((f) => [f.id, f])), [forms]);
   const visibleSubs = filter === "all" ? subs : subs.filter((s) => s.form_id === filter);
@@ -76,6 +99,23 @@ export default function Messages() {
             {forms.map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
           </SelectContent>
         </Select>}>
+
+      {live && (
+        <div data-testid="live-now-banner" className="bg-slate-900 text-white rounded-3xl p-4 mb-4 flex items-center gap-4">
+          <span className="h-10 w-10 rounded-2xl bg-brand-600/20 text-brand-300 flex items-center justify-center shrink-0">
+            <Radio className="h-5 w-5" />
+          </span>
+          {live.artwork && <img src={live.artwork} alt="" className="h-12 w-12 rounded-lg object-cover shrink-0" />}
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] uppercase tracking-widest text-brand-300 font-bold">Nu live in de overlay</div>
+            <div className="text-sm font-semibold truncate">{live.text || [live.artist, live.title].filter(Boolean).join(" - ") || "—"}</div>
+          </div>
+          <button data-testid="live-clear-btn" onClick={clearLive}
+            className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors">
+            <X className="h-3.5 w-3.5" />Wis
+          </button>
+        </div>
+      )}
 
       {visibleSubs.length === 0 ? (
         <div className="bg-white rounded-3xl clara-soft p-12 text-center" data-testid="messages-empty">
@@ -113,7 +153,7 @@ export default function Messages() {
                       ) : listFields.map((f) => (
                         <div key={f.key} className="min-w-0">
                           <div className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">{f.label}</div>
-                          <FieldValue field={f} value={s.data?.[f.key]} />
+                          <FieldValue field={f} value={s.data?.[f.key]} onLive={f.type === "song_pick" ? sendLive : undefined} />
                         </div>
                       ))}
                     </div>
@@ -123,7 +163,7 @@ export default function Messages() {
                         {detailFields.map((f) => (
                           <div key={f.key} className="min-w-0">
                             <div className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">{f.label}</div>
-                            <FieldValue field={f} value={s.data?.[f.key]} />
+                            <FieldValue field={f} value={s.data?.[f.key]} onLive={f.type === "song_pick" ? sendLive : undefined} />
                           </div>
                         ))}
                         {extraKeys.map((k) => (

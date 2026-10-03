@@ -5,6 +5,7 @@ import AppLayout from "@/components/AppLayout";
 import { PrimaryButton, SecondaryButton } from "@/components/PrimaryButton";
 import SceneCanvas from "@/components/SceneCanvas";
 import ElementInspector from "@/components/ElementInspector";
+import LayersPanel from "@/components/LayersPanel";
 import { ImageUpload } from "@/components/ImageUpload";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -66,6 +67,9 @@ export default function SceneEditor() {
     setSelId(el.id); setSelFlowId(null);
   };
   const delEl = () => { setScene((s) => ({ ...s, elements: s.elements.filter((e) => e.id !== selId) })); setSelId(null); };
+  const reorderEls = (arr) => setScene((s) => ({ ...s, elements: arr }));
+  const toggleVisible = (elId) => setScene((s) => ({ ...s, elements: s.elements.map((e) => e.id === elId ? { ...e, hidden: !e.hidden } : e) }));
+  const deleteEl = (elId) => { setScene((s) => ({ ...s, elements: s.elements.filter((e) => e.id !== elId) })); setSelId((cur) => cur === elId ? null : cur); };
 
   const save = async (silent) => {
     setSaving(true);
@@ -104,6 +108,12 @@ export default function SceneEditor() {
               className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 border border-brand-200 bg-brand-50/40 transition-colors">
               <Film className="h-4 w-4 text-brand-600" />Pancarte flow
             </button>
+          </div>
+          <div className="mt-5">
+            <div className="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-2">Layers <span className="text-slate-300 normal-case tracking-normal">· top = front</span></div>
+            <LayersPanel elements={scene.elements} selectedId={selId}
+              onSelect={(sid) => { setSelId(sid); setSelFlowId(null); }}
+              onReorder={reorderEls} onToggleVisible={toggleVisible} onDelete={deleteEl} />
           </div>
           <div className="mt-5 space-y-2">
             <Label className="text-[11px] uppercase tracking-widest text-slate-400 font-bold">Background</Label>

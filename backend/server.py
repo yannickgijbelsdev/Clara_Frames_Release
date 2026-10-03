@@ -217,6 +217,13 @@ class SourceInput(BaseModel):
     timezone: Optional[str] = None
     workspace_id: Optional[str] = None
 
+class LiveSongInput(BaseModel):
+    workspace_id: str
+    title: str = ""
+    artist: str = ""
+    artwork: str = ""
+    preview: str = ""
+
 class SceneInput(BaseModel):
     name: str
     width: int = 1920
@@ -578,6 +585,10 @@ async def resolve_source_values(source: dict) -> Dict[str, Any]:
     if source.get("type") == "builtin_time":
         tz = source.get("timezone") or "UTC"
         return {"_tz": tz}
+    if source.get("type") == "builtin_live":
+        live = source.get("live") or {}
+        return {"title": live.get("title", ""), "artist": live.get("artist", ""),
+                "text": live.get("text", ""), "artwork": live.get("artwork", "")}
     now = datetime.now(timezone.utc)
     interval = int(source.get("refresh_interval", 30))
     last = source.get("last_fetched")
@@ -606,7 +617,16 @@ async def resolve_source_values(source: dict) -> Dict[str, Any]:
         values.setdefault("text", raw.get("_text", ""))
     return values
 
+LIVE_FIELDS = [
+    {"key": "text", "label": "Artiest — Titel", "path": "text"},
+    {"key": "title", "label": "Titel", "path": "title"},
+    {"key": "artist", "label": "Artiest", "path": "artist"},
+    {"key": "artwork", "label": "Hoesje (afbeelding)", "path": "artwork"},
+]
+
 def _prep_builtin(body: SourceInput) -> dict:
+    if body.type == "builtin_live":
+        return {"url": "", "fields": [dict(f) for f in LIVE_FIELDS]}
     if body.type == "builtin_weather":
         lat = body.latitude if body.latitude is not None else 50.85
         lon = body.longitude if body.longitude is not None else 4.35
@@ -626,6 +646,47 @@ def _prep_builtin(body: SourceInput) -> dict:
         # Plain-text API (e.g. now-playing.txt): expose the whole response as "text"
         fields = [{"key": "text", "label": "Response text", "path": "_text"}]
     return {"url": body.url, "fields": fields}
+
+async def _get_or_create_live_source(user: dict, workspace_id: str) -> dict:
+    src = await db.sources.find_one({"user_id": user["id"], "workspace_id": workspace_id, "type": "builtin_live"})
+    if src:
+        return src
+    doc = {
+        "id": str(uuid.uuid4()), "user_id": user["id"], "workspace_id": workspace_id,
+        "name": "Nu Speelt (live)", "type": "builtin_live", "url": "", "method": "GET",
+        "headers": {}, "refresh_interval": 5, "fields": [dict(f) for f in LIVE_FIELDS],
+        "live": {}, "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.sources.insert_one(doc)
+    return doc
+
+@api_router.get("/sources/live")
+async def get_live_source(workspace_id: str, user: dict = Depends(get_current_user)):
+    src = await _get_or_create_live_source(user, workspace_id)
+    src.pop("_id", None)
+    src.pop("last_raw", None)
+    return src
+
+@api_router.post("/sources/live")
+async def set_live_song(body: LiveSongInput, user: dict = Depends(get_current_user)):
+    src = await _get_or_create_live_source(user, body.workspace_id)
+    title = (body.title or "").strip()
+    artist = (body.artist or "").strip()
+    text = " - ".join([x for x in [artist, title] if x])
+    live = {
+        "title": title, "artist": artist, "artwork": body.artwork or "",
+        "preview": body.preview or "", "text": text,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.sources.update_one({"id": src["id"]}, {"$set": {"live": live}})
+    return {"ok": True, "source_id": src["id"], "live": live}
+
+@api_router.delete("/sources/live")
+async def clear_live_song(workspace_id: str, user: dict = Depends(get_current_user)):
+    src = await _get_or_create_live_source(user, workspace_id)
+    await db.sources.update_one({"id": src["id"]}, {"$set": {"live": {}}})
+    return {"ok": True}
+
 
 @api_router.get("/sources")
 async def list_sources(workspace_id: Optional[str] = None, user: dict = Depends(get_current_user)):
@@ -902,6 +963,13 @@ async def build_scene_data(scene: dict) -> Dict[str, Any]:
                 source_cache[sid] = await resolve_source_values(src) if src else {}
             val = source_cache.get(sid, {}).get(props.get("fieldKey"))
             out[name] = val if val is not None else ""
+        elif etype == "image" and props.get("sourceId") and props.get("fieldKey"):
+            sid = props.get("sourceId")
+            if sid not in source_cache:
+                src = await db.sources.find_one({"id": sid})
+                source_cache[sid] = await resolve_source_values(src) if src else {}
+            val = source_cache.get(sid, {}).get(props.get("fieldKey"))
+            out[name] = val if val is not None else ""
     return out
 
 async def resolve_element_value(el: dict) -> str:
@@ -1137,6 +1205,7 @@ function toMin(hhmm){ if(!hhmm) return null; const [h,m]=hhmm.split(':'); return
 const clocks = [];
 const timeds = [];
 const apiEls = [];
+const imageApis = [];
 var lastValues = {};
 
 function buildElementNode(el){
@@ -1150,10 +1219,13 @@ function buildElementNode(el){
   inner.style.width='100%'; inner.style.height='100%'; inner.style.display='flex';
   inner.style.justifyContent='inherit'; inner.style.alignItems='inherit';
   applyAnim(inner, p);
-  var ref = {node:d, clock:null, api:null, timed:null};
+  var ref = {node:d, clock:null, api:null, timed:null, imgApi:null};
   if(el.type==='image'){
-    if(p.src){ var img=document.createElement('img'); img.src=p.src; img.style.width='100%'; img.style.height='100%';
-      img.style.objectFit=(el.style&&el.style.objectFit)||'contain'; inner.appendChild(img); }
+    var img=document.createElement('img'); img.style.width='100%'; img.style.height='100%';
+    img.style.objectFit=(el.style&&el.style.objectFit)||'contain';
+    if(p.sourceId && p.fieldKey){ ref.imgApi={img:img, p:p}; if(p.src) img.src=p.src; }
+    else if(p.src){ img.src=p.src; }
+    inner.appendChild(img);
   } else if(el.type==='clock'){
     inner.textContent = fmtClock(p.timezone, p.format);
     ref.clock = {d:inner, p:p};
@@ -1193,9 +1265,11 @@ function applyBackground(host, bg){
 }
 
 (SCENE.elements||[]).forEach(function(el){
+  if(el.hidden) return;
   var ref = buildElementNode(el);
   if(ref.clock) clocks.push(ref.clock);
   if(ref.api) apiEls.push(ref.api);
+  if(ref.imgApi) imageApis.push(ref.imgApi);
   if(ref.timed) timeds.push(ref.timed);
   stage.appendChild(ref.node);
 });
@@ -1211,11 +1285,13 @@ function renderPancarte(pan, w, h){
   st.style.position='absolute'; st.style.left=((w-sw)/2)+'px'; st.style.top=((h-sh)/2)+'px';
   st.style.width=pw+'px'; st.style.height=ph+'px'; st.style.transformOrigin='top left'; st.style.transform='scale('+scale+')'; st.style.overflow='hidden';
   applyBackground(st, pan.background);
-  var res = {node:box, clocks:[], apis:[]};
+  var res = {node:box, clocks:[], apis:[], images:[]};
   (pan.elements||[]).forEach(function(el){
+    if(el.hidden) return;
     var ref = buildElementNode(el);
     if(ref.clock) res.clocks.push(ref.clock);
     if(ref.api) res.apis.push(ref.api);
+    if(ref.imgApi) res.images.push(ref.imgApi);
     st.appendChild(ref.node);
   });
   box.appendChild(st);
@@ -1224,6 +1300,9 @@ function renderPancarte(pan, w, h){
 
 function updateApis(list, values){
   list.forEach(function(a){ var v = values[a.p.sourceId+':'+a.p.fieldKey]; if(v==null) v=''; a.d.textContent=(a.p.prefix||'')+v+(a.p.suffix||''); });
+}
+function updateImages(list, values){
+  list.forEach(function(a){ var v = values[a.p.sourceId+':'+a.p.fieldKey]; if(v && a.img.getAttribute('src')!==v){ a.img.src=v; } });
 }
 
 var placements = [];
@@ -1234,7 +1313,7 @@ var placements = [];
   cont.style.position='absolute'; cont.style.left=pl.x+'px'; cont.style.top=pl.y+'px';
   cont.style.width=pl.w+'px'; cont.style.height=pl.h+'px'; cont.style.overflow='hidden';
   stage.appendChild(cont);
-  var idx=0, adv=null, cur={clocks:[],apis:[]};
+  var idx=0, adv=null, cur={clocks:[],apis:[],images:[]};
   function render(){
     cont.innerHTML='';
     if(!pans.length){ return; }
@@ -1243,9 +1322,10 @@ var placements = [];
     var ea = entranceAnim({entrance: flow?flow.entrance:'none', entranceDuration: flow?flow.entranceDuration:0.6});
     if(ea) r.node.style.animation = ea;
     cont.appendChild(r.node);
-    cur = {clocks:r.clocks, apis:r.apis};
+    cur = {clocks:r.clocks, apis:r.apis, images:r.images};
     cur.clocks.forEach(function(c){ c.d.textContent = fmtClock(c.p.timezone, c.p.format); });
     updateApis(cur.apis, lastValues);
+    updateImages(cur.images, lastValues);
   }
   function advance(){ idx++; render(); }
   function startAdv(){ if(!adv && pans.length>1){ adv=setInterval(advance, Math.max(1,(flow&&flow.interval)||5)*1000); } }
@@ -1285,7 +1365,8 @@ async function poll(){
     const data = await r.json();
     lastValues = data;
     updateApis(apiEls, data);
-    placements.forEach(function(f){ updateApis(f.getCur().apis, data); });
+    updateImages(imageApis, data);
+    placements.forEach(function(f){ updateApis(f.getCur().apis, data); updateImages(f.getCur().images, data); });
   }catch(e){}
 }
 setInterval(poll, 5000); poll();
@@ -1300,16 +1381,17 @@ async def public_values(token: str):
     cache: Dict[str, Dict[str, Any]] = {}
 
     async def add_el(el):
-        if el.get("type") != "api_field":
+        if el.get("type") not in ("api_field", "image"):
             return
         p = el.get("props", {})
         sid = p.get("sourceId")
-        if not sid:
+        fk = p.get("fieldKey")
+        if not sid or not fk:
             return
         if sid not in cache:
             src_doc = await db.sources.find_one({"id": sid})
             cache[sid] = await resolve_source_values(src_doc) if src_doc else {}
-        out[f"{sid}:{p.get('fieldKey')}"] = cache.get(sid, {}).get(p.get("fieldKey"), "")
+        out[f"{sid}:{fk}"] = cache.get(sid, {}).get(fk, "")
 
     for el in scene.get("elements", []):
         await add_el(el)

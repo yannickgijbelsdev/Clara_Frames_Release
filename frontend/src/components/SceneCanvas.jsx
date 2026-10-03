@@ -98,13 +98,14 @@ export default function SceneCanvas({ scene, editable = false, selectedId, onSel
           <div style={{ position: "absolute", inset: 0, background: scene.background.overlayColor, opacity: scene.background.overlayOpacity, pointerEvents: "none" }} />
         )}
         {(scene.elements || []).map((el) => {
+          if (el.hidden && !editable) return null;
           const selected = editable && el.id === selectedId;
           return (
             <div key={el.id}
               data-testid={`canvas-el-${el.id}`}
               onPointerDown={(e) => onPointerDown(e, el, "move")}
               onClick={(e) => e.stopPropagation()}
-              style={{ ...elBoxStyle(el), cursor: editable ? "move" : "default", outline: selected ? "2px solid #5f6da6" : "none", outlineOffset: 2 }}>
+              style={{ ...elBoxStyle(el), opacity: el.hidden ? 0.3 : (el.opacity != null ? el.opacity : 1), cursor: editable ? "move" : "default", outline: selected ? "2px solid #5f6da6" : "none", outlineOffset: 2 }}>
               <div style={{ width: "100%", height: "100%", display: "flex", justifyContent: "inherit", alignItems: "inherit", ...entranceStyle(el) }}>
                 <div style={{ width: "100%", height: "100%", display: "flex", justifyContent: "inherit", alignItems: "inherit", ...animStyle(el) }}>
                   <ElementContent el={el} sourceValues={sourceValues} />

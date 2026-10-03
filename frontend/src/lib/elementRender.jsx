@@ -57,7 +57,9 @@ export function elBoxStyle(el) {
 export function ElementContent({ el, sourceValues }) {
   const p = el.props || {};
   if (el.type === "image") {
-    return p.src ? <img src={p.src} alt="" style={{ width: "100%", height: "100%", objectFit: (el.style?.objectFit) || "contain" }} /> :
+    const bound = p.sourceId && p.fieldKey ? sourceValues?.[`${p.sourceId}:${p.fieldKey}`] : "";
+    const src = bound || p.src;
+    return src ? <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: (el.style?.objectFit) || "contain" }} /> :
       <span style={{ fontSize: 16, opacity: .6 }}>image</span>;
   }
   if (el.type === "clock") return <span>{formatClock(p.timezone, p.format)}</span>;

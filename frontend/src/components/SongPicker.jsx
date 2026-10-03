@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BACKEND } from "@/lib/api";
 import { Input } from "@/components/ui/input";
-import { Search, Play, Pause, Plus, X, ArrowUp, ArrowDown, Music, Loader2 } from "lucide-react";
+import { Search, Play, Pause, Plus, X, ArrowUp, ArrowDown, Music, Loader2, Radio } from "lucide-react";
 
 const SEARCH_URL = `${BACKEND}/api/public/itunes/search`;
 
@@ -48,7 +48,7 @@ function normSong(s) {
   };
 }
 
-export function SongList({ songs = [] }) {
+export function SongList({ songs = [], onLive }) {
   const { playing, toggle } = usePreview();
   if (!Array.isArray(songs) || songs.length === 0) return <span className="text-sm text-slate-400">—</span>;
   return (
@@ -64,6 +64,12 @@ export function SongList({ songs = [] }) {
               <div className="text-xs text-slate-400 truncate">{s.artist || ""}</div>
             </div>
             <PlayButton id={s.id || `s${i}`} url={s.preview} playing={playing} toggle={toggle} />
+            {onLive && (
+              <button type="button" data-testid={`song-live-${i}`} onClick={() => onLive(s)}
+                className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-full bg-brand-50 text-brand-600 hover:bg-brand-100 transition-colors">
+                <Radio className="h-3.5 w-3.5" />Live
+              </button>
+            )}
           </div>
         );
       })}

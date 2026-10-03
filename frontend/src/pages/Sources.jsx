@@ -15,6 +15,7 @@ const TYPE_META = {
   custom: { label: "Custom API", icon: Globe },
   builtin_weather: { label: "Weather (Open-Meteo)", icon: Cloud },
   builtin_time: { label: "World Clock", icon: Clock },
+  builtin_live: { label: "Nu Speelt (live)", icon: Radio },
 };
 
 const empty = { name: "", type: "custom", url: "", method: "GET", refresh_interval: 30, fields: [{ key: "", label: "", path: "" }], latitude: 50.85, longitude: 4.35, timezone: "Europe/Brussels" };
@@ -27,7 +28,11 @@ export default function Sources() {
   const [editId, setEditId] = useState(null);
   const [testOut, setTestOut] = useState(null);
 
-  const load = () => { if (current) api.get(`/sources?workspace_id=${current}`).then(({ data }) => setSources(data)).catch(() => {}); };
+  const load = async () => {
+    if (!current) return;
+    try { await api.get(`/sources/live?workspace_id=${current}`); } catch (e) {}
+    api.get(`/sources?workspace_id=${current}`).then(({ data }) => setSources(data)).catch(() => {});
+  };
   useEffect(() => { load(); }, [current]);
 
   const openNew = () => { setForm(empty); setEditId(null); setTestOut(null); setOpen(true); };
@@ -91,7 +96,9 @@ export default function Sources() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <button data-testid={`edit-source-${s.id}`} onClick={() => openEdit(s)} className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"><Pencil className="h-4 w-4" /></button>
+                  {s.type !== "builtin_live" && (
+                    <button data-testid={`edit-source-${s.id}`} onClick={() => openEdit(s)} className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"><Pencil className="h-4 w-4" /></button>
+                  )}
                   <button data-testid={`del-source-${s.id}`} onClick={() => remove(s.id)} className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </motion.div>

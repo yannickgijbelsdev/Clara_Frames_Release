@@ -5,6 +5,7 @@ import AppLayout from "@/components/AppLayout";
 import { PrimaryButton, SecondaryButton } from "@/components/PrimaryButton";
 import SceneCanvas from "@/components/SceneCanvas";
 import ElementInspector from "@/components/ElementInspector";
+import LayersPanel from "@/components/LayersPanel";
 import { ImageUpload } from "@/components/ImageUpload";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +36,9 @@ export default function PancarteEditor() {
   const updateStyle = (patch) => setPan((s) => ({ ...s, elements: s.elements.map((e) => e.id === selId ? { ...e, style: { ...e.style, ...patch } } : e) }));
   const addEl = (type) => { const el = templates[type](); setPan((s) => ({ ...s, elements: [...s.elements, el] })); setSelId(el.id); };
   const delEl = () => { setPan((s) => ({ ...s, elements: s.elements.filter((e) => e.id !== selId) })); setSelId(null); };
+  const reorderEls = (arr) => setPan((s) => ({ ...s, elements: arr }));
+  const toggleVisible = (elId) => setPan((s) => ({ ...s, elements: s.elements.map((e) => e.id === elId ? { ...e, hidden: !e.hidden } : e) }));
+  const deleteEl = (elId) => { setPan((s) => ({ ...s, elements: s.elements.filter((e) => e.id !== elId) })); setSelId((cur) => cur === elId ? null : cur); };
 
   const save = async (silent) => {
     setSaving(true);
@@ -65,6 +69,11 @@ export default function PancarteEditor() {
                 <t.icon className="h-4 w-4 text-brand-600" />{t.label}
               </button>
             ))}
+          </div>
+          <div className="mt-5">
+            <div className="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-2">Layers <span className="text-slate-300 normal-case tracking-normal">· top = front</span></div>
+            <LayersPanel elements={pan.elements} selectedId={selId}
+              onSelect={setSelId} onReorder={reorderEls} onToggleVisible={toggleVisible} onDelete={deleteEl} />
           </div>
           <div className="mt-5 space-y-2">
             <Label className="text-[11px] uppercase tracking-widest text-slate-400 font-bold">Background</Label>
