@@ -1,0 +1,23 @@
+{
+  "summary": "End-to-end verification of 'Nu Speelt (live)' + Layers panel features. Backend (9/9 pytest passed, test_live_now_playing.py): GET/POST/DELETE /api/sources/live work correctly; new workspaces auto-create a builtin_live source with fields text/title/artist/artwork; POST derives text='Artist - Title'; scene overlay pipeline resolves live values into /public/scene/{token}/values.json (keyed as {sourceId}:text / {sourceId}:artwork) and /data.json (mapped by element name); DELETE empties the values; overlay HTML embeds hidden flag correctly. Frontend (full flow verified end-to-end with yannick admin + MFA): (1) /sources shows a single 'Nu Speelt (live)' card with field pills text/title/artist/artwork and ONLY a delete button (no edit) [del-source-{id} testid]. (2) /scenes/{id} shows the LayersPanel [data-testid=layers-panel] with layer-row-{id}, layer-visible-{id}, layer-delete-{id} for all 3 elements; clicking a row selects (brand-highlighted) and populates the right-side inspector; visibility toggle flips the row icon and the inspector title attribute switches between 'Hide'/'Show'. (3) Selecting the image layer (Logo) exposes 'Live source (optional)' [prop-img-source] and after selecting 'Nu Speelt (live)' the 'Image field' [prop-img-field] select appears with options text/title/artist/artwork. (4) Messages inbox: seeded TEST_LiveFlow form with a song_pick field + submitted one song ('Coldplay - Fix You'); the song row renders [song-live-0] 'Live' button; clicking it (a) shows 'Live gezet in de overlay' toast, (b) renders the top banner [live-now-banner] with artwork + 'Coldplay - Fix You' + 'Wis' button [live-clear-btn]; clicking Wis clears live source and hides the banner.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_live_now_playing.py",
+    "/app/test_reports/pytest/iter16_live.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py _get_or_create_live_source: idempotent per (user_id, workspace_id). Good. Make sure deletion of a workspace cascades builtin_live source cleanup (not verified in this iteration).",
+    "server.py build_scene_data: shares source_cache per request so repeated bound elements only resolve once per source - good. api_field branch guards against missing src by returning '', but image branch requires both sourceId and fieldKey (correct).",
+    "LayersPanel visibility toggle updates el.hidden only; the public overlay JS checks el.hidden on both scene and pancarte element loops (lines 1268, 1290). Also build_scene_data does NOT skip hidden elements -> hidden api_field/image values still appear as columns in data.json (verified in test_hidden_element_skipped_in_overlay_html). This is likely intentional (vMix data source column stability), but worth confirming with product.",
+    "Note: data.json column names come from props.name via _sanitize_key with fallback to type_6charId; if two elements share the same name they'll collide (last-write-wins). Minor edge case."
+  ],
+  "updated_files": ["/app/backend/tests/test_live_now_playing.py"],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100% (all testids and flows verified)"},
+  "test_credentials": "admin yannick.gijbels@koodh.com / KYLovie13monx + MFA secret NKSPU7UH4M5BJ3X3353DNTNA54YNIJSY (as per /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created and TORE DOWN TEST_LiveFlow form (+ submission) in workspace 83e9d223-ae96-4e12-a0ff-198a959582c5. Cleared live song after test. Reset Logo element on scene 731e1f59-ff3f-495d-a9a0-c837f29aeb77 (unset sourceId/fieldKey that got applied during inspector test).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Live-source + Layers-panel features are fully working. Key testids verified: layers-panel, layer-row-{elId}, layer-visible-{elId}, layer-delete-{elId}, prop-img-source, prop-img-field, song-live-{index}, live-now-banner, live-clear-btn, del-source-{id}. Backend tests live in /app/backend/tests/test_live_now_playing.py (run with: pytest -o addopts=\"\" to avoid xdist parallel race on the single shared workspace's live source). Drag-to-reorder of layers was not deterministically tested (per request best-effort); rows render + select/hide/delete all work."
+}

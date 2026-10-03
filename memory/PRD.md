@@ -10,6 +10,14 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Design: Clara Campaigns light-thema (Outfit / Plus Jakarta Sans, rose/periwinkle)
 - Editor: drag & drop op 16:9 canvas
 
+## 2026-10-03 — "Nu Speelt (live)" + Layers panel
+- LIVE NOW-PLAYING: per-workspace `builtin_live` source (auto-created). Fields: text ("Artist - Title"), title, artist, artwork. Endpoints: GET/POST/DELETE /api/sources/live (?workspace_id). One active song; new replaces previous; DELETE clears. Messages inbox: a "Live" button per song (song-live-{i}) sets it live; a top banner (live-now-banner) shows the current live song with a "Wis" button (live-clear-btn).
+- IMAGE BINDING: image elements can bind to a source field (props.sourceId + fieldKey, e.g. artwork). Overlay JS (imageApis/updateImages) + build_scene_data + values.json now resolve image bindings so artwork updates live. Inspector: prop-img-source + prop-img-field.
+- LAYERS PANEL (/app/frontend/src/components/LayersPanel.jsx): added to Scene & Pancarte editors (left column). Lists elements (front-first, "top = front"), click row to select, eye toggle visibility (el.hidden), trash to delete, drag grip to reorder (z-index). Hidden elements skipped in overlay HTML + PancarteView + canvas preview (dimmed in editor). Note: build_scene_data does NOT skip hidden (vMix column stability).
+- Tested iter16: backend 9/9, frontend 100%, no issues.
+- NEXT (Phase 2, requested): Regie/Control page — rebuild existing page into an operator surface with live overlay preview + rundown + one-click "Set Live" per overlay (English), editable Variables (title/subtitle/image) before going live, designed to run 24/7. Needs a live-channel mechanism to push a chosen pancarte into the running scene output.
+
+
 ## Architecture
 - Backend: FastAPI (/api), MongoDB (motor). JWT via httpOnly cookies + TOTP MFA (pyotp, qrcode).
 - Frontend: React 19, react-router, framer-motion, shadcn/ui, Tailwind (Clara tokens).
