@@ -63,6 +63,13 @@ export function ElementContent({ el, sourceValues }) {
       <span style={{ fontSize: 16, opacity: .6 }}>image</span>;
   }
   if (el.type === "clock") return <span>{formatClock(p.timezone, p.format)}</span>;
+  if (el.type === "overlay") {
+    const fit = el.style?.objectFit || "contain";
+    if (!p.url) return <span style={{ fontSize: 16, opacity: .6 }}>overlay</span>;
+    if (p.kind === "html") return <iframe title="overlay" src={p.url} scrolling="no" style={{ width: "100%", height: "100%", border: 0, background: "transparent", pointerEvents: "none" }} />;
+    if (p.kind === "video") return <video src={p.url} autoPlay loop muted playsInline style={{ width: "100%", height: "100%", objectFit: fit, pointerEvents: "none" }} />;
+    return <img src={p.url} alt="" style={{ width: "100%", height: "100%", objectFit: fit, pointerEvents: "none" }} />;
+  }
   if (el.type === "api_field") {
     const key = `${p.sourceId}:${p.fieldKey}`;
     const v = sourceValues?.[key];

@@ -1,4 +1,4 @@
-import { Type, Clock, Image as ImageIcon, CalendarClock, Radio } from "lucide-react";
+import { Type, Clock, Image as ImageIcon, CalendarClock, Radio, MonitorPlay } from "lucide-react";
 
 export const FONTS = ["'Outfit', sans-serif", "'Plus Jakarta Sans', sans-serif", "'JetBrains Mono', monospace", "Arial", "Georgia", "Impact"];
 export const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
@@ -15,6 +15,8 @@ export const templates = {
     style: { color: "#ffffff", fontSize: 48, fontWeight: 600, fontFamily: FONTS[1], backgroundColor: "#5f6da6", borderRadius: 18, padding: 24, textAlign: "left" } }),
   api_field: () => ({ id: uid(), type: "api_field", x: 200, y: 400, w: 600, h: 100, rotation: 0, opacity: 1,
     props: { name: "api", sourceId: "", fieldKey: "", prefix: "", suffix: "" }, style: { color: "#ffffff", fontSize: 56, fontWeight: 700, fontFamily: FONTS[0], textAlign: "left" } }),
+  overlay: () => ({ id: uid(), type: "overlay", x: 0, y: 0, w: 1920, h: 1080, rotation: 0, opacity: 1,
+    props: { name: "overlay", overlayId: "", url: "", kind: "" }, style: { objectFit: "contain" } }),
 };
 
 export const TOOLS = [
@@ -23,4 +25,5 @@ export const TOOLS = [
   { type: "image", label: "Image / Logo", icon: ImageIcon },
   { type: "timed_text", label: "Timed text + photo", icon: CalendarClock },
   { type: "api_field", label: "API field", icon: Radio },
+  { type: "overlay", label: "Overlay (HTML/video)", icon: MonitorPlay },
 ];

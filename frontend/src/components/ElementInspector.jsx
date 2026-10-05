@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Trash2 } from "lucide-react";
 import { FONTS } from "@/lib/elementDefs";
 
-export default function ElementInspector({ sel, sources = [], updateProps, updateStyle, updateEl, delEl, footer = null }) {
+export default function ElementInspector({ sel, sources = [], overlays = [], updateProps, updateStyle, updateEl, delEl, footer = null }) {
   const rawFields = (sources.find((s) => s.id === sel?.props?.sourceId)?.fields || []).filter((f) => (f.key || "").trim());
   const srcFields = rawFields.length ? rawFields : [{ key: "text", label: "Response text" }];
   return (
@@ -97,7 +97,27 @@ export default function ElementInspector({ sel, sources = [], updateProps, updat
         </>
       )}
 
-      {sel.type !== "image" && (
+      {sel.type === "overlay" && (
+        <>
+          <div className="space-y-1.5"><Label>Overlay source</Label>
+            <Select value={sel.props.overlayId || ""} onValueChange={(v) => { const o = overlays.find((x) => x.id === v); updateProps({ overlayId: v, url: o?.url || "", kind: o?.kind || "", name: o?.name || sel.props.name }); }}>
+              <SelectTrigger className="rounded-xl" data-testid="prop-overlay"><SelectValue placeholder="Choose an overlay" /></SelectTrigger>
+              <SelectContent>{overlays.map((o) => <SelectItem key={o.id} value={o.id}>{o.name} · {o.kind}</SelectItem>)}</SelectContent>
+            </Select>
+            {overlays.length === 0 && <p className="text-[11px] text-slate-400">Upload overlays on the <b>Overlays</b> page first.</p>}
+            {sel.props.kind === "html" && <p className="text-[11px] text-slate-400">HTML overlay shown in a transparent iframe.</p>}
+          </div>
+          {sel.props.kind && sel.props.kind !== "html" && (
+            <div className="space-y-1.5"><Label>Fit</Label>
+              <Select value={sel.style.objectFit || "contain"} onValueChange={(v) => updateStyle({ objectFit: v })}>
+                <SelectTrigger className="rounded-xl" data-testid="prop-overlay-fit"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="contain">Fit (contain)</SelectItem><SelectItem value="cover">Fill (cover)</SelectItem></SelectContent>
+              </Select></div>
+          )}
+        </>
+      )}
+
+      {sel.type !== "image" && sel.type !== "overlay" && (
         <>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5"><Label>Font size</Label><Input type="number" value={sel.style.fontSize || 40} onChange={(e) => updateStyle({ fontSize: parseInt(e.target.value) || 40 })} className="rounded-xl text-sm" /></div>

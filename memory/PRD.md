@@ -10,6 +10,15 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Design: Clara Campaigns light-thema (Outfit / Plus Jakarta Sans, rose/periwinkle)
 - Editor: drag & drop op 16:9 canvas
 
+## 2026-10-05 — Overlays (uploadable HTML/video/image overlays)
+- New nav item "Overlays" (/overlays, page /app/frontend/src/pages/Overlays.jsx), workspace-scoped library: upload + preview (HTML in transparent iframe, video, image) + copy URL + delete.
+- Backend: collection `overlays`; POST /api/overlays/upload (multipart file + workspace_id form field) -> S3 (overlays/{uid}/..), HTML stored with ContentType text/html; GET /api/overlays?workspace_id; DELETE /api/overlays/{id}. Kinds: html (.html/.htm, max 5MB), video (mp4/webm/mov, max 50MB), image (png/jpg/webp/gif, max 10MB). Needs `Form` import from fastapi.
+- New element type "overlay" (elementDefs templates + TOOLS 'Overlay (HTML/video)', icon MonitorPlay). Props: {name, overlayId, url, kind}; style.objectFit for video/image. Usable in BOTH Scene & Pancarte editors; appears as a layer in the Layers panel.
+- Rendering: ElementContent (elementRender.jsx) + backend OVERLAY_HTML buildElementNode render html->transparent iframe (pointerEvents none in editor), video->autoplay/loop/muted video, image->img. Verified e2e: upload html, scene render embeds iframe+url; Overlays page + editor tool/inspector/canvas verified via screenshots.
+- Inspector: prop-overlay (choose overlay), prop-overlay-fit (non-html). Editors load /overlays and pass to ElementInspector.
+- Redeploy needed for live site.
+
+
 ## 2026-10-03 — "Nu Speelt (live)" + Layers panel
 - LIVE NOW-PLAYING: per-workspace `builtin_live` source (auto-created). Fields: text ("Artist - Title"), title, artist, artwork. Endpoints: GET/POST/DELETE /api/sources/live (?workspace_id). One active song; new replaces previous; DELETE clears. Messages inbox: a "Live" button per song (song-live-{i}) sets it live; a top banner (live-now-banner) shows the current live song with a "Wis" button (live-clear-btn).
 - IMAGE BINDING: image elements can bind to a source field (props.sourceId + fieldKey, e.g. artwork). Overlay JS (imageApis/updateImages) + build_scene_data + values.json now resolve image bindings so artwork updates live. Inspector: prop-img-source + prop-img-field.

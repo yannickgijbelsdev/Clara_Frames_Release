@@ -19,6 +19,7 @@ export default function PancarteEditor() {
   const nav = useNavigate();
   const [pan, setPan] = useState(null);
   const [sources, setSources] = useState([]);
+  const [overlays, setOverlays] = useState([]);
   const [selId, setSelId] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -26,6 +27,11 @@ export default function PancarteEditor() {
     api.get(`/pancartes/${id}`).then(({ data }) => setPan(data)).catch(() => { toast.error("Pancarte not found"); nav("/pancartes"); });
     api.get("/sources").then(({ data }) => setSources(data)).catch(() => {});
   }, [id]);
+
+  useEffect(() => {
+    if (!pan?.workspace_id) return;
+    api.get(`/overlays?workspace_id=${pan.workspace_id}`).then(({ data }) => setOverlays(data)).catch(() => {});
+  }, [pan?.workspace_id]);
 
   const sel = pan?.elements.find((e) => e.id === selId) || null;
 
@@ -123,7 +129,7 @@ export default function PancarteEditor() {
           {!sel ? (
             <p className="text-sm text-slate-400 text-center py-8">Select an element to edit its properties.</p>
           ) : (
-            <ElementInspector sel={sel} sources={sources} updateProps={updateProps} updateStyle={updateStyle} updateEl={updateEl} delEl={delEl} />
+            <ElementInspector sel={sel} sources={sources} overlays={overlays} updateProps={updateProps} updateStyle={updateStyle} updateEl={updateEl} delEl={delEl} />
           )}
         </div>
       </div>

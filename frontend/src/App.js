@@ -20,6 +20,7 @@ import PublicForm from "@/pages/PublicForm";
 import ExportPage from "@/pages/ExportPage";
 import Sources from "@/pages/Sources";
 import MediaLibrary from "@/pages/MediaLibrary";
+import Overlays from "@/pages/Overlays";
 import Help from "@/pages/Help";
 import Settings from "@/pages/Settings";
 import Users from "@/pages/Users";
@@ -61,6 +62,7 @@ function App() {
               <Route path="/messages" element={<Protected><Messages /></Protected>} />
               <Route path="/sources" element={<Protected><Sources /></Protected>} />
               <Route path="/media" element={<Protected><MediaLibrary /></Protected>} />
+              <Route path="/overlays" element={<Protected><Overlays /></Protected>} />
               <Route path="/settings" element={<Protected><Settings /></Protected>} />
               <Route path="/users" element={<Protected><Users /></Protected>} />
               <Route path="/help" element={<Protected><Help /></Protected>} />

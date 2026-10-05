@@ -24,7 +24,7 @@ import requests
 import boto3
 from botocore.config import Config
 from bson import ObjectId
-from fastapi import FastAPI, APIRouter, Request, Response, HTTPException, Depends, UploadFile, File
+from fastapi import FastAPI, APIRouter, Request, Response, HTTPException, Depends, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, PlainTextResponse, JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -549,6 +549,77 @@ async def delete_media(media_id: str, user: dict = Depends(get_current_user)):
         logger.error(f"S3 delete failed: {e}")
     await db.media.delete_one({"id": media_id})
     return {"ok": True}
+
+# ---------------------------------------------------------------------------
+# Overlays (uploadable HTML / video / image overlays, usable in scenes & pancartes)
+# ---------------------------------------------------------------------------
+ALLOWED_OVERLAY_HTML = {"text/html", "application/xhtml+xml"}
+ALLOWED_OVERLAY_TYPES = ALLOWED_OVERLAY_HTML | ALLOWED_IMAGE_TYPES | ALLOWED_VIDEO_TYPES
+
+def _overlay_kind(content_type: str, filename: str) -> str:
+    name = (filename or "").lower()
+    if content_type in ALLOWED_OVERLAY_HTML or name.endswith((".html", ".htm")):
+        return "html"
+    if content_type in ALLOWED_VIDEO_TYPES or name.endswith((".mp4", ".webm", ".mov", ".ogg")):
+        return "video"
+    return "image"
+
+@api_router.post("/overlays/upload")
+async def upload_overlay(file: UploadFile = File(...), workspace_id: str = Form(...), user: dict = Depends(get_current_user)):
+    name = (file.filename or "").lower()
+    is_html = file.content_type in ALLOWED_OVERLAY_HTML or name.endswith((".html", ".htm"))
+    if file.content_type not in ALLOWED_OVERLAY_TYPES and not is_html:
+        raise HTTPException(status_code=400, detail="Only HTML, video or image files are allowed")
+    data = await file.read()
+    is_video = file.content_type in ALLOWED_VIDEO_TYPES
+    limit = 50 * 1024 * 1024 if is_video else (5 * 1024 * 1024 if is_html else 10 * 1024 * 1024)
+    if len(data) > limit:
+        mb = 50 if is_video else (5 if is_html else 10)
+        raise HTTPException(status_code=400, detail=f"File too large (max {mb} MB)")
+    ext = (file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "bin")
+    ext = re.sub(r"[^a-z0-9]", "", ext)[:5] or "bin"
+    content_type = "text/html; charset=utf-8" if is_html else file.content_type
+    key = f"overlays/{user['id']}/{uuid.uuid4().hex}.{ext}"
+    try:
+        await asyncio.to_thread(
+            get_s3().put_object,
+            Bucket=S3_BUCKET, Key=key, Body=data,
+            ContentType=content_type, ACL="public-read",
+        )
+    except Exception as e:
+        logger.error(f"S3 overlay upload failed: {e}")
+        raise HTTPException(status_code=502, detail="Upload to storage failed")
+    url = f"{S3_ENDPOINT.rstrip('/')}/{S3_BUCKET}/{key}"
+    doc = {
+        "id": str(uuid.uuid4()), "user_id": user["id"], "workspace_id": workspace_id,
+        "key": key, "url": url, "name": file.filename or key.split("/")[-1],
+        "kind": _overlay_kind(file.content_type, file.filename), "content_type": content_type,
+        "size": len(data), "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.overlays.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+@api_router.get("/overlays")
+async def list_overlays(workspace_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+    q = {"user_id": user["id"]}
+    if workspace_id:
+        q["workspace_id"] = workspace_id
+    docs = await db.overlays.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return docs
+
+@api_router.delete("/overlays/{overlay_id}")
+async def delete_overlay(overlay_id: str, user: dict = Depends(get_current_user)):
+    doc = await db.overlays.find_one({"id": overlay_id, "user_id": user["id"]})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Overlay not found")
+    try:
+        await asyncio.to_thread(get_s3().delete_object, Bucket=S3_BUCKET, Key=doc["key"])
+    except Exception as e:
+        logger.error(f"S3 overlay delete failed: {e}")
+    await db.overlays.delete_one({"id": overlay_id})
+    return {"ok": True}
+
 
 # ---------------------------------------------------------------------------
 # API Sources
@@ -1240,6 +1311,13 @@ function buildElementNode(el){
   } else if(el.type==='api_field'){
     inner.textContent = (p.prefix||'') + '\u2026' + (p.suffix||'');
     ref.api = {d:inner, p:p};
+  } else if(el.type==='overlay'){
+    var ok = p.kind||''; var ofit = (el.style&&el.style.objectFit)||'contain';
+    if(ok==='html' && p.url){ var fr=document.createElement('iframe'); fr.src=p.url; fr.setAttribute('scrolling','no');
+      fr.setAttribute('allowtransparency','true'); fr.style.width='100%'; fr.style.height='100%'; fr.style.border='0'; fr.style.background='transparent'; inner.appendChild(fr); }
+    else if(ok==='video' && p.url){ var vo=document.createElement('video'); vo.src=p.url; vo.autoplay=true; vo.loop=true; vo.muted=true;
+      vo.setAttribute('playsinline',''); vo.setAttribute('muted',''); vo.style.width='100%'; vo.style.height='100%'; vo.style.objectFit=ofit; inner.appendChild(vo); }
+    else if(p.url){ var io=document.createElement('img'); io.src=p.url; io.style.width='100%'; io.style.height='100%'; io.style.objectFit=ofit; inner.appendChild(io); }
   } else {
     inner.textContent = p.text || '';
   }
