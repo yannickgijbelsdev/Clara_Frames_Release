@@ -219,6 +219,8 @@ class SourceInput(BaseModel):
     separator: Optional[str] = None
     artwork: Optional[bool] = None
     reverse: Optional[bool] = None
+    format: Optional[str] = None  # custom API: text | json | image
+    image_path: Optional[str] = None
     workspace_id: Optional[str] = None
 
 class LiveSongInput(BaseModel):
@@ -781,12 +783,21 @@ def _prep_builtin(body: SourceInput) -> dict:
         return {"url": url, "fields": fields, "latitude": lat, "longitude": lon}
     if body.type == "builtin_time":
         return {"url": "", "fields": [], "timezone": body.timezone or "Europe/Brussels"}
+    # Custom API: respect explicit response format (text | json | image)
+    fmt = (body.format or "").strip().lower()
+    if fmt == "text":
+        return {"url": body.url, "fields": [{"key": "text", "label": "Response text", "path": "_text"}], "format": "text"}
+    if fmt == "image":
+        img_path = (body.image_path or "").strip() or "_text"
+        return {"url": body.url, "fields": [{"key": "image", "label": "Image URL", "path": img_path}],
+                "format": "image", "image_path": (body.image_path or "").strip()}
     fields = [f.model_dump() for f in body.fields]
     has_mapping = any((f.get("key") or "").strip() for f in fields)
     if not has_mapping:
-        # Plain-text API (e.g. now-playing.txt): expose the whole response as "text"
+        # No explicit format & no mappings: expose the whole response as "text"
         fields = [{"key": "text", "label": "Response text", "path": "_text"}]
-    return {"url": body.url, "fields": fields}
+        return {"url": body.url, "fields": fields, "format": "text"}
+    return {"url": body.url, "fields": fields, "format": "json"}
 
 async def _get_or_create_live_source(user: dict, workspace_id: str) -> dict:
     src = await db.sources.find_one({"user_id": user["id"], "workspace_id": workspace_id, "type": "builtin_live"})
@@ -877,6 +888,8 @@ async def create_source(body: SourceInput, user: dict = Depends(get_current_user
         "separator": prep.get("separator"),
         "artwork": prep.get("artwork"),
         "reverse": prep.get("reverse"),
+        "format": prep.get("format"),
+        "image_path": prep.get("image_path"),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.sources.insert_one(doc)
@@ -900,6 +913,8 @@ async def update_source(source_id: str, body: SourceInput, user: dict = Depends(
         "separator": prep.get("separator"),
         "artwork": prep.get("artwork"),
         "reverse": prep.get("reverse"),
+        "format": prep.get("format"),
+        "image_path": prep.get("image_path"),
         "last_raw": None, "last_fetched": None,
     }
     await db.sources.update_one({"id": source_id}, {"$set": upd})

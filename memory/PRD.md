@@ -196,6 +196,12 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Fix (frontend): ElementInspector field dropdown filters blank keys and falls back to a selectable "text" option; Sources.jsx hint tells users to leave mappings empty for plain-text APIs.
 - Verified e2e in preview: source test, /values.json, /element/{id}.txt and /data.json all return the live song. NEEDS REDEPLOY for the live site.
 
+## 2026-06 — Custom API response-type selector
+- Added explicit "Response type" choice for Custom API sources: Text API (whole response → `text` field), JSON API (field mappings via json paths), Image API (response/JSON-path → `image` field for binding to an Image element).
+- Backend (server.py): SourceInput gains `format` + `image_path`; `_prep_builtin` builds fields per format (text→_text, image→image_path or _text, json→mappings); create/update persist `format`/`image_path`. Legacy sources derive format on the frontend (deriveFormat).
+- Frontend (Sources.jsx): new `source-format` select; mappings only shown for JSON; `source-image-path` input for Image API (optional — empty = plain-text URL response).
+- Verified e2e: all 4 cases via curl + iTunes image-path resolve returns the artwork URL; UI dropdown confirmed via screenshot.
+
 ## Known follow-ups (code review, non-blocking)
 - Pancarte/Flow delete is immediate (no confirm dialog) — matches existing Scenes behaviour.
 - FlowEditor/SceneEditor duplicate flow/pancarte fetch + cycling logic; could extract a useFlowCycle hook.

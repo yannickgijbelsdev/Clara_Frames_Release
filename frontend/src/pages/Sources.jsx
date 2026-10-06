@@ -19,7 +19,15 @@ const TYPE_META = {
   builtin_live: { label: "Nu Speelt (live)", icon: Radio },
 };
 
-const empty = { name: "", type: "custom", url: "", method: "GET", refresh_interval: 30, fields: [{ key: "", label: "", path: "" }], latitude: 50.85, longitude: 4.35, timezone: "Europe/Brussels", song_path: "", separator: " - ", artwork: true, reverse: false };
+const empty = { name: "", type: "custom", format: "json", url: "", method: "GET", refresh_interval: 30, image_path: "", fields: [{ key: "", label: "", path: "" }], latitude: 50.85, longitude: 4.35, timezone: "Europe/Brussels", song_path: "", separator: " - ", artwork: true, reverse: false };
+
+const deriveFormat = (s) => {
+  if (s.format) return s.format;
+  const fields = s.fields || [];
+  if (fields.length && fields.some((f) => f.path && f.path !== "_text")) return "json";
+  if (fields.length) return "text";
+  return "json";
+};
 
 export default function Sources() {
   const { current } = useWorkspace();
@@ -38,7 +46,7 @@ export default function Sources() {
 
   const openNew = () => { setForm(empty); setEditId(null); setTestOut(null); setOpen(true); };
   const openEdit = (s) => {
-    setForm({ ...empty, ...s, fields: s.fields?.length ? s.fields : empty.fields });
+    setForm({ ...empty, ...s, format: deriveFormat(s), fields: s.fields?.length ? s.fields : empty.fields });
     setEditId(s.id); setTestOut(null); setOpen(true);
   };
 
@@ -159,8 +167,34 @@ export default function Sources() {
               <>
                 <div className="space-y-1.5"><Label>API URL</Label>
                   <Input data-testid="source-url" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://api.example.com/data" className="rounded-xl" /></div>
+
+                <div className="space-y-1.5"><Label>Response type</Label>
+                  <Select value={form.format} onValueChange={(v) => setForm({ ...form, format: v })}>
+                    <SelectTrigger data-testid="source-format" className="rounded-xl"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="text">Text API — plain text as one field</SelectItem>
+                      <SelectItem value="json">JSON API — map fields via JSON paths</SelectItem>
+                      <SelectItem value="image">Image API — response is an image URL</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="space-y-1.5"><Label>Refresh interval (seconds)</Label>
                   <Input type="number" min="5" value={form.refresh_interval} onChange={(e) => setForm({ ...form, refresh_interval: parseInt(e.target.value) || 30 })} className="rounded-xl" /></div>
+
+                {form.format === "text" && (
+                  <p className="text-[11px] text-slate-400">The entire response is exposed as a single <code className="font-mono">text</code> field. Perfect for a now-playing <code className="font-mono">.txt</code> endpoint.</p>
+                )}
+
+                {form.format === "image" && (
+                  <>
+                    <div className="space-y-1.5"><Label>Image path in JSON (optional)</Label>
+                      <Input data-testid="source-image-path" value={form.image_path} onChange={(e) => setForm({ ...form, image_path: e.target.value })} placeholder="e.g. data.cover_url — leave empty if the response is the URL itself" className="rounded-xl text-sm font-mono" /></div>
+                    <p className="text-[11px] text-slate-400">Exposes an <code className="font-mono">image</code> field. Bind it to an Image element to show the live picture. Leave the path empty when the response body is already the image URL (plain text); fill it in when the URL sits inside a JSON field.</p>
+                  </>
+                )}
+
+                {form.format === "json" && (
                 <div>
                   <div className="flex items-center justify-between mb-1.5"><Label>Field mappings</Label>
                     <button onClick={addField} className="text-xs text-brand-600 font-medium inline-flex items-center gap-1"><Plus className="h-3 w-3" />Add</button></div>
@@ -173,8 +207,9 @@ export default function Sources() {
                       </div>
                     ))}
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1.5">Path uses dot / index notation, e.g. <code className="font-mono">current.temperature_2m</code> or <code className="font-mono">results.0.name</code>. For a plain-text API (e.g. a now-playing <code className="font-mono">.txt</code>) leave the mappings empty — the full response is exposed automatically as the <code className="font-mono">text</code> field.</p>
+                  <p className="text-[11px] text-slate-400 mt-1.5">Path uses dot / index notation, e.g. <code className="font-mono">current.temperature_2m</code> or <code className="font-mono">results.0.name</code>.</p>
                 </div>
+                )}
               </>
             )}
 
