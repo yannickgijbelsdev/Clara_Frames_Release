@@ -56,7 +56,7 @@ export default function SceneEditor() {
   const selFlow = scene?.flows?.find((f) => f.id === selFlowId) || null;
 
   const addFlow = () => {
-    const f = { id: uid(), flow_id: "", x: 480, y: 720, w: 960, h: 540, schedule: { mode: "always", everyMinutes: 5, showSeconds: 15 } };
+    const f = { id: uid(), flow_id: "", x: 480, y: 720, w: 960, h: 540, schedule: { mode: "always", everyMinutes: 5, showSeconds: 20 } };
     setScene((s) => ({ ...s, flows: [...(s.flows || []), f] }));
     setSelId(null); setSelFlowId(f.id);
   };
@@ -200,9 +200,12 @@ export default function SceneEditor() {
                 const sch = selFlow.schedule || {};
                 const count = (selFlowDef?.pancarte_ids || []).length;
                 const per = selFlowDef?.interval || 5;
+                const show = sch.showSeconds ?? 20;
+                const every = sch.everyMinutes || 5;
                 const lead = sch.intro?.url ? (sch.intro.leadSeconds ?? 10) : 0;
                 const outro = sch.outro?.url ? (sch.outro.seconds ?? 5) : 0;
-                const total = lead + count * per + outro;
+                const total = lead + show + outro;
+                const overflow = total >= every * 60;
                 const setOverlay = (slot, id) => {
                   const o = overlays.find((x) => x.id === id);
                   const extra = slot === "intro" ? { leadSeconds: sch.intro?.leadSeconds ?? 10 } : { seconds: sch.outro?.seconds ?? 5 };
@@ -210,8 +213,13 @@ export default function SceneEditor() {
                 };
                 return (
                   <div className="space-y-3">
-                    <div className="space-y-1.5"><Label>Appear every (min)</Label>
-                      <Input type="number" min="1" value={sch.everyMinutes || 10} onChange={(e) => updateSchedule({ everyMinutes: parseInt(e.target.value) || 10 })} className="rounded-xl text-sm" data-testid="flow-every" /></div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1.5"><Label>Appear every (min)</Label>
+                        <Input type="number" min="1" value={sch.everyMinutes || 5} onChange={(e) => updateSchedule({ everyMinutes: parseInt(e.target.value) || 1 })} className="rounded-xl text-sm" data-testid="flow-every" /></div>
+                      <div className="space-y-1.5"><Label>Show for (sec)</Label>
+                        <Input type="number" min="1" value={sch.showSeconds ?? 20} onChange={(e) => updateSchedule({ showSeconds: parseInt(e.target.value) || 1 })} className="rounded-xl text-sm" data-testid="flow-show-seconds" /></div>
+                    </div>
+                    <p className="text-[11px] text-slate-400">Aligns to the clock from midnight (e.g. every 5 min → 12:00, 12:05, 12:10 …). Pancartes cycle within the show window every {per}s.</p>
 
                     <div className="space-y-1.5 pt-2 border-t border-slate-100">
                       <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Intro overlay (before pancartes)</Label>
@@ -239,8 +247,13 @@ export default function SceneEditor() {
                     </div>
 
                     <div className="rounded-xl bg-brand-50/60 border border-brand-100 p-2.5 text-xs text-slate-600" data-testid="flow-timeline-summary">
-                      Every {sch.everyMinutes || 10} min: {lead > 0 ? `${lead}s intro → ` : ""}{count} pancarte{count === 1 ? "" : "s"} × {per}s{outro > 0 ? ` → ${outro}s end` : ""} → closes automatically ({total}s total).
+                      Every {every} min: {lead > 0 ? `${lead}s intro → ` : ""}shows {show}s ({count} pancarte{count === 1 ? "" : "s"} × {per}s){outro > 0 ? ` → ${outro}s end` : ""} → closes automatically ({total}s total).
                     </div>
+                    {overflow && (
+                      <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-700" data-testid="flow-overflow-warning">
+                        ⚠ The visible time ({total}s) is ≥ the {every} min cycle, so it never closes. Lower "Show for" or raise "Appear every".
+                      </div>
+                    )}
                   </div>
                 );
               })()}

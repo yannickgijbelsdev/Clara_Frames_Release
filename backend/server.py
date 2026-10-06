@@ -1592,13 +1592,15 @@ function tick(){
       var per=Math.max(1,(f.flow&&f.flow.interval)||5);
       var count=f.pans.length;
       var lead=(f.introNode && sc.intro)?Math.max(0,(sc.intro.leadSeconds!=null?sc.intro.leadSeconds:10)):0;
-      var seriesDur=count>0?count*per:0;
+      var showDur=Math.max(1,(sc.showSeconds!=null?sc.showSeconds:20));
       var outroDur=(f.outroNode && sc.outro)?Math.max(1,(sc.outro.seconds!=null?sc.outro.seconds:5)):0;
-      var phase=Math.floor(Date.now()/1000)%cycle;
+      var d=new Date();
+      var secOfDay=d.getHours()*3600+d.getMinutes()*60+d.getSeconds();
+      var phase=secOfDay%cycle;
       var state='none', panIdx=0;
       if(lead>0 && phase<lead){ state='intro'; }
-      else if(seriesDur>0 && phase<lead+seriesDur){ state='series'; panIdx=Math.min(count-1, Math.floor((phase-lead)/per)); }
-      else if(phase<lead+seriesDur+outroDur){ state='outro'; }
+      else if(count>0 && phase>=lead && phase<lead+showDur){ state='series'; panIdx=Math.floor((phase-lead)/per)%count; }
+      else if(phase<lead+showDur+outroDur){ state='outro'; }
       showTimedPart(f.introNode, state==='intro');
       showTimedPart(f.outroNode, state==='outro');
       if(state==='series'){ if(f._state!=='series') f.seriesLayer.style.display='block'; f.setIdx(panIdx); }

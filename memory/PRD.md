@@ -196,6 +196,12 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Fix (frontend): ElementInspector field dropdown filters blank keys and falls back to a selectable "text" option; Sources.jsx hint tells users to leave mappings empty for plain-text APIs.
 - Verified e2e in preview: source test, /values.json, /element/{id}.txt and /data.json all return the live song. NEEDS REDEPLOY for the live site.
 
+## 2026-06 — Timed flow fix (clock-aligned, explicit show duration)
+- Problem: pancarte flows "kept looping" — the scene flow was in "Always on" mode, and the Timed mode derived its visible duration implicitly from pancartes×interval (confusing, and `showSeconds` was dead config).
+- Fix (overlay JS in server.py everyX branch): visible window now = explicit `schedule.showSeconds`; pancartes cycle within it (`floor((phase-lead)/per) % count`); cycle phase is clock-aligned to local midnight (`secOfDay % cycle`) so it fires on fixed clock moments (12:00, 12:05, …) per the vMix machine timezone.
+- Fix (SceneEditor.jsx): Timed mode now has two explicit fields — "Appear every (min)" + "Show for (sec)"; live summary uses showSeconds; added overflow warning when intro+show+outro ≥ cycle (would never close); clock-alignment hint text. Default new flow showSeconds=20.
+- Verified: Python sim of the timing (shows N s each cycle then hides, reappears on the minute) + overlay HTML contains the new JS + editor UI screenshot (fields, summary, overflow warning all render).
+
 ## 2026-06 — Custom API response-type selector
 - Added explicit "Response type" choice for Custom API sources: Text API (whole response → `text` field), JSON API (field mappings via json paths), Image API (response/JSON-path → `image` field for binding to an Image element).
 - Backend (server.py): SourceInput gains `format` + `image_path`; `_prep_builtin` builds fields per format (text→_text, image→image_path or _text, json→mappings); create/update persist `format`/`image_path`. Legacy sources derive format on the frontend (deriveFormat).
