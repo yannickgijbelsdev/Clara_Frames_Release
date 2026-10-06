@@ -1,0 +1,25 @@
+{
+  "summary": "End-to-end verification of (A) image drag bug fix, (B) new Ticker-bar element, (C) Messages per-row Live toggle. Backend: 9 passed, 1 skipped (no pre-existing scenes in workspace to regression-test overlay export at root; overlay tested via newly-created ticker scene instead). test_ticker.py validates: POST /submissions/{sid}/ticker toggles on/off; GET /forms/{fid}/ticker-items returns submission text when ticker=true and omits when false; GET /public/scene/{token}/ticker/{form_id} returns the same items (unauth); GET /public/scene/{token}/overlay contains 'clara-ticker' keyframe + ticker branch; GET /sources/values regression OK. Frontend (yannick admin + MFA, cookie auth): (1) BUG FIX: created a scene with an image element (src=placeholder.png) and verified <img draggable=false, pointerEvents=none, webkitUserDrag=none>; mouse-down on image body + move +200/+100 then up moved the element bounding rect by exactly (+200,+100) — no native image ghost-drag intercept. (2) 'Add element' list includes add-ticker; clicking creates a ticker layer visible in LayersPanel. (3) Properties panel for ticker exposes prop-ticker-form, prop-ticker-text, prop-ticker-icon, prop-ticker-speed; filling freeText 'Welcome to Radio GRK test' renders scrolling text in the canvas with the chosen separator (●) even without a form. (4) Messages page: message-ticker-{sid} button toggles 'Live' → 'Live in ticker' (brand-filled), triggers POST /submissions/{sid}/ticker, and the ticker-items endpoint confirms the backend state. Toast 'Removed from ticker' shown when toggled off. All seed data (scene, form, submission) cleaned up.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_ticker.py",
+    "/app/test_reports/pytest/iter17_ticker.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py _submission_ticker_text uses U+00B7 (middle dot) as join separator between fields but the overlay JS buildElementNode ticker branch uses (p.icon||'\\u25CF') as the separator between items. The two separators look similar but are intentionally different scopes (within-submission vs between-items). OK.",
+    "toggle_submission_ticker does not return 404 when the submission does not belong to the user — it silently updates 0 rows and returns {ok:true, ticker:on}. Minor: consider raising 404 for missing/foreign submissions for correctness and auditability.",
+    "public_ticker_items looks up form by {id, user_id: scene.user_id}; if a form is in a different user's workspace it quietly returns []. Acceptable.",
+    "overlay HTML embeds BACKEND via BACKEND constant used by pullTicker; verified clara-ticker keyframe present. Animation duration = max(8, round(len(one) * speed)) seconds — speed=0.35 default -> plausible.",
+    "elementRender.jsx image branch: draggable={false} + pointerEvents:'none' + WebkitUserDrag:'none' + userSelect:'none' is the correct combination to disable native image drag across Chrome/Safari/Firefox. Verified via live DOM inspection.",
+    "Note: when an image element has NO src, the renderer falls back to a <span>image</span> placeholder which does NOT have the draggable fix — but it also has no native drag behaviour since it's not an <img>, so the fix is effectively complete."
+  ],
+  "updated_files": ["/app/backend/tests/test_ticker.py"],
+  "success_rate": {"backend": "90% (9 passed, 1 skipped)", "frontend": "100% (all drag/ticker/live flows verified)"},
+  "test_credentials": "yannick.gijbels@koodh.com / KYLovie13monx + TOTP NKSPU7UH4M5BJ3X3353DNTNA54YNIJSY (per /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created and TORE DOWN: scene c616e847/d5b47baf (TEST_DragImage, TEST_TickerDragScene), form b6aa6710 (TEST_TickerLive), submission 71cbccbd; and pytest-scope TEST_TickerForm + submission 'Hello Ticker World' inside workspace 83e9d223-ae96-4e12-a0ff-198a959582c5. All deleted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Ticker + image-drag-fix fully working. Key testids verified: canvas-el-{elId} (parent handles drag), add-ticker, layer-row-{elId}, prop-ticker-form, prop-ticker-text, prop-ticker-icon, prop-ticker-speed, message-ticker-{sid}. Backend tests live in /app/backend/tests/test_ticker.py (run with -o addopts= to disable xdist parallel race on the shared workspace). The TestRegression::test_overlay_export_root test currently skips when no pre-existing scenes are in the workspace — not a bug."
+}
