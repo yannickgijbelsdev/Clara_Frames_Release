@@ -215,6 +215,10 @@ class SourceInput(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     timezone: Optional[str] = None
+    song_path: Optional[str] = None
+    separator: Optional[str] = None
+    artwork: Optional[bool] = None
+    reverse: Optional[bool] = None
     workspace_id: Optional[str] = None
 
 class LiveSongInput(BaseModel):
@@ -651,6 +655,35 @@ def _fetch_source_sync(url: str, method: str, headers: dict) -> Any:
     except Exception:
         return {"_text": r.text}
 
+async def _itunes_artwork(term: str) -> str:
+    term = (term or "").strip()
+    if not term:
+        return ""
+    try:
+        r = await asyncio.to_thread(requests.get, "https://itunes.apple.com/search",
+                                    params={"term": term, "media": "music", "entity": "song", "limit": 1}, timeout=8)
+        results = r.json().get("results", [])
+    except Exception:
+        return ""
+    if not results:
+        return ""
+    art = results[0].get("artworkUrl100") or results[0].get("artworkUrl60") or ""
+    return art.replace("100x100bb", "600x600bb") if art else ""
+
+def _split_now_playing(song: str, sep: str, reverse: bool):
+    song = (song or "").strip()
+    sep = sep or " - "
+    artist, title = "", ""
+    if sep and sep in song:
+        a, b = song.split(sep, 1)
+        if reverse:
+            title, artist = a.strip(), b.strip()
+        else:
+            artist, title = a.strip(), b.strip()
+    else:
+        title = song
+    return artist, title
+
 async def resolve_source_values(source: dict) -> Dict[str, Any]:
     """Fetch (respecting cache) and resolve configured field values."""
     if source.get("type") == "builtin_time":
@@ -678,6 +711,31 @@ async def resolve_source_values(source: dict) -> Dict[str, Any]:
         except Exception as e:
             await db.sources.update_one({"id": source["id"]}, {"$set": {"last_error": str(e)}})
             raw = source.get("last_raw")
+    if source.get("type") == "builtin_nowplaying":
+        song = ""
+        if isinstance(raw, dict):
+            if set(raw.keys()) == {"_text"}:
+                song = (raw.get("_text") or "").strip()
+            else:
+                sp = source.get("song_path") or ""
+                val = _resolve_path(raw, sp) if sp else None
+                if not val:
+                    for k in ("song_title", "raw_song_title", "original_song_title", "title", "np", "nowplaying", "song"):
+                        if raw.get(k):
+                            val = raw.get(k); break
+                song = (str(val) if val else "").strip()
+        else:
+            song = str(raw or "").strip()
+        artist, title = _split_now_playing(song, source.get("separator") or " - ", bool(source.get("reverse")))
+        artwork = ""
+        if source.get("artwork", True) and song:
+            cache = source.get("np_cache") or {}
+            if cache.get("song") == song and cache.get("artwork") is not None:
+                artwork = cache.get("artwork") or ""
+            else:
+                artwork = await _itunes_artwork(((artist + " " + title).strip()) or song)
+                await db.sources.update_one({"id": source["id"]}, {"$set": {"np_cache": {"song": song, "artwork": artwork}}})
+        return {"song": song, "artist": artist, "title": title, "artwork": artwork}
     values = {}
     for f in source.get("fields", []):
         if not (f.get("key") or "").strip():
@@ -695,7 +753,19 @@ LIVE_FIELDS = [
     {"key": "artwork", "label": "Hoesje (afbeelding)", "path": "artwork"},
 ]
 
+NOWPLAYING_FIELDS = [
+    {"key": "artist", "label": "Artist", "path": "artist"},
+    {"key": "title", "label": "Title", "path": "title"},
+    {"key": "song", "label": "Song (full)", "path": "song"},
+    {"key": "artwork", "label": "Album cover", "path": "artwork"},
+]
+
 def _prep_builtin(body: SourceInput) -> dict:
+    if body.type == "builtin_nowplaying":
+        return {"url": body.url, "fields": [dict(f) for f in NOWPLAYING_FIELDS],
+                "song_path": body.song_path or "", "separator": body.separator or " - ",
+                "artwork": True if body.artwork is None else bool(body.artwork),
+                "reverse": bool(body.reverse), "refresh_interval": int(body.refresh_interval or 15)}
     if body.type == "builtin_live":
         return {"url": "", "fields": [dict(f) for f in LIVE_FIELDS]}
     if body.type == "builtin_weather":
@@ -803,6 +873,10 @@ async def create_source(body: SourceInput, user: dict = Depends(get_current_user
         "latitude": prep.get("latitude", body.latitude),
         "longitude": prep.get("longitude", body.longitude),
         "timezone": prep.get("timezone", body.timezone),
+        "song_path": prep.get("song_path"),
+        "separator": prep.get("separator"),
+        "artwork": prep.get("artwork"),
+        "reverse": prep.get("reverse"),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.sources.insert_one(doc)
@@ -822,6 +896,10 @@ async def update_source(source_id: str, body: SourceInput, user: dict = Depends(
         "latitude": prep.get("latitude", body.latitude),
         "longitude": prep.get("longitude", body.longitude),
         "timezone": prep.get("timezone", body.timezone),
+        "song_path": prep.get("song_path"),
+        "separator": prep.get("separator"),
+        "artwork": prep.get("artwork"),
+        "reverse": prep.get("reverse"),
         "last_raw": None, "last_fetched": None,
     }
     await db.sources.update_one({"id": source_id}, {"$set": upd})

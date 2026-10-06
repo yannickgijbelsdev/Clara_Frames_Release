@@ -10,6 +10,16 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Design: Clara Campaigns light-thema (Outfit / Plus Jakarta Sans, rose/periwinkle)
 - Editor: drag & drop op 16:9 canvas
 
+## 2026-10-06d — "Now Playing (radio)" smart source (split artist/title + album cover)
+- New source type builtin_nowplaying: reads a radio now-playing URL (JSON like …/now-playing with song_title, OR a plain …/now-playing.txt) and exposes SEPARATE fields: artist, title, song (full), artwork.
+- Splits the song string on a configurable separator (default " - "); optional reverse for "Title - Artist". JSON song field auto-detected (song_title/raw_song_title/original_song_title/title/np...) or set via song_path.
+- Album cover fetched automatically via iTunes (_itunes_artwork, 600x600), cached per song string on the source doc (np_cache) so iTunes is only queried when the song changes.
+- Backend: SourceInput gained song_path/separator/artwork/reverse; _prep_builtin + create/update persist them; resolve_source_values has a builtin_nowplaying branch (after fetch). NOWPLAYING_FIELDS drive the field list + api_field/image binding dropdowns.
+- Frontend: Sources dialog has a builtin_nowplaying section (URL, separator, refresh, optional JSON song field, reverse checkbox, auto-artwork checkbox). TYPE_META label "Now Playing (radio)".
+- USAGE: place an api_field bound to `artist` and another to `title` (each element keeps its own bold/font/size/color/align via ElementInspector), and an image element bound to `artwork`. Styling-per-element already existed.
+- Verified e2e (curl): JSON + .txt both return artist/title/song + hi-res artwork. Redeploy needed for live site.
+
+
 ## 2026-10-06c — FIX: API values now shown live in the editor
 - Bug: in the Scene/Pancarte editor an api_field showed only "…" and source-bound images stayed static, so users thought their API wasn't loading ("API's worden niet getoond"). Cause: the editors never fetched resolved source values; SceneCanvas received no sourceValues.
 - Fix: new backend GET /api/sources/values?workspace_id=... resolves every workspace source to a {"sourceId:fieldKey": value} map (skips internal _keys). SceneEditor & PancarteEditor fetch it on load + every 15s and pass sourceValues to SceneCanvas; FlowRegion forwards sourceValues to PancarteView so pancarte api_fields/images inside flows also show live data.

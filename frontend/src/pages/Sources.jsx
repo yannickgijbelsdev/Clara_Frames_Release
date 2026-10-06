@@ -9,16 +9,17 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Trash2, Radio, Cloud, Clock, Globe, FlaskConical, Pencil } from "lucide-react";
+import { Plus, Trash2, Radio, Cloud, Clock, Globe, FlaskConical, Pencil, Music } from "lucide-react";
 
 const TYPE_META = {
   custom: { label: "Custom API", icon: Globe },
+  builtin_nowplaying: { label: "Now Playing (radio)", icon: Music },
   builtin_weather: { label: "Weather (Open-Meteo)", icon: Cloud },
   builtin_time: { label: "World Clock", icon: Clock },
   builtin_live: { label: "Nu Speelt (live)", icon: Radio },
 };
 
-const empty = { name: "", type: "custom", url: "", method: "GET", refresh_interval: 30, fields: [{ key: "", label: "", path: "" }], latitude: 50.85, longitude: 4.35, timezone: "Europe/Brussels" };
+const empty = { name: "", type: "custom", url: "", method: "GET", refresh_interval: 30, fields: [{ key: "", label: "", path: "" }], latitude: 50.85, longitude: 4.35, timezone: "Europe/Brussels", song_path: "", separator: " - ", artwork: true, reverse: false };
 
 export default function Sources() {
   const { current } = useWorkspace();
@@ -130,6 +131,29 @@ export default function Sources() {
             )}
             {form.type === "builtin_time" && (
               <div className="space-y-1.5"><Label>Timezone (IANA)</Label><Input value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })} placeholder="Europe/Brussels" className="rounded-xl" /></div>
+            )}
+            {form.type === "builtin_nowplaying" && (
+              <>
+                <div className="space-y-1.5"><Label>Now-playing URL</Label>
+                  <Input data-testid="np-url" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://…/now-playing (JSON) or …/now-playing.txt" className="rounded-xl" /></div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5"><Label>Separator</Label>
+                    <Input data-testid="np-sep" value={form.separator} onChange={(e) => setForm({ ...form, separator: e.target.value })} placeholder=" - " className="rounded-xl font-mono" /></div>
+                  <div className="space-y-1.5"><Label>Refresh (sec)</Label>
+                    <Input type="number" min="5" value={form.refresh_interval} onChange={(e) => setForm({ ...form, refresh_interval: parseInt(e.target.value) || 15 })} className="rounded-xl" /></div>
+                </div>
+                <div className="space-y-1.5"><Label>JSON song field (optional)</Label>
+                  <Input data-testid="np-songpath" value={form.song_path} onChange={(e) => setForm({ ...form, song_path: e.target.value })} placeholder="song_title (auto-detected if empty)" className="rounded-xl font-mono text-sm" /></div>
+                <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer" data-testid="np-reverse">
+                  <input type="checkbox" checked={!!form.reverse} onChange={(e) => setForm({ ...form, reverse: e.target.checked })} className="h-4 w-4 rounded accent-brand-600" />
+                  Order is "Title - Artist" (reverse)
+                </label>
+                <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer" data-testid="np-artwork">
+                  <input type="checkbox" checked={form.artwork !== false} onChange={(e) => setForm({ ...form, artwork: e.target.checked })} className="h-4 w-4 rounded accent-brand-600" />
+                  Fetch album cover automatically (iTunes)
+                </label>
+                <p className="text-[11px] text-slate-400">Exposes separate fields: <code className="font-mono">artist</code>, <code className="font-mono">title</code>, <code className="font-mono">song</code> and <code className="font-mono">artwork</code>. Place each as its own element to style independently; bind an image to <code className="font-mono">artwork</code> for the album cover.</p>
+              </>
             )}
             {form.type === "custom" && (
               <>
