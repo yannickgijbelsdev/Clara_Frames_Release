@@ -20,6 +20,7 @@ export default function PancarteEditor() {
   const [pan, setPan] = useState(null);
   const [sources, setSources] = useState([]);
   const [overlays, setOverlays] = useState([]);
+  const [sourceValues, setSourceValues] = useState({});
   const [selId, setSelId] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -31,6 +32,10 @@ export default function PancarteEditor() {
   useEffect(() => {
     if (!pan?.workspace_id) return;
     api.get(`/overlays?workspace_id=${pan.workspace_id}`).then(({ data }) => setOverlays(data)).catch(() => {});
+    const fetchVals = () => api.get(`/sources/values?workspace_id=${pan.workspace_id}`).then(({ data }) => setSourceValues(data)).catch(() => {});
+    fetchVals();
+    const t = setInterval(fetchVals, 15000);
+    return () => clearInterval(t);
   }, [pan?.workspace_id]);
 
   const sel = pan?.elements.find((e) => e.id === selId) || null;
@@ -119,7 +124,7 @@ export default function PancarteEditor() {
         {/* canvas */}
         <div className="bg-slate-100 rounded-3xl clara-soft p-4">
           <div className="rounded-2xl overflow-hidden ring-1 ring-slate-300 shadow-inner">
-            <SceneCanvas scene={pan} editable selectedId={selId} onSelect={setSelId} onUpdate={updateEl} />
+            <SceneCanvas scene={pan} editable selectedId={selId} onSelect={setSelId} onUpdate={updateEl} sourceValues={sourceValues} />
           </div>
           <p className="text-xs text-slate-400 mt-2 text-center">Pancarte {pan.width}×{pan.height} · click an element to edit · drag the corner to resize</p>
         </div>

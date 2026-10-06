@@ -769,6 +769,23 @@ async def list_sources(workspace_id: Optional[str] = None, user: dict = Depends(
         d.pop("_id", None)
     return docs
 
+@api_router.get("/sources/values")
+async def resolve_all_source_values(workspace_id: str, user: dict = Depends(get_current_user)):
+    """Resolve every source in a workspace to a {sourceId:fieldKey -> value} map for live editor previews."""
+    srcs = await db.sources.find({"user_id": user["id"], "workspace_id": workspace_id}).to_list(200)
+    out = {}
+    for s in srcs:
+        try:
+            vals = await resolve_source_values(s)
+        except Exception:
+            vals = {}
+        for k, v in (vals or {}).items():
+            if k.startswith("_"):
+                continue
+            out[f"{s['id']}:{k}"] = v
+    return out
+
+
 @api_router.post("/sources")
 async def create_source(body: SourceInput, user: dict = Depends(get_current_user)):
     prep = _prep_builtin(body)

@@ -13,7 +13,7 @@ function OverlaySurface({ ov }) {
 
 const PREVIEW_GAP = 1.5; // compact pause between timed cycles in the editor preview
 
-function FlowRegion({ placement, flowData, editable, selected, onPointerDownRegion }) {
+function FlowRegion({ placement, flowData, editable, selected, onPointerDownRegion, sourceValues }) {
   const flow = flowData?.flow || null;
   const pancartes = flowData?.pancartes || [];
   const sc = placement.schedule || {};
@@ -74,7 +74,7 @@ function FlowRegion({ placement, flowData, editable, selected, onPointerDownRegi
         <div key={segKey} style={{ position: "absolute", inset: 0, ...(cur?.kind === "pan" ? flowEntranceStyle(flow) : { animation: "clara-in-fade .4s ease-out both" }) }}>
           {cur?.kind === "intro" && <OverlaySurface ov={sc.intro} />}
           {cur?.kind === "outro" && <OverlaySurface ov={sc.outro} />}
-          {pan && <PancarteView pancarte={pan} />}
+          {pan && <PancarteView pancarte={pan} sourceValues={sourceValues} />}
         </div>
       ))}
       {timed && showingSomething && (
@@ -174,7 +174,7 @@ export default function SceneCanvas({ scene, editable = false, selectedId, onSel
         })}
         {(scene.flows || []).map((pl) => (
           <FlowRegion key={pl.id} placement={pl} flowData={flowsData[pl.flow_id]} editable={editable}
-            selected={editable && pl.id === selectedFlowId}
+            selected={editable && pl.id === selectedFlowId} sourceValues={sourceValues}
             onPointerDownRegion={(e, item, mode) => onPointerDown(e, item, mode, "flow")} />
         ))}
       </div>

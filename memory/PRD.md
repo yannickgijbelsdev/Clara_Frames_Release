@@ -10,6 +10,13 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Design: Clara Campaigns light-thema (Outfit / Plus Jakarta Sans, rose/periwinkle)
 - Editor: drag & drop op 16:9 canvas
 
+## 2026-10-06c — FIX: API values now shown live in the editor
+- Bug: in the Scene/Pancarte editor an api_field showed only "…" and source-bound images stayed static, so users thought their API wasn't loading ("API's worden niet getoond"). Cause: the editors never fetched resolved source values; SceneCanvas received no sourceValues.
+- Fix: new backend GET /api/sources/values?workspace_id=... resolves every workspace source to a {"sourceId:fieldKey": value} map (skips internal _keys). SceneEditor & PancarteEditor fetch it on load + every 15s and pass sourceValues to SceneCanvas; FlowRegion forwards sourceValues to PancarteView so pancarte api_fields/images inside flows also show live data.
+- Verified: api_field rendered "♪ Charlie Puth - Attention" live on canvas; /sources/values returns plain-text (now-playing, live-station) correctly.
+- NOTE for JSON APIs (e.g. /api/public/schedule/.../today returns {shows:[...]}): plain-text default 'text' field resolves to null — user must map a field path (e.g. shows.0.title). Plain-text endpoints (now-playing.txt, live) work out of the box via the auto 'text' field.
+
+
 ## 2026-10-06b — Canvas timeline preview for timed flows
 - SceneCanvas FlowRegion now PLAYS the full timed sequence in the editor canvas (not just a text summary): intro overlay (leadSeconds) → each pancarte (flow.interval) → end overlay (seconds) → short gap → loop. Continuous 'always' mode still cycles pancartes.
 - Uses a compact PREVIEW_GAP (1.5s) between cycles so designers see the sequence quickly; a phase badge (data-testid flow-phase-{placementId}) shows Intro / Pancarte i/N / End. Overlays rendered via OverlaySurface (iframe/video/img, pointer-events none).

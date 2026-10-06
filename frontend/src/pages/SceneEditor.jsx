@@ -20,6 +20,7 @@ export default function SceneEditor() {
   const [scene, setScene] = useState(null);
   const [sources, setSources] = useState([]);
   const [overlays, setOverlays] = useState([]);
+  const [sourceValues, setSourceValues] = useState({});
   const [flows, setFlows] = useState([]);
   const [pancartes, setPancartes] = useState([]);
   const [selId, setSelId] = useState(null);
@@ -36,6 +37,10 @@ export default function SceneEditor() {
     api.get(`/flows?workspace_id=${scene.workspace_id}`).then(({ data }) => setFlows(data)).catch(() => {});
     api.get(`/pancartes?workspace_id=${scene.workspace_id}`).then(({ data }) => setPancartes(data)).catch(() => {});
     api.get(`/overlays?workspace_id=${scene.workspace_id}`).then(({ data }) => setOverlays(data)).catch(() => {});
+    const fetchVals = () => api.get(`/sources/values?workspace_id=${scene.workspace_id}`).then(({ data }) => setSourceValues(data)).catch(() => {});
+    fetchVals();
+    const t = setInterval(fetchVals, 15000);
+    return () => clearInterval(t);
   }, [scene?.workspace_id]);
 
   const pancartesById = useMemo(() => Object.fromEntries(pancartes.map((p) => [p.id, p])), [pancartes]);
@@ -159,7 +164,7 @@ export default function SceneEditor() {
         <div className="bg-slate-100 rounded-3xl clara-soft p-4">
           <div className="rounded-2xl overflow-hidden ring-1 ring-slate-300 shadow-inner">
             <SceneCanvas scene={scene} editable selectedId={selId} onSelect={(sid) => { setSelId(sid); if (sid) setSelFlowId(null); }} onUpdate={updateEl}
-              selectedFlowId={selFlowId} onSelectFlow={(fid) => { setSelFlowId(fid); if (fid) setSelId(null); }} onUpdateFlow={updateFlow} flowsData={flowsData} />
+              selectedFlowId={selFlowId} onSelectFlow={(fid) => { setSelFlowId(fid); if (fid) setSelId(null); }} onUpdateFlow={updateFlow} flowsData={flowsData} sourceValues={sourceValues} />
           </div>
           <p className="text-xs text-slate-400 mt-2 text-center">Canvas {scene.width}×{scene.height} · click an element to edit · drag the corner to resize</p>
         </div>
