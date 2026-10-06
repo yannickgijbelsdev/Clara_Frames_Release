@@ -10,6 +10,14 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Design: Clara Campaigns light-thema (Outfit / Plus Jakarta Sans, rose/periwinkle)
 - Editor: drag & drop op 16:9 canvas
 
+## 2026-10-06 — Timed pancarte flows (intro/outro overlays + auto-close)
+- Scene flow placements now support a TIMED mode that plays the pancarte series ONCE then auto-closes (no longer a fixed showSeconds window). Per-pancarte seconds = flow.interval; series duration = count × interval.
+- Each timed placement can have an INTRO overlay (from the Overlays library) that starts N seconds BEFORE the pancartes (schedule.intro = {overlayId,url,kind,fit,leadSeconds}) and an END/outro overlay shown for M seconds AFTER the series (schedule.outro = {overlayId,url,kind,fit,seconds}).
+- Timeline per cycle (everyMinutes): [intro leadSeconds] → [pancartes ×interval, once] → [outro seconds] → hidden until next cycle. Implemented in OVERLAY_HTML (buildOverlayNode, showTimedPart, phase-based tick); continuous 'always' mode unchanged.
+- Editor: SceneEditor flow panel rebuilt — mode select (Always / Timed), Appear every (min), Intro overlay + 'starts … sec before', End overlay + 'show for … sec', and a live timeline summary (data-testid flow-timeline-summary, flow-intro-overlay, flow-outro-overlay, flow-intro-lead, flow-outro-seconds). Uses the workspace overlays list.
+- Verified e2e: overlay HTML embeds intro/outro + timing logic (no JS errors); browser render caught the INTRO phase; flow panel + summary verified via screenshot. Redeploy needed for live site.
+
+
 ## 2026-10-05 — Overlays (uploadable HTML/video/image overlays)
 - New nav item "Overlays" (/overlays, page /app/frontend/src/pages/Overlays.jsx), workspace-scoped library: upload + preview (HTML in transparent iframe, video, image) + copy URL + delete.
 - Backend: collection `overlays`; POST /api/overlays/upload (multipart file + workspace_id form field) -> S3 (overlays/{uid}/..), HTML stored with ContentType text/html; GET /api/overlays?workspace_id; DELETE /api/overlays/{id}. Kinds: html (.html/.htm, max 5MB), video (mp4/webm/mov, max 50MB), image (png/jpg/webp/gif, max 10MB). Needs `Form` import from fastapi.

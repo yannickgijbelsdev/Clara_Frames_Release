@@ -187,14 +187,56 @@ export default function SceneEditor() {
               <div className="space-y-1.5"><Label>When to show</Label>
                 <Select value={selFlow.schedule?.mode || "always"} onValueChange={(v) => updateSchedule({ mode: v })}>
                   <SelectTrigger className="rounded-xl" data-testid="flow-schedule"><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="always">Always on (cycle pancartes)</SelectItem><SelectItem value="everyX">Appear every X minutes</SelectItem></SelectContent>
+                  <SelectContent><SelectItem value="always">Always on (cycle pancartes)</SelectItem><SelectItem value="everyX">Timed (appear every X min, then close)</SelectItem></SelectContent>
                 </Select></div>
-              {selFlow.schedule?.mode === "everyX" && (
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1.5"><Label>Every (min)</Label><Input type="number" min="1" value={selFlow.schedule?.everyMinutes || 5} onChange={(e) => updateSchedule({ everyMinutes: parseInt(e.target.value) || 5 })} className="rounded-xl text-sm" data-testid="flow-every" /></div>
-                  <div className="space-y-1.5"><Label>Show (sec)</Label><Input type="number" min="1" value={selFlow.schedule?.showSeconds || 15} onChange={(e) => updateSchedule({ showSeconds: parseInt(e.target.value) || 15 })} className="rounded-xl text-sm" data-testid="flow-show" /></div>
-                </div>
-              )}
+              {selFlow.schedule?.mode === "everyX" && (() => {
+                const sch = selFlow.schedule || {};
+                const count = (selFlowDef?.pancarte_ids || []).length;
+                const per = selFlowDef?.interval || 5;
+                const lead = sch.intro?.url ? (sch.intro.leadSeconds ?? 10) : 0;
+                const outro = sch.outro?.url ? (sch.outro.seconds ?? 5) : 0;
+                const total = lead + count * per + outro;
+                const setOverlay = (slot, id) => {
+                  const o = overlays.find((x) => x.id === id);
+                  const extra = slot === "intro" ? { leadSeconds: sch.intro?.leadSeconds ?? 10 } : { seconds: sch.outro?.seconds ?? 5 };
+                  updateSchedule({ [slot]: id === "none" ? null : { overlayId: id, url: o?.url || "", kind: o?.kind || "", name: o?.name || "", fit: o?.kind === "html" ? undefined : "contain", ...extra } });
+                };
+                return (
+                  <div className="space-y-3">
+                    <div className="space-y-1.5"><Label>Appear every (min)</Label>
+                      <Input type="number" min="1" value={sch.everyMinutes || 10} onChange={(e) => updateSchedule({ everyMinutes: parseInt(e.target.value) || 10 })} className="rounded-xl text-sm" data-testid="flow-every" /></div>
+
+                    <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                      <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Intro overlay (before pancartes)</Label>
+                      <Select value={sch.intro?.overlayId || "none"} onValueChange={(v) => setOverlay("intro", v)}>
+                        <SelectTrigger className="rounded-xl" data-testid="flow-intro-overlay"><SelectValue placeholder="None" /></SelectTrigger>
+                        <SelectContent><SelectItem value="none">None</SelectItem>{overlays.map((o) => <SelectItem key={o.id} value={o.id}>{o.name} · {o.kind}</SelectItem>)}</SelectContent>
+                      </Select>
+                      {sch.intro?.url && (
+                        <div className="space-y-1.5"><Label>Starts … sec before</Label>
+                          <Input type="number" min="0" value={sch.intro?.leadSeconds ?? 10} onChange={(e) => updateSchedule({ intro: { ...sch.intro, leadSeconds: parseInt(e.target.value) || 0 } })} className="rounded-xl text-sm" data-testid="flow-intro-lead" /></div>
+                      )}
+                      {overlays.length === 0 && <p className="text-[11px] text-slate-400">Upload overlays on the Overlays page to use them here.</p>}
+                    </div>
+
+                    <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                      <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">End overlay (after pancartes)</Label>
+                      <Select value={sch.outro?.overlayId || "none"} onValueChange={(v) => setOverlay("outro", v)}>
+                        <SelectTrigger className="rounded-xl" data-testid="flow-outro-overlay"><SelectValue placeholder="None" /></SelectTrigger>
+                        <SelectContent><SelectItem value="none">None</SelectItem>{overlays.map((o) => <SelectItem key={o.id} value={o.id}>{o.name} · {o.kind}</SelectItem>)}</SelectContent>
+                      </Select>
+                      {sch.outro?.url && (
+                        <div className="space-y-1.5"><Label>Show for … sec</Label>
+                          <Input type="number" min="1" value={sch.outro?.seconds ?? 5} onChange={(e) => updateSchedule({ outro: { ...sch.outro, seconds: parseInt(e.target.value) || 1 } })} className="rounded-xl text-sm" data-testid="flow-outro-seconds" /></div>
+                      )}
+                    </div>
+
+                    <div className="rounded-xl bg-brand-50/60 border border-brand-100 p-2.5 text-xs text-slate-600" data-testid="flow-timeline-summary">
+                      Every {sch.everyMinutes || 10} min: {lead > 0 ? `${lead}s intro → ` : ""}{count} pancarte{count === 1 ? "" : "s"} × {per}s{outro > 0 ? ` → ${outro}s end` : ""} → closes automatically ({total}s total).
+                    </div>
+                  </div>
+                );
+              })()}
               <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-slate-100">
                 {["x", "y", "w", "h"].map((k) => (
                   <div key={k} className="space-y-1"><Label className="text-[10px] uppercase text-slate-400">{k}</Label>
