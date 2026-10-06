@@ -10,6 +10,11 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Design: Clara Campaigns light-thema (Outfit / Plus Jakarta Sans, rose/periwinkle)
 - Editor: drag & drop op 16:9 canvas
 
+## 2026-10-06e — One-click "Now Playing" pancarte template
+- Pancartes page: new "Now Playing template" button (data-testid np-template-btn). Finds the workspace's builtin_nowplaying source and creates a 1920x1080 pancarte pre-wired: album cover image (bound to artwork), "NOW PLAYING" label, artist api_field (bold Outfit), title api_field (lighter Jakarta), then opens it in the editor. If no now-playing source exists it toasts to create one first.
+- Verified via UI: clicking created a pancarte showing live cover + "Creedence Clearwater Revival" / "Bad Moon Rising" from the GRK source; layers title/artist/label/cover present. Artist font tuned to 76px + lineHeight for long names.
+
+
 ## 2026-10-06d — "Now Playing (radio)" smart source (split artist/title + album cover)
 - New source type builtin_nowplaying: reads a radio now-playing URL (JSON like …/now-playing with song_title, OR a plain …/now-playing.txt) and exposes SEPARATE fields: artist, title, song (full), artwork.
 - Splits the song string on a configurable separator (default " - "); optional reverse for "Title - Artist". JSON song field auto-detected (song_title/raw_song_title/original_song_title/title/np...) or set via song_path.

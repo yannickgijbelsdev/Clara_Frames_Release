@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Copy, LayoutTemplate } from "lucide-react";
+import { Plus, Pencil, Trash2, Copy, LayoutTemplate, Music } from "lucide-react";
 import { uid } from "@/lib/elementDefs";
 
 export default function Pancartes() {
@@ -38,6 +38,34 @@ export default function Pancartes() {
     nav(`/pancartes/${data.id}`);
   };
 
+  const createNowPlaying = async () => {
+    if (!current) return;
+    let sources = [];
+    try { const { data } = await api.get(`/sources?workspace_id=${current}`); sources = data; } catch (e) {}
+    const np = sources.find((s) => s.type === "builtin_nowplaying");
+    if (!np) {
+      toast.error("Create a 'Now Playing (radio)' source first on the API Sources page.");
+      return;
+    }
+    const { data } = await api.post("/pancartes", {
+      name: "Now Playing", width: 1920, height: 1080, background: { color: "#0b1020" }, workspace_id: current,
+      elements: [
+        { id: uid(), type: "image", x: 140, y: 280, w: 520, h: 520, rotation: 0, opacity: 1,
+          props: { name: "cover", src: "", sourceId: np.id, fieldKey: "artwork" }, style: { objectFit: "cover", borderRadius: 24 } },
+        { id: uid(), type: "text", x: 720, y: 300, w: 1060, h: 70, rotation: 0, opacity: 1,
+          props: { name: "label", text: "NOW PLAYING" }, style: { color: "#8ea2ff", fontSize: 40, fontWeight: 800, letterSpacing: 6, fontFamily: "'Outfit', sans-serif", textAlign: "left" } },
+        { id: uid(), type: "api_field", x: 720, y: 372, w: 1060, h: 170, rotation: 0, opacity: 1,
+          props: { name: "artist", sourceId: np.id, fieldKey: "artist", prefix: "", suffix: "" },
+          style: { color: "#ffffff", fontSize: 76, fontWeight: 800, lineHeight: 1.05, fontFamily: "'Outfit', sans-serif", textAlign: "left" } },
+        { id: uid(), type: "api_field", x: 720, y: 560, w: 1060, h: 110, rotation: 0, opacity: 1,
+          props: { name: "title", sourceId: np.id, fieldKey: "title", prefix: "", suffix: "" },
+          style: { color: "#c9d0ee", fontSize: 56, fontWeight: 500, fontFamily: "'Plus Jakarta Sans', sans-serif", textAlign: "left" } },
+      ],
+    });
+    toast.success(`Now Playing template created — bound to "${np.name}"`);
+    nav(`/pancartes/${data.id}`);
+  };
+
   const duplicate = async (p) => {
     const { data } = await api.post("/pancartes", { name: `${p.name} copy`, width: p.width, height: p.height, background: p.background, elements: p.elements, workspace_id: current });
     toast.success("Pancarte duplicated"); load();
@@ -46,7 +74,10 @@ export default function Pancartes() {
 
   return (
     <AppLayout title="Pancartes" subtitle={`${items.length} card design(s) · reusable across flows`}
-      actions={<PrimaryButton icon={Plus} data-testid="new-pancarte-btn" onClick={() => setOpen(true)}>New pancarte</PrimaryButton>}>
+      actions={<div className="flex items-center gap-2">
+        <SecondaryButton icon={Music} data-testid="np-template-btn" onClick={createNowPlaying}>Now Playing template</SecondaryButton>
+        <PrimaryButton icon={Plus} data-testid="new-pancarte-btn" onClick={() => setOpen(true)}>New pancarte</PrimaryButton>
+      </div>}>
 
       {items.length === 0 ? (
         <div className="bg-white rounded-3xl clara-soft p-12 text-center">
