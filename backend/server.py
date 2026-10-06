@@ -1240,6 +1240,7 @@ OVERLAY_HTML = r"""<!DOCTYPE html>
   @keyframes clara-in-left{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
   @keyframes clara-in-right{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:translateX(0)}}
   @keyframes clara-in-zoom{from{opacity:0;transform:scale(0.8)}to{opacity:1;transform:scale(1)}}
+  @keyframes clara-ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 </style></head>
 <script>
 function applyAnim(node, p){
@@ -1413,6 +1414,26 @@ function buildElementNode(el){
     else if(ok==='video' && p.url){ var vo=document.createElement('video'); vo.src=p.url; vo.autoplay=true; vo.loop=true; vo.muted=true;
       vo.setAttribute('playsinline',''); vo.setAttribute('muted',''); vo.style.width='100%'; vo.style.height='100%'; vo.style.objectFit=ofit; inner.appendChild(vo); }
     else if(p.url){ var io=document.createElement('img'); io.src=p.url; io.style.width='100%'; io.style.height='100%'; io.style.objectFit=ofit; inner.appendChild(io); }
+  } else if(el.type==='ticker'){
+    inner.style.overflow='hidden'; inner.style.whiteSpace='nowrap'; inner.style.display='block';
+    var track=document.createElement('div'); track.style.display='inline-block'; track.style.whiteSpace='nowrap'; track.style.willChange='transform';
+    inner.appendChild(track);
+    function renderTicker(items){
+      var sep = ' \\u00A0'+(p.icon||'\\u25CF')+'\\u00A0 ';
+      var base = [];
+      if(p.freeText) base.push(p.freeText);
+      (items||[]).forEach(function(s){ if(s) base.push(s); });
+      var one = base.length ? (base.join(sep) + sep) : (p.freeText||'');
+      if(!one){ track.textContent=''; return; }
+      track.textContent = one + one;
+      var secs = Math.max(8, Math.round((one.length) * (parseFloat(p.speed)||0.35)));
+      track.style.animation = 'clara-ticker ' + secs + 's linear infinite';
+    }
+    renderTicker([]);
+    if(p.formId){
+      function pullTicker(){ fetch(BACKEND + '/api/public/scene/' + TOKEN + '/ticker/' + p.formId).then(function(r){return r.json();}).then(function(d){ renderTicker(d.items||[]); }).catch(function(){}); }
+      pullTicker(); setInterval(pullTicker, 10000);
+    }
   } else {
     inner.textContent = p.text || '';
   }
@@ -1718,6 +1739,55 @@ async def mark_submission_read(sid: str, user: dict = Depends(get_current_user))
 async def delete_submission(sid: str, user: dict = Depends(get_current_user)):
     await db.submissions.delete_one({"id": sid, "user_id": user["id"]})
     return {"ok": True}
+
+def _submission_ticker_text(form: dict, data: dict) -> str:
+    parts = []
+    for f in (form.get("fields") or []):
+        v = (data or {}).get(f.get("key"))
+        if v is None or v == "":
+            continue
+        if isinstance(v, list):
+            if v and isinstance(v[0], dict):
+                s = v[0]
+                combo = " - ".join([x for x in [s.get("artist") or "", s.get("title") or s.get("trackName") or ""] if x])
+                if combo:
+                    parts.append(combo)
+            continue
+        if isinstance(v, (str, int, float)):
+            sv = str(v).strip()
+            if sv:
+                parts.append(sv)
+    return " \u00B7 ".join(parts)
+
+@api_router.post("/submissions/{sid}/ticker")
+async def toggle_submission_ticker(sid: str, body: Dict[str, Any], user: dict = Depends(get_current_user)):
+    on = bool(body.get("on", True))
+    await db.submissions.update_one({"id": sid, "user_id": user["id"]}, {"$set": {"ticker": on}})
+    return {"ok": True, "ticker": on}
+
+async def _ticker_items_for_form(form: dict) -> list:
+    if not form:
+        return []
+    subs = await db.submissions.find({"form_id": form["id"], "ticker": True}).sort("created_at", -1).to_list(50)
+    items = []
+    for s in subs:
+        t = _submission_ticker_text(form, s.get("data") or {})
+        if t:
+            items.append(t)
+    return items
+
+@api_router.get("/forms/{fid}/ticker-items")
+async def form_ticker_items(fid: str, user: dict = Depends(get_current_user)):
+    form = await db.forms.find_one({"id": fid, "user_id": user["id"]})
+    return {"items": await _ticker_items_for_form(form)}
+
+@api_router.get("/public/scene/{token}/ticker/{form_id}")
+async def public_ticker_items(token: str, form_id: str):
+    scene = await db.scenes.find_one({"public_token": token})
+    if not scene:
+        raise HTTPException(status_code=404, detail="Scene not found")
+    form = await db.forms.find_one({"id": form_id, "user_id": scene.get("user_id")})
+    return {"items": await _ticker_items_for_form(form)}
 
 # ---- Public form endpoints (consumed by external websites, permissive CORS) ----
 HONEYPOT_FIELD = "_gotcha"

@@ -7,7 +7,7 @@ import { useWorkspace } from "@/context/WorkspaceContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SongList } from "@/components/SongPicker";
 import { toast } from "sonner";
-import { Inbox, ChevronDown, ChevronUp, Trash2, Check, Mail, Radio, X } from "lucide-react";
+import { Inbox, ChevronDown, ChevronUp, Trash2, Check, Mail, Radio, X, ScrollText } from "lucide-react";
 
 function renderValue(field, value) {
   if (value === undefined || value === null || value === "") return "—";
@@ -85,6 +85,13 @@ export default function Messages() {
   const remove = async (s) => {
     setSubs((arr) => arr.filter((x) => x.id !== s.id));
     try { await api.delete(`/submissions/${s.id}`); window.dispatchEvent(new Event("submissions-changed")); toast.success("Message deleted"); } catch (e) { toast.error("Delete failed"); }
+  };
+
+  const toggleTicker = async (s) => {
+    const on = !s.ticker;
+    setSubs((arr) => arr.map((x) => x.id === s.id ? { ...x, ticker: on } : x));
+    try { await api.post(`/submissions/${s.id}/ticker`, { on }); toast.success(on ? "Live in ticker" : "Removed from ticker"); }
+    catch (e) { toast.error("Failed"); setSubs((arr) => arr.map((x) => x.id === s.id ? { ...x, ticker: !on } : x)); }
   };
 
   const unreadTotal = subs.filter((s) => !s.read).length;
@@ -184,6 +191,10 @@ export default function Messages() {
                       {!s.read && (
                         <button data-testid={`message-markread-${s.id}`} onClick={() => markRead(s)} className="text-xs font-medium text-slate-500 hover:text-brand-600 inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" />Mark read</button>
                       )}
+                      <button data-testid={`message-ticker-${s.id}`} onClick={() => toggleTicker(s)}
+                        className={`text-xs font-semibold inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full transition-colors ${s.ticker ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+                        <ScrollText className="h-3.5 w-3.5" />{s.ticker ? "Live in ticker" : "Live"}
+                      </button>
                       <button data-testid={`message-delete-${s.id}`} onClick={() => remove(s)} className="ml-auto h-8 w-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   </div>

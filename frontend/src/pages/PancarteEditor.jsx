@@ -21,6 +21,7 @@ export default function PancarteEditor() {
   const [sources, setSources] = useState([]);
   const [overlays, setOverlays] = useState([]);
   const [sourceValues, setSourceValues] = useState({});
+  const [formsList, setFormsList] = useState([]);
   const [selId, setSelId] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -32,6 +33,7 @@ export default function PancarteEditor() {
   useEffect(() => {
     if (!pan?.workspace_id) return;
     api.get(`/overlays?workspace_id=${pan.workspace_id}`).then(({ data }) => setOverlays(data)).catch(() => {});
+    api.get(`/forms?workspace_id=${pan.workspace_id}`).then(({ data }) => setFormsList(data)).catch(() => {});
     const fetchVals = () => api.get(`/sources/values?workspace_id=${pan.workspace_id}`).then(({ data }) => setSourceValues(data)).catch(() => {});
     fetchVals();
     const t = setInterval(fetchVals, 15000);
@@ -134,7 +136,7 @@ export default function PancarteEditor() {
           {!sel ? (
             <p className="text-sm text-slate-400 text-center py-8">Select an element to edit its properties.</p>
           ) : (
-            <ElementInspector sel={sel} sources={sources} overlays={overlays} updateProps={updateProps} updateStyle={updateStyle} updateEl={updateEl} delEl={delEl} />
+            <ElementInspector sel={sel} sources={sources} overlays={overlays} forms={formsList} updateProps={updateProps} updateStyle={updateStyle} updateEl={updateEl} delEl={delEl} />
           )}
         </div>
       </div>

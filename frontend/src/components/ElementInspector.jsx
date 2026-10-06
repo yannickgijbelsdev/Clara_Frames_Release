@@ -23,7 +23,7 @@ function RoundingControl({ sel, updateStyle }) {
   );
 }
 
-export default function ElementInspector({ sel, sources = [], overlays = [], updateProps, updateStyle, updateEl, delEl, footer = null }) {
+export default function ElementInspector({ sel, sources = [], overlays = [], forms = [], updateProps, updateStyle, updateEl, delEl, footer = null }) {
   const rawFields = (sources.find((s) => s.id === sel?.props?.sourceId)?.fields || []).filter((f) => (f.key || "").trim());
   const srcFields = rawFields.length ? rawFields : [{ key: "text", label: "Response text" }];
   return (
@@ -132,6 +132,32 @@ export default function ElementInspector({ sel, sources = [], overlays = [], upd
               </Select></div>
           )}
           <RoundingControl sel={sel} updateStyle={updateStyle} />
+        </>
+      )}
+
+      {sel.type === "ticker" && (
+        <>
+          <div className="space-y-1.5"><Label>Messages from form</Label>
+            <Select value={sel.props.formId || "none"} onValueChange={(v) => updateProps({ formId: v === "none" ? "" : v })}>
+              <SelectTrigger className="rounded-xl" data-testid="prop-ticker-form"><SelectValue placeholder="None" /></SelectTrigger>
+              <SelectContent><SelectItem value="none">None (free text only)</SelectItem>{forms.map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}</SelectContent>
+            </Select>
+            <p className="text-[11px] text-slate-400">Only messages marked <b>Live</b> in Messages appear here.</p>
+          </div>
+          <div className="space-y-1.5"><Label>Free text (scrolls along)</Label>
+            <Input value={sel.props.freeText || ""} onChange={(e) => updateProps({ freeText: e.target.value })} className="rounded-xl text-sm" data-testid="prop-ticker-text" placeholder="e.g. Welcome to Radio GRK" /></div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1.5"><Label>Separator icon</Label>
+              <Select value={sel.props.icon || "\u25CF"} onValueChange={(v) => updateProps({ icon: v })}>
+                <SelectTrigger className="rounded-xl" data-testid="prop-ticker-icon"><SelectValue /></SelectTrigger>
+                <SelectContent>{["\u25CF", "\u2605", "\u266A", "\u25C6", "\u25B2", "\u25A0", "\u27A4", "\u2726", "\u2014", "|", "\u2665"].map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent>
+              </Select></div>
+            <div className="space-y-1.5"><Label>Speed</Label>
+              <Select value={String(sel.props.speed ?? 0.35)} onValueChange={(v) => updateProps({ speed: parseFloat(v) })}>
+                <SelectTrigger className="rounded-xl" data-testid="prop-ticker-speed"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="0.6">Slow</SelectItem><SelectItem value="0.35">Normal</SelectItem><SelectItem value="0.18">Fast</SelectItem></SelectContent>
+              </Select></div>
+          </div>
         </>
       )}
 

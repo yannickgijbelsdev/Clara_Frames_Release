@@ -1,4 +1,32 @@
 import { formatClock } from "@/lib/clock";
+import { useEffect, useState } from "react";
+import api from "@/lib/api";
+
+function Ticker({ el }) {
+  const p = el.props || {};
+  const [items, setItems] = useState([]);
+  useEffect(() => {
+    if (!p.formId) { setItems([]); return; }
+    let alive = true;
+    const pull = () => api.get(`/forms/${p.formId}/ticker-items`).then(({ data }) => { if (alive) setItems(data.items || []); }).catch(() => {});
+    pull();
+    const t = setInterval(pull, 10000);
+    return () => { alive = false; clearInterval(t); };
+  }, [p.formId]);
+  const sep = ` \u00A0${p.icon || "\u25CF"}\u00A0 `;
+  const base = [];
+  if (p.freeText) base.push(p.freeText);
+  items.forEach((s) => s && base.push(s));
+  const one = base.length ? base.join(sep) + sep : "";
+  const secs = Math.max(8, Math.round((one.length || 20) * (parseFloat(p.speed) || 0.35)));
+  return (
+    <div style={{ width: "100%", height: "100%", overflow: "hidden", whiteSpace: "nowrap", display: "flex", alignItems: "center" }}>
+      {one ? (
+        <div style={{ display: "inline-block", whiteSpace: "nowrap", animation: `clara-ticker ${secs}s linear infinite` }}>{one + one}</div>
+      ) : <span style={{ opacity: .6 }}>ticker — choose a form or add free text</span>}
+    </div>
+  );
+}
 
 const ANIM_MAP = { pulse: "clara-pulse", fade: "clara-fade", spin: "clara-spin", bounce: "clara-bounce", float: "clara-float", blink: "clara-blink", slide: "clara-slide" };
 export function animStyle(el) {
@@ -59,10 +87,11 @@ export function ElementContent({ el, sourceValues }) {
   if (el.type === "image") {
     const bound = p.sourceId && p.fieldKey ? sourceValues?.[`${p.sourceId}:${p.fieldKey}`] : "";
     const src = bound || p.src;
-    return src ? <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: (el.style?.objectFit) || "contain" }} /> :
+    return src ? <img src={src} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: (el.style?.objectFit) || "contain", pointerEvents: "none", userSelect: "none", WebkitUserDrag: "none" }} /> :
       <span style={{ fontSize: 16, opacity: .6 }}>image</span>;
   }
   if (el.type === "clock") return <span>{formatClock(p.timezone, p.format)}</span>;
+  if (el.type === "ticker") return <Ticker el={el} />;
   if (el.type === "overlay") {
     const fit = el.style?.objectFit || "contain";
     if (!p.url) return <span style={{ fontSize: 16, opacity: .6 }}>overlay</span>;

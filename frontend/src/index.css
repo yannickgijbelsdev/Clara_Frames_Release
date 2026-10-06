@@ -69,6 +69,7 @@ h1, h2, h3, h4, .font-display { font-family: 'Outfit', sans-serif; }
 @keyframes clara-in-left{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
 @keyframes clara-in-right{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:translateX(0)}}
 @keyframes clara-in-zoom{from{opacity:0;transform:scale(0.8)}to{opacity:1;transform:scale(1)}}
+@keyframes clara-ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: #cbd2dd; border-radius: 999px; border: 2px solid #F5F6F8; }

@@ -21,6 +21,7 @@ export default function SceneEditor() {
   const [sources, setSources] = useState([]);
   const [overlays, setOverlays] = useState([]);
   const [sourceValues, setSourceValues] = useState({});
+  const [formsList, setFormsList] = useState([]);
   const [flows, setFlows] = useState([]);
   const [pancartes, setPancartes] = useState([]);
   const [selId, setSelId] = useState(null);
@@ -37,6 +38,7 @@ export default function SceneEditor() {
     api.get(`/flows?workspace_id=${scene.workspace_id}`).then(({ data }) => setFlows(data)).catch(() => {});
     api.get(`/pancartes?workspace_id=${scene.workspace_id}`).then(({ data }) => setPancartes(data)).catch(() => {});
     api.get(`/overlays?workspace_id=${scene.workspace_id}`).then(({ data }) => setOverlays(data)).catch(() => {});
+    api.get(`/forms?workspace_id=${scene.workspace_id}`).then(({ data }) => setFormsList(data)).catch(() => {});
     const fetchVals = () => api.get(`/sources/values?workspace_id=${scene.workspace_id}`).then(({ data }) => setSourceValues(data)).catch(() => {});
     fetchVals();
     const t = setInterval(fetchVals, 15000);
@@ -252,7 +254,7 @@ export default function SceneEditor() {
           ) : !sel ? (
             <p className="text-sm text-slate-400 text-center py-8">Select an element or flow to edit its properties.</p>
           ) : (
-            <ElementInspector sel={sel} sources={sources} overlays={overlays} updateProps={updateProps} updateStyle={updateStyle} updateEl={updateEl} delEl={delEl}
+            <ElementInspector sel={sel} sources={sources} overlays={overlays} forms={formsList} updateProps={updateProps} updateStyle={updateStyle} updateEl={updateEl} delEl={delEl}
               footer={
                 <div className="pt-3 border-t border-slate-100">
                   <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">vMix output URL</Label>
