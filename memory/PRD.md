@@ -10,6 +10,12 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Design: Clara Campaigns light-thema (Outfit / Plus Jakarta Sans, rose/periwinkle)
 - Editor: drag & drop op 16:9 canvas
 
+## 2026-10-06b — Canvas timeline preview for timed flows
+- SceneCanvas FlowRegion now PLAYS the full timed sequence in the editor canvas (not just a text summary): intro overlay (leadSeconds) → each pancarte (flow.interval) → end overlay (seconds) → short gap → loop. Continuous 'always' mode still cycles pancartes.
+- Uses a compact PREVIEW_GAP (1.5s) between cycles so designers see the sequence quickly; a phase badge (data-testid flow-phase-{placementId}) shows Intro / Pancarte i/N / End. Overlays rendered via OverlaySurface (iframe/video/img, pointer-events none).
+- Verified via screenshot: phase advanced INTRO → PANCARTE 1/2 → PANCARTE 2/2 → END → (gap) → loop. Redeploy needed for live site.
+
+
 ## 2026-10-06 — Timed pancarte flows (intro/outro overlays + auto-close)
 - Scene flow placements now support a TIMED mode that plays the pancarte series ONCE then auto-closes (no longer a fixed showSeconds window). Per-pancarte seconds = flow.interval; series duration = count × interval.
 - Each timed placement can have an INTRO overlay (from the Overlays library) that starts N seconds BEFORE the pancartes (schedule.intro = {overlayId,url,kind,fit,leadSeconds}) and an END/outro overlay shown for M seconds AFTER the series (schedule.outro = {overlayId,url,kind,fit,seconds}).
