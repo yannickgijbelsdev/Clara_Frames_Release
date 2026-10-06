@@ -7,6 +7,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Trash2 } from "lucide-react";
 import { FONTS } from "@/lib/elementDefs";
 
+function RoundingControl({ sel, updateStyle }) {
+  const r = sel.style?.borderRadius ?? 0;
+  const circle = Math.round(Math.min(sel.w || 400, sel.h || 400) / 2);
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between"><Label>Corner radius</Label><span className="text-xs text-slate-400">{r}px</span></div>
+      <input type="range" min="0" max={circle} value={Math.min(r, circle)} onChange={(e) => updateStyle({ borderRadius: parseInt(e.target.value) })} className="w-full accent-brand-600" data-testid="prop-radius" />
+      <div className="flex gap-1.5">
+        <button type="button" onClick={() => updateStyle({ borderRadius: 0 })} className="text-[11px] px-2 py-1 rounded-full border border-slate-200 hover:bg-slate-50" data-testid="radius-square">Square</button>
+        <button type="button" onClick={() => updateStyle({ borderRadius: 24 })} className="text-[11px] px-2 py-1 rounded-full border border-slate-200 hover:bg-slate-50" data-testid="radius-rounded">Rounded</button>
+        <button type="button" onClick={() => updateStyle({ borderRadius: circle })} className="text-[11px] px-2 py-1 rounded-full border border-slate-200 hover:bg-slate-50" data-testid="radius-circle">Circle</button>
+      </div>
+    </div>
+  );
+}
+
 export default function ElementInspector({ sel, sources = [], overlays = [], updateProps, updateStyle, updateEl, delEl, footer = null }) {
   const rawFields = (sources.find((s) => s.id === sel?.props?.sourceId)?.fields || []).filter((f) => (f.key || "").trim());
   const srcFields = rawFields.length ? rawFields : [{ key: "text", label: "Response text" }];
@@ -56,6 +72,7 @@ export default function ElementInspector({ sel, sources = [], overlays = [], upd
               <p className="text-[11px] text-slate-400">Live beeld-URL, bv. het veld <code className="font-mono">artwork</code> van "Nu Speelt".</p>
             </div>
           )}
+          <RoundingControl sel={sel} updateStyle={updateStyle} />
         </>
       )}
 
@@ -114,6 +131,7 @@ export default function ElementInspector({ sel, sources = [], overlays = [], upd
                 <SelectContent><SelectItem value="contain">Fit (contain)</SelectItem><SelectItem value="cover">Fill (cover)</SelectItem></SelectContent>
               </Select></div>
           )}
+          <RoundingControl sel={sel} updateStyle={updateStyle} />
         </>
       )}
 

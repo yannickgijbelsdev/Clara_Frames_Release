@@ -10,6 +10,12 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Design: Clara Campaigns light-thema (Outfit / Plus Jakarta Sans, rose/periwinkle)
 - Editor: drag & drop op 16:9 canvas
 
+## 2026-10-06f — Corner radius control for images & overlays
+- ElementInspector gained a RoundingControl (data-testid prop-radius slider + radius-square/radius-rounded/radius-circle buttons) for image and overlay elements. Writes style.borderRadius; max = half the smaller dimension so "Circle" makes a square image a perfect circle.
+- Rendering already clipped via elBoxStyle (overflow:hidden + borderRadius) in editor/PancarteView AND the vMix overlay box (d.style.borderRadius + overflow hidden), so rounding carries through to vMix output.
+- Verified via UI: album cover rounded to a circle (computed border-radius 260px on a 520px box).
+
+
 ## 2026-10-06e — One-click "Now Playing" pancarte template
 - Pancartes page: new "Now Playing template" button (data-testid np-template-btn). Finds the workspace's builtin_nowplaying source and creates a 1920x1080 pancarte pre-wired: album cover image (bound to artwork), "NOW PLAYING" label, artist api_field (bold Outfit), title api_field (lighter Jakarta), then opens it in the editor. If no now-playing source exists it toasts to create one first.
 - Verified via UI: clicking created a pancarte showing live cover + "Creedence Clearwater Revival" / "Bad Moon Rising" from the GRK source; layers title/artist/label/cover present. Artist font tuned to 76px + lineHeight for long names.
