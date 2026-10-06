@@ -1431,7 +1431,8 @@ function buildElementNode(el){
     }
     renderTicker([]);
     if(p.formId){
-      function pullTicker(){ fetch(BACKEND + '/api/public/scene/' + TOKEN + '/ticker/' + p.formId).then(function(r){return r.json();}).then(function(d){ renderTicker(d.items||[]); }).catch(function(){}); }
+      var fq = (p.fields && p.fields.length) ? ('?fields=' + encodeURIComponent(p.fields.join(','))) : '';
+      function pullTicker(){ fetch(BACKEND + '/api/public/scene/' + TOKEN + '/ticker/' + p.formId + fq).then(function(r){return r.json();}).then(function(d){ renderTicker(d.items||[]); }).catch(function(){}); }
       pullTicker(); setInterval(pullTicker, 10000);
     }
   } else {
@@ -1740,10 +1741,12 @@ async def delete_submission(sid: str, user: dict = Depends(get_current_user)):
     await db.submissions.delete_one({"id": sid, "user_id": user["id"]})
     return {"ok": True}
 
-def _submission_ticker_text(form: dict, data: dict) -> str:
+def _submission_ticker_text(form: dict, data: dict, keys: list = None) -> str:
+    fields_by_key = {f.get("key"): f for f in (form.get("fields") or [])}
+    order = [k for k in keys if k in fields_by_key] if keys else [f.get("key") for f in (form.get("fields") or [])]
     parts = []
-    for f in (form.get("fields") or []):
-        v = (data or {}).get(f.get("key"))
+    for k in order:
+        v = (data or {}).get(k)
         if v is None or v == "":
             continue
         if isinstance(v, list):
@@ -1765,29 +1768,35 @@ async def toggle_submission_ticker(sid: str, body: Dict[str, Any], user: dict = 
     await db.submissions.update_one({"id": sid, "user_id": user["id"]}, {"$set": {"ticker": on}})
     return {"ok": True, "ticker": on}
 
-async def _ticker_items_for_form(form: dict) -> list:
+async def _ticker_items_for_form(form: dict, keys: list = None) -> list:
     if not form:
         return []
     subs = await db.submissions.find({"form_id": form["id"], "ticker": True}).sort("created_at", -1).to_list(50)
     items = []
     for s in subs:
-        t = _submission_ticker_text(form, s.get("data") or {})
+        t = _submission_ticker_text(form, s.get("data") or {}, keys)
         if t:
             items.append(t)
     return items
 
+def _parse_keys(fields: Optional[str]) -> Optional[list]:
+    if not fields:
+        return None
+    ks = [k.strip() for k in fields.split(",") if k.strip()]
+    return ks or None
+
 @api_router.get("/forms/{fid}/ticker-items")
-async def form_ticker_items(fid: str, user: dict = Depends(get_current_user)):
+async def form_ticker_items(fid: str, fields: Optional[str] = None, user: dict = Depends(get_current_user)):
     form = await db.forms.find_one({"id": fid, "user_id": user["id"]})
-    return {"items": await _ticker_items_for_form(form)}
+    return {"items": await _ticker_items_for_form(form, _parse_keys(fields))}
 
 @api_router.get("/public/scene/{token}/ticker/{form_id}")
-async def public_ticker_items(token: str, form_id: str):
+async def public_ticker_items(token: str, form_id: str, fields: Optional[str] = None):
     scene = await db.scenes.find_one({"public_token": token})
     if not scene:
         raise HTTPException(status_code=404, detail="Scene not found")
     form = await db.forms.find_one({"id": form_id, "user_id": scene.get("user_id")})
-    return {"items": await _ticker_items_for_form(form)}
+    return {"items": await _ticker_items_for_form(form, _parse_keys(fields))}
 
 # ---- Public form endpoints (consumed by external websites, permissive CORS) ----
 HONEYPOT_FIELD = "_gotcha"

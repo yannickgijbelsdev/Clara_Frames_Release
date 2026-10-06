@@ -10,6 +10,13 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Design: Clara Campaigns light-thema (Outfit / Plus Jakarta Sans, rose/periwinkle)
 - Editor: drag & drop op 16:9 canvas
 
+## 2026-10-06h — Ticker: choose which form fields show
+- Ticker element gained props.fields (array of form field keys). Empty = all fields; otherwise only those fields, in the tapped order.
+- Backend: _submission_ticker_text(form, data, keys) + _ticker_items_for_form(form, keys); endpoints GET /forms/{fid}/ticker-items and GET /public/scene/{token}/ticker/{form_id} accept ?fields=key1,key2. Overlay JS + editor Ticker append ?fields=.
+- Inspector: when a form is chosen, a "Fields to show" chip row (data-testid ticker-fields, ticker-field-{key}) toggles props.fields.
+- Verified via curl: all→"Jan · Amy Winehouse - Rehab", fields=name→"Jan", fields=song,name→order respected.
+
+
 ## 2026-10-06g — Image-drag fix + Ticker bar + Messages "Live" toggle (tested iter17)
 - FIX: image elements were hard to move (native image drag hijacked the pointer). elementRender.jsx image now renders <img draggable=false pointerEvents:none userSelect:none WebkitUserDrag:none> so the parent box handles the drag. Verified: dragging the image body moves the element exactly.
 - NEW element type "ticker" (TOOLS 'Ticker bar', icon ScrollText): a full-width scrolling bar. Props: formId (messages source), freeText (scrolls along), icon (separator glyph from a set), speed (Slow/Normal/Fast). Styled via the normal font/colour/background controls. CSS keyframe clara-ticker (index.css + OVERLAY_HTML). Renders as a seamless marquee (content duplicated, translateX -50%).

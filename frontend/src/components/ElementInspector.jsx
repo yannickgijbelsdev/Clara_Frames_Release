@@ -144,6 +144,27 @@ export default function ElementInspector({ sel, sources = [], overlays = [], for
             </Select>
             <p className="text-[11px] text-slate-400">Only messages marked <b>Live</b> in Messages appear here.</p>
           </div>
+          {sel.props.formId && (() => {
+            const tf = forms.find((f) => f.id === sel.props.formId);
+            const flds = tf?.fields || [];
+            const selKeys = sel.props.fields || [];
+            if (!flds.length) return null;
+            const toggleKey = (k) => updateProps({ fields: selKeys.includes(k) ? selKeys.filter((x) => x !== k) : [...selKeys, k] });
+            return (
+              <div className="space-y-1.5">
+                <Label>Fields to show</Label>
+                <div className="flex flex-wrap gap-1.5" data-testid="ticker-fields">
+                  {flds.map((f) => (
+                    <button key={f.key} type="button" data-testid={`ticker-field-${f.key}`} onClick={() => toggleKey(f.key)}
+                      className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors ${selKeys.includes(f.key) ? "bg-brand-600 text-white border-brand-600" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                      {f.label || f.key}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-slate-400">{selKeys.length ? "Showing selected fields, in the order you tap them." : "Nothing selected = all fields."}</p>
+              </div>
+            );
+          })()}
           <div className="space-y-1.5"><Label>Free text (scrolls along)</Label>
             <Input value={sel.props.freeText || ""} onChange={(e) => updateProps({ freeText: e.target.value })} className="rounded-xl text-sm" data-testid="prop-ticker-text" placeholder="e.g. Welcome to Radio GRK" /></div>
           <div className="grid grid-cols-2 gap-2">

@@ -8,11 +8,12 @@ function Ticker({ el }) {
   useEffect(() => {
     if (!p.formId) { setItems([]); return; }
     let alive = true;
-    const pull = () => api.get(`/forms/${p.formId}/ticker-items`).then(({ data }) => { if (alive) setItems(data.items || []); }).catch(() => {});
+    const fq = (p.fields && p.fields.length) ? `?fields=${encodeURIComponent(p.fields.join(","))}` : "";
+    const pull = () => api.get(`/forms/${p.formId}/ticker-items${fq}`).then(({ data }) => { if (alive) setItems(data.items || []); }).catch(() => {});
     pull();
     const t = setInterval(pull, 10000);
     return () => { alive = false; clearInterval(t); };
-  }, [p.formId]);
+  }, [p.formId, (p.fields || []).join(",")]);
   const sep = ` \u00A0${p.icon || "\u25CF"}\u00A0 `;
   const base = [];
   if (p.freeText) base.push(p.freeText);
