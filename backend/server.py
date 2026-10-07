@@ -1414,6 +1414,7 @@ function toMin(hhmm){ if(!hhmm) return null; const [h,m]=hhmm.split(':'); return
 
 const clocks = [];
 const timeds = [];
+const timedEls = [];
 const apiEls = [];
 const imageApis = [];
 var lastValues = {};
@@ -1429,7 +1430,7 @@ function buildElementNode(el){
   inner.style.width='100%'; inner.style.height='100%'; inner.style.display='flex';
   inner.style.justifyContent='inherit'; inner.style.alignItems='inherit';
   applyAnim(inner, p);
-  var ref = {node:d, clock:null, api:null, timed:null, imgApi:null};
+  var ref = {node:d, clock:null, api:null, timed:null, imgApi:null, timedEl:null};
   if(el.type==='image'){
     var img=document.createElement('img'); img.style.width='100%'; img.style.height='100%';
     img.style.objectFit=(el.style&&el.style.objectFit)||'contain';
@@ -1466,11 +1467,11 @@ function buildElementNode(el){
       vo.setAttribute('playsinline',''); vo.setAttribute('muted',''); vo.style.width='100%'; vo.style.height='100%'; vo.style.objectFit=ofit; inner.appendChild(vo); }
     else if(p.url){ var io=document.createElement('img'); io.src=p.url; io.style.width='100%'; io.style.height='100%'; io.style.objectFit=ofit; inner.appendChild(io); }
   } else if(el.type==='ticker'){
-    inner.style.overflow='hidden'; inner.style.whiteSpace='nowrap'; inner.style.display='block';
-    var track=document.createElement('div'); track.style.display='inline-block'; track.style.whiteSpace='nowrap'; track.style.willChange='transform';
+    inner.style.overflow='hidden'; inner.style.whiteSpace='nowrap'; inner.style.display='flex'; inner.style.alignItems='center';
+    var track=document.createElement('div'); track.style.display='inline-block'; track.style.whiteSpace='nowrap'; track.style.willChange='transform'; track.style.flex='0 0 auto';
     inner.appendChild(track);
     function renderTicker(items){
-      var sep = ' \\u00A0'+(p.icon||'\\u25CF')+'\\u00A0 ';
+      var sep = ' \u00A0'+(p.icon||'\u25CF')+'\u00A0 ';
       var base = [];
       if(p.freeText) base.push(p.freeText);
       (items||[]).forEach(function(s){ if(s) base.push(s); });
@@ -1490,6 +1491,11 @@ function buildElementNode(el){
     inner.textContent = p.text || '';
   }
   ent.appendChild(inner); d.appendChild(ent);
+  if(el.timing && el.timing.mode && el.timing.mode!=='always'){
+    var tkey = (p.sourceId && p.fieldKey) ? (p.sourceId+':'+p.fieldKey) : null;
+    d.style.display='none';
+    ref.timedEl = {d:d, ent:ent, p:p, timing:el.timing, key:tkey, _vis:null, _lastVal:undefined, _showUntil:0};
+  }
   return ref;
 }
 
@@ -1517,6 +1523,7 @@ function applyBackground(host, bg){
   if(ref.api) apiEls.push(ref.api);
   if(ref.imgApi) imageApis.push(ref.imgApi);
   if(ref.timed) timeds.push(ref.timed);
+  if(ref.timedEl) timedEls.push(ref.timedEl);
   stage.appendChild(ref.node);
 });
 
@@ -1612,6 +1619,11 @@ function showTimedPart(node, on){
   if(on){ if(node.style.display!=='block'){ node.style.display='block'; node.style.animation='clara-in-fade .4s ease-out both'; } }
   else { node.style.display='none'; }
 }
+function elGapSeconds(tm){ var g=Math.max(0, parseFloat(tm.gap)||0); var u=tm.gapUnit||'min'; return u==='hour'?g*3600:(u==='min'?g*60:g); }
+function setElVis(t, vis){
+  if(vis && t._vis!==true){ t.d.style.display='flex'; retriggerEntrance(t.ent, t.p); t._vis=true; }
+  else if(!vis && t._vis!==false){ t.d.style.display='none'; t._vis=false; }
+}
 
 function tick(){
   clocks.forEach(function(c){ c.d.textContent = fmtClock(c.p.timezone, c.p.format); });
@@ -1644,6 +1656,18 @@ function tick(){
       else { if(f._state==='series') f.seriesLayer.style.display='none'; f._state='none'; }
     }
     var cur=f.getCur(); cur.clocks.forEach(function(c){ c.d.textContent=fmtClock(c.p.timezone,c.p.format); });
+  });
+  var _tn=new Date(); var _sod=_tn.getHours()*3600+_tn.getMinutes()*60+_tn.getSeconds();
+  timedEls.forEach(function(t){
+    if(t.timing.mode==='interval'){
+      var show=Math.max(1, t.timing.showSeconds||10);
+      var cyc=show+elGapSeconds(t.timing);
+      setElVis(t, (_sod % cyc) < show);
+    } else if(t.timing.mode==='onchange'){
+      var v = t.key ? lastValues[t.key] : null;
+      if(v!=null && v!=='' && v!==t._lastVal){ t._lastVal=v; t._showUntil=Date.now()+Math.max(1,(t.timing.showSeconds||10))*1000; }
+      setElVis(t, !!(t._showUntil && Date.now()<t._showUntil));
+    }
   });
 }
 setInterval(tick, 1000); tick();

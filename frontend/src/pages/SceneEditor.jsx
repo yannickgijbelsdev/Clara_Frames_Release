@@ -348,7 +348,7 @@ export default function SceneEditor() {
           ) : !sel ? (
             <p className="text-sm text-slate-400 text-center py-8">Select an element or flow to edit its properties.</p>
           ) : (
-            <ElementInspector sel={sel} sources={sources} overlays={overlays} forms={formsList} updateProps={updateProps} updateStyle={updateStyle} updateEl={updateEl} delEl={delEl}
+            <ElementInspector sel={sel} sources={sources} overlays={overlays} forms={formsList} updateProps={updateProps} updateStyle={updateStyle} updateEl={updateEl} delEl={delEl} allowTiming
               footer={
                 <div className="pt-3 border-t border-slate-100">
                   <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">vMix output URL</Label>

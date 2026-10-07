@@ -23,7 +23,7 @@ function RoundingControl({ sel, updateStyle }) {
   );
 }
 
-export default function ElementInspector({ sel, sources = [], overlays = [], forms = [], updateProps, updateStyle, updateEl, delEl, footer = null }) {
+export default function ElementInspector({ sel, sources = [], overlays = [], forms = [], updateProps, updateStyle, updateEl, delEl, footer = null, allowTiming = false }) {
   const rawFields = (sources.find((s) => s.id === sel?.props?.sourceId)?.fields || []).filter((f) => (f.key || "").trim());
   const srcFields = rawFields.length ? rawFields : [{ key: "text", label: "Response text" }];
   return (
@@ -232,6 +232,50 @@ export default function ElementInspector({ sel, sources = [], overlays = [], for
               <SecondaryButton onClick={() => updateStyle({ backgroundColor: undefined })} className="text-xs py-1.5">Clear</SecondaryButton>
             </div></div>
         </>
+      )}
+
+      {allowTiming && (sel.type === "api_field" || sel.type === "image") && (
+        <div className="space-y-1.5 pt-3 border-t border-slate-100">
+          <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">On-screen timing</Label>
+          <Select value={sel.timing?.mode || "always"}
+            onValueChange={(v) => updateEl(sel.id, { timing: { ...(sel.timing || {}), mode: v, showSeconds: sel.timing?.showSeconds ?? 10, gap: sel.timing?.gap ?? 5, gapUnit: sel.timing?.gapUnit ?? "min" } })}>
+            <SelectTrigger className="rounded-xl" data-testid="el-timing-mode"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="always">Always visible</SelectItem>
+              <SelectItem value="interval">Show on interval</SelectItem>
+              <SelectItem value="onchange">Show when data changes</SelectItem>
+            </SelectContent>
+          </Select>
+          {sel.timing?.mode && sel.timing.mode !== "always" && (
+            <div className="space-y-1.5"><Label>Stays on screen (sec)</Label>
+              <Input type="number" min="1" value={sel.timing?.showSeconds ?? 10}
+                onChange={(e) => updateEl(sel.id, { timing: { ...sel.timing, showSeconds: parseInt(e.target.value) || 1 } })}
+                className="rounded-xl text-sm" data-testid="el-timing-show" /></div>
+          )}
+          {sel.timing?.mode === "interval" && (
+            <>
+              <div className="space-y-1.5"><Label>Gap between appearances</Label>
+                <div className="flex gap-2">
+                  <Input type="number" min="0" value={sel.timing?.gap ?? 5}
+                    onChange={(e) => updateEl(sel.id, { timing: { ...sel.timing, gap: parseFloat(e.target.value) || 0 } })}
+                    className="rounded-xl text-sm" data-testid="el-timing-gap" />
+                  <Select value={sel.timing?.gapUnit || "min"} onValueChange={(v) => updateEl(sel.id, { timing: { ...sel.timing, gapUnit: v } })}>
+                    <SelectTrigger className="rounded-xl w-32" data-testid="el-timing-gap-unit"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sec">seconds</SelectItem>
+                      <SelectItem value="min">minutes</SelectItem>
+                      <SelectItem value="hour">hours</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-400">Klok-uitgelijnd: verschijnt, blijft {sel.timing?.showSeconds ?? 10}s, verdwijnt, herhaalt.</p>
+            </>
+          )}
+          {sel.timing?.mode === "onchange" && (
+            <p className="text-[11px] text-slate-400">Verschijnt {sel.timing?.showSeconds ?? 10}s zodra de data verandert (bv. een nieuw Now Playing-nummer), daarna weg tot de volgende wijziging.</p>
+          )}
+        </div>
       )}
 
       <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-slate-100">
