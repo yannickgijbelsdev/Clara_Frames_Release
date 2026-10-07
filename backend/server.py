@@ -234,7 +234,7 @@ class SceneInput(BaseModel):
     name: str
     width: int = 1920
     height: int = 1080
-    background: Dict[str, Any] = {"color": "#0b1020"}
+    background: Dict[str, Any] = {"mode": "transparent"}
     elements: List[Dict[str, Any]] = []
     flows: List[Dict[str, Any]] = []
     workspace_id: Optional[str] = None
@@ -1233,7 +1233,7 @@ async def public_overlay(token: str):
     scene_json = _json.dumps(scene)
     backend = os.environ.get("FRONTEND_URL", "")
     html = OVERLAY_HTML.replace("__SCENE__", scene_json).replace("__TOKEN__", token).replace("__BACKEND__", backend)
-    return HTMLResponse(html)
+    return HTMLResponse(html, headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache"})
 
 # ---------------------------------------------------------------------------
 # Overlay HTML/JS renderer (self-contained, loaded by vMix Web Browser input)
@@ -1292,12 +1292,14 @@ const BACKEND = "__BACKEND__";
 const stage = document.getElementById('stage');
 stage.style.width = SCENE.width + 'px';
 stage.style.height = SCENE.height + 'px';
-if (SCENE.background && SCENE.background.color) stage.style.background = SCENE.background.color;
-if (SCENE.background && SCENE.background.type === 'stream' && SCENE.background.src) {
+var BG = SCENE.background || {};
+var BGMODE = BG.mode || (BG.type === 'stream' ? 'stream' : ((BG.src && BG.type !== 'color') ? 'media' : (BG.type === 'color' ? 'color' : 'transparent')));
+if (BGMODE === 'color' && BG.color) stage.style.background = BG.color;
+if (BGMODE === 'stream' && BG.src) {
   var sb = document.createElement('div');
   sb.style.position='absolute'; sb.style.top=0; sb.style.left=0; sb.style.width='100%'; sb.style.height='100%'; sb.style.overflow='hidden';
-  var surl = SCENE.background.src;
-  if (SCENE.background.stream === 'vimeo') {
+  var surl = BG.src;
+  if (BG.stream === 'vimeo') {
     var vm = (surl.match(/vimeo\.com\/(?:video\/)?(\d+)/) || [])[1] || (surl.match(/(\d{6,})/) || [])[1];
     var ifr = document.createElement('iframe');
     ifr.src = 'https://player.vimeo.com/video/' + vm + '?background=1&autoplay=1&loop=1&muted=1&autopause=0';
@@ -1308,27 +1310,27 @@ if (SCENE.background && SCENE.background.type === 'stream' && SCENE.background.s
   } else {
     var sv = document.createElement('video');
     sv.autoplay=true; sv.loop=true; sv.muted=true; sv.setAttribute('playsinline',''); sv.setAttribute('muted','');
-    sv.style.width='100%'; sv.style.height='100%'; sv.style.objectFit=(SCENE.background.fit==='contain'?'contain':'cover');
+    sv.style.width='100%'; sv.style.height='100%'; sv.style.objectFit=(BG.fit==='contain'?'contain':'cover');
     if (window.Hls && window.Hls.isSupported()) { var h=new window.Hls(); h.loadSource(surl); h.attachMedia(sv); }
     else { sv.src = surl; }
     sb.appendChild(sv);
   }
   stage.appendChild(sb);
 }
-if (SCENE.background && SCENE.background.src && SCENE.background.type !== 'stream') {
-  var bfit = SCENE.background.fit || 'cover';
+if (BGMODE === 'media' && BG.src) {
+  var bfit = BG.fit || 'cover';
   var bg;
-  if (SCENE.background.type === 'video') {
+  if (BG.type === 'video') {
     bg = document.createElement('video');
-    bg.src = SCENE.background.src; bg.autoplay = true; bg.loop = true; bg.muted = true;
+    bg.src = BG.src; bg.autoplay = true; bg.loop = true; bg.muted = true;
     bg.setAttribute('playsinline', ''); bg.setAttribute('muted', '');
     bg.style.width = '100%'; bg.style.height = '100%'; bg.style.objectFit = bfit === 'contain' ? 'contain' : 'cover';
   } else if (bfit === 'repeat') {
     bg = document.createElement('div');
     bg.style.width = '100%'; bg.style.height = '100%';
-    bg.style.backgroundImage = 'url(' + SCENE.background.src + ')'; bg.style.backgroundRepeat = 'repeat';
+    bg.style.backgroundImage = 'url(' + BG.src + ')'; bg.style.backgroundRepeat = 'repeat';
   } else {
-    bg = document.createElement('img'); bg.src = SCENE.background.src;
+    bg = document.createElement('img'); bg.src = BG.src;
     bg.style.width = '100%'; bg.style.height = '100%'; bg.style.objectFit = bfit === 'contain' ? 'contain' : 'cover';
   }
   bg.style.position = 'absolute'; bg.style.top = 0; bg.style.left = 0;
@@ -1657,8 +1659,24 @@ async function poll(){
   }catch(e){}
 }
 setInterval(poll, 5000); poll();
+
+// Auto-sync: reload the overlay when the scene is edited & saved (so vMix updates without manual refresh)
+(function(){
+  var _ver = SCENE.updated_at || '';
+  setInterval(function(){
+    fetch(BACKEND + '/api/public/scene/' + TOKEN + '/version', {cache:'no-store'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){ if(!d || !d.v) return; if(!_ver){ _ver = d.v; return; } if(d.v !== _ver){ location.reload(true); } })
+      .catch(function(){});
+  }, 4000);
+})();
 </script>
 </body></html>"""
+
+@api_router.get("/public/scene/{token}/version")
+async def public_version(token: str):
+    scene = await _get_public_scene(token)
+    return JSONResponse({"v": scene.get("updated_at") or ""}, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
 
 @api_router.get("/public/scene/{token}/values.json")
 async def public_values(token: str):

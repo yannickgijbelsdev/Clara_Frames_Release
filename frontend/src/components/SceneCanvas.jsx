@@ -144,6 +144,12 @@ export default function SceneCanvas({ scene, editable = false, selectedId, onSel
 
   const onPointerUp = useCallback(() => { drag.current = null; }, []);
 
+  const _bg = scene.background || {};
+  const _bgMode = _bg.mode || (_bg.type === "stream" ? "stream" : (_bg.src && _bg.type !== "color" ? "media" : (_bg.type === "color" ? "color" : "transparent")));
+  const stageBg = _bgMode === "color" && _bg.color
+    ? { background: _bg.color }
+    : { backgroundColor: "#0f172a", backgroundImage: "linear-gradient(45deg,#1e293b 25%,transparent 25%),linear-gradient(-45deg,#1e293b 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#1e293b 75%),linear-gradient(-45deg,transparent 75%,#1e293b 75%)", backgroundSize: "24px 24px", backgroundPosition: "0 0,0 12px,12px -12px,-12px 0" };
+
   return (
     <div ref={wrapRef} className="relative w-full" style={{ aspectRatio: `${scene.width} / ${scene.height}` }}>
       <div
@@ -153,7 +159,7 @@ export default function SceneCanvas({ scene, editable = false, selectedId, onSel
           position: "absolute", top: 0, left: 0,
           width: scene.width, height: scene.height,
           transform: `scale(${scale})`, transformOrigin: "top left",
-          background: scene.background?.color || "#0b1020",
+          ...stageBg,
           overflow: "hidden",
         }}
       >

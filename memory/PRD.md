@@ -196,6 +196,11 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Fix (frontend): ElementInspector field dropdown filters blank keys and falls back to a selectable "text" option; Sources.jsx hint tells users to leave mappings empty for plain-text APIs.
 - Verified e2e in preview: source test, /values.json, /element/{id}.txt and /data.json all return the live song. NEEDS REDEPLOY for the live site.
 
+## 2026-06 — Transparent-by-default background + vMix auto-sync
+- **Transparent background**: scene background is now mode-based (`background.mode`: transparent | color | media | stream). Overlay JS only paints a color when mode==='color', renders media when 'media', stream when 'stream' — otherwise fully transparent (default). Existing scenes with legacy `{color:...}` (no mode/type) now derive to transparent. SceneInput default → `{mode:'transparent'}`. SceneEditor: a Background mode Select (bg-mode) replaces the always-on color picker; editor canvas shows a transparency checkerboard when not a solid color.
+- **Auto-sync to vMix**: overlay response now sends `Cache-Control: no-store`; overlay JS polls `/api/public/scene/{token}/version` every 4s and `location.reload()`s when `updated_at` changes — so saving a scene updates the vMix Web Browser input without a manual refresh. New endpoint GET /api/public/scene/{token}/version.
+- Verified via curl (no-cache headers, BGMODE logic, version endpoint) + screenshot (checkerboard + mode selector color/stream).
+
 ## 2026-06 — Scenes/Messages batch (5 features)
 - **Overlay in/out overlap**: timed pancarte-flow intro/outro overlays now CROSSFADE over the pancarte series (lie on top, no separate added time). Overlay JS everyX branch: series visible whole `showSeconds`, intro visible first `intro.leadSeconds`, outro visible last `outro.seconds`. SceneEditor labels → "(overlaps start)/(overlaps end)", summary + overflow (show>=cycle) updated. SceneCanvas FlowRegion preview rewritten to match (overlays stacked on top of cycling pancartes).
 - **Messages inline edit**: PUT /api/submissions/{sid} {data:{...}} (scoped by user_id, 404 if missing). Messages.jsx: Bewerk → per-field inputs (edit-field-<key>) → Opslaan/Annuleer.

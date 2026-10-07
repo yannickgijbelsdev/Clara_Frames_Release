@@ -130,54 +130,85 @@ export default function SceneEditor() {
           </div>
           <div className="mt-5 space-y-2">
             <Label className="text-[11px] uppercase tracking-widest text-slate-400 font-bold">Background</Label>
-            <input type="color" data-testid="bg-color" value={scene.background?.color || "#0b1020"}
-              onChange={(e) => setScene({ ...scene, background: { ...scene.background, color: e.target.value } })}
-              className="w-full h-9 rounded-lg cursor-pointer border border-slate-200" />
-            <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold pt-1 block">Image / video background</Label>
-            <ImageUpload accept="image/*,video/*" maxMB={50} previewClass="h-20"
-              value={scene.background?.type && scene.background?.type !== "color" ? scene.background?.src : ""}
-              onChange={(url) => setScene({ ...scene, background: url
-                ? { color: scene.background?.color || "#0b1020", type: /\.(mp4|webm|mov|ogg)$/i.test(url) ? "video" : "image", src: url }
-                : { color: scene.background?.color || "#0b1020" } })}
-              testid="bg-media" />
-            {scene.background?.src && scene.background?.type !== "color" && (
-              <div className="space-y-2 pt-1">
-                <div className="space-y-1">
-                  <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Fit</Label>
-                  <Select value={scene.background?.fit || "cover"} onValueChange={(v) => setScene({ ...scene, background: { ...scene.background, fit: v } })}>
-                    <SelectTrigger className="rounded-xl" data-testid="bg-fit"><SelectValue /></SelectTrigger>
+            {(() => {
+              const bg = scene.background || {};
+              const bgMode = bg.mode || (bg.type === "stream" ? "stream" : (bg.src && bg.type !== "color" ? "media" : (bg.type === "color" ? "color" : "transparent")));
+              const setBgMode = (mode) => {
+                if (mode === "transparent") setScene({ ...scene, background: { mode: "transparent" } });
+                else if (mode === "color") setScene({ ...scene, background: { mode: "color", color: bg.color || "#0b1020" } });
+                else if (mode === "media") setScene({ ...scene, background: { mode: "media", type: bg.type === "video" ? "video" : "image", src: bg.type && bg.type !== "stream" && bg.type !== "color" ? (bg.src || "") : "", fit: bg.fit || "cover", overlayColor: bg.overlayColor, overlayOpacity: bg.overlayOpacity } });
+                else if (mode === "stream") setScene({ ...scene, background: { mode: "stream", type: "stream", stream: bg.stream || "vimeo", src: bg.type === "stream" ? (bg.src || "") : "", fit: bg.fit || "cover" } });
+              };
+              return (
+                <>
+                  <Select value={bgMode} onValueChange={setBgMode}>
+                    <SelectTrigger className="rounded-xl" data-testid="bg-mode"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cover">Fill (cover)</SelectItem>
-                      <SelectItem value="contain">Fit (contain)</SelectItem>
-                      <SelectItem value="repeat">Repeat (tile)</SelectItem>
+                      <SelectItem value="transparent">Transparent (vMix overlay)</SelectItem>
+                      <SelectItem value="color">Solid color</SelectItem>
+                      <SelectItem value="media">Image / video</SelectItem>
+                      <SelectItem value="stream">Stream (Vimeo / HLS)</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Dim overlay</Label>
-                  <div className="flex items-center gap-2">
-                    <input type="color" data-testid="bg-overlay-color" value={scene.background?.overlayColor || "#000000"} onChange={(e) => setScene({ ...scene, background: { ...scene.background, overlayColor: e.target.value } })} className="h-9 w-14 rounded-lg border border-slate-200 cursor-pointer" />
-                    <input type="range" min="0" max="1" step="0.05" value={scene.background?.overlayOpacity ?? 0} onChange={(e) => setScene({ ...scene, background: { ...scene.background, overlayOpacity: parseFloat(e.target.value) } })} className="flex-1 accent-brand-600" data-testid="bg-overlay-opacity" />
-                    <span className="text-xs text-slate-500 w-9 text-right">{Math.round((scene.background?.overlayOpacity ?? 0) * 100)}%</span>
-                  </div>
-                </div>
-              </div>
-            )}
-            <div className="space-y-1 pt-2 border-t border-slate-100">
-              <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Stream background (Vimeo / HLS)</Label>
-              <Input data-testid="bg-stream" placeholder="https://vimeo.com/123… or https://…/stream.m3u8"
-                value={scene.background?.type === "stream" ? (scene.background?.src || "") : ""}
-                onChange={(e) => {
-                  const url = e.target.value.trim();
-                  if (!url) { setScene({ ...scene, background: { color: scene.background?.color || "#0b1020" } }); return; }
-                  const stream = /vimeo\.com/i.test(url) ? "vimeo" : "hls";
-                  setScene({ ...scene, background: { color: scene.background?.color || "#0b1020", type: "stream", stream, src: url, fit: scene.background?.fit || "cover" } });
-                }}
-                className="rounded-xl text-sm" />
-              {scene.background?.type === "stream" && (
-                <p className="text-[11px] text-slate-400">{scene.background?.stream === "vimeo" ? "Vimeo" : "HLS"}-stream op de volledige achtergrond. Vimeo speelt automatisch, gedempt en in loop.</p>
-              )}
-            </div>
+
+                  {bgMode === "transparent" && (
+                    <p className="text-[11px] text-slate-400">Transparant — vMix ziet enkel je elementen bovenop je andere inputs. Aanrader voor overlays.</p>
+                  )}
+
+                  {bgMode === "color" && (
+                    <input type="color" data-testid="bg-color" value={bg.color || "#0b1020"}
+                      onChange={(e) => setScene({ ...scene, background: { mode: "color", color: e.target.value } })}
+                      className="w-full h-9 rounded-lg cursor-pointer border border-slate-200" />
+                  )}
+
+                  {bgMode === "media" && (
+                    <>
+                      <ImageUpload accept="image/*,video/*" maxMB={50} previewClass="h-20"
+                        value={bg.src || ""}
+                        onChange={(url) => setScene({ ...scene, background: { ...bg, mode: "media", type: /\.(mp4|webm|mov|ogg)$/i.test(url || "") ? "video" : "image", src: url || "", fit: bg.fit || "cover" } })}
+                        testid="bg-media" />
+                      {bg.src && (
+                        <div className="space-y-2 pt-1">
+                          <div className="space-y-1">
+                            <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Fit</Label>
+                            <Select value={bg.fit || "cover"} onValueChange={(v) => setScene({ ...scene, background: { ...bg, fit: v } })}>
+                              <SelectTrigger className="rounded-xl" data-testid="bg-fit"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="cover">Fill (cover)</SelectItem>
+                                <SelectItem value="contain">Fit (contain)</SelectItem>
+                                <SelectItem value="repeat">Repeat (tile)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Dim overlay</Label>
+                            <div className="flex items-center gap-2">
+                              <input type="color" data-testid="bg-overlay-color" value={bg.overlayColor || "#000000"} onChange={(e) => setScene({ ...scene, background: { ...bg, overlayColor: e.target.value } })} className="h-9 w-14 rounded-lg border border-slate-200 cursor-pointer" />
+                              <input type="range" min="0" max="1" step="0.05" value={bg.overlayOpacity ?? 0} onChange={(e) => setScene({ ...scene, background: { ...bg, overlayOpacity: parseFloat(e.target.value) } })} className="flex-1 accent-brand-600" data-testid="bg-overlay-opacity" />
+                              <span className="text-xs text-slate-500 w-9 text-right">{Math.round((bg.overlayOpacity ?? 0) * 100)}%</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {bgMode === "stream" && (
+                    <>
+                      <Input data-testid="bg-stream" placeholder="https://vimeo.com/123… of https://…/stream.m3u8"
+                        value={bg.src || ""}
+                        onChange={(e) => {
+                          const url = e.target.value.trim();
+                          const stream = /vimeo\.com/i.test(url) ? "vimeo" : "hls";
+                          setScene({ ...scene, background: { mode: "stream", type: "stream", stream, src: url, fit: bg.fit || "cover" } });
+                        }}
+                        className="rounded-xl text-sm" />
+                      <p className="text-[11px] text-slate-400">{/vimeo/i.test(bg.src || "") ? "Vimeo" : "HLS"}-stream op de volledige achtergrond. Speelt automatisch, gedempt en in loop.</p>
+                    </>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </div>
 
