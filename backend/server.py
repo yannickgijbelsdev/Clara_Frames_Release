@@ -721,7 +721,12 @@ def _resolve_path(data: Any, path: str) -> Any:
     return cur
 
 def _fetch_source_sync(url: str, method: str, headers: dict) -> Any:
-    r = requests.request(method or "GET", url, headers=headers or {}, timeout=8)
+    hdrs = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36",
+        "Accept": "*/*",
+    }
+    hdrs.update(headers or {})
+    r = requests.request(method or "GET", url, headers=hdrs, timeout=8, allow_redirects=True)
     r.raise_for_status()
     try:
         return r.json()
