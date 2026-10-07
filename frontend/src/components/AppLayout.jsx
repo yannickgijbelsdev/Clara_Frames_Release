@@ -1,5 +1,5 @@
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { motion } from "framer-motion";
 import api from "@/lib/api";
 import { Logo } from "@/components/Logo";
@@ -12,6 +12,98 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Globe, ChevronDown, HelpCircle, LogOut, Settings, Users, Plus, Check } from "lucide-react";
+
+function DesktopNav({ navItems, location, navigate }) {
+  const containerRef = useRef(null);
+  const measureRef = useRef(null);
+  const [visibleCount, setVisibleCount] = useState(navItems.length);
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const container = containerRef.current;
+      const hidden = measureRef.current;
+      if (!container || !hidden) return;
+      const avail = container.offsetWidth;
+      const children = Array.from(hidden.children);
+      const gap = 2;
+      const total = children.reduce((a, c) => a + c.offsetWidth + gap, 0);
+      if (total <= avail) { setVisibleCount(navItems.length); return; }
+      const moreW = 104; // reserve for the "More" button
+      let used = 0, count = 0;
+      for (let i = 0; i < children.length; i++) {
+        const w = children[i].offsetWidth + gap;
+        if (used + w <= avail - moreW) { used += w; count++; } else break;
+      }
+      setVisibleCount(Math.max(1, count));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (containerRef.current) ro.observe(containerRef.current);
+    window.addEventListener("resize", measure);
+    return () => { ro.disconnect(); window.removeEventListener("resize", measure); };
+  }, [navItems]);
+
+  const visible = navItems.slice(0, visibleCount);
+  const overflow = navItems.slice(visibleCount);
+  const overflowActive = overflow.some(({ to }) => location.pathname === to || location.pathname.startsWith(to + "/"));
+
+  const itemClass = "relative flex items-center px-3 py-2 rounded-full text-sm font-medium transition-colors hover:text-slate-900 whitespace-nowrap";
+
+  return (
+    <div className="hidden xl:flex items-center flex-1 min-w-0 ml-3">
+      {/* hidden measuring copy (all items, off-screen) */}
+      <nav ref={measureRef} aria-hidden="true" className="flex items-center gap-0.5 absolute opacity-0 pointer-events-none -z-10" style={{ left: -9999, top: 0 }}>
+        {navItems.map(({ to, label, badge }) => (
+          <span key={to} className={itemClass}>
+            <span className="flex items-center gap-1.5">{label}{badge > 0 && <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold">{badge > 99 ? "99+" : badge}</span>}</span>
+          </span>
+        ))}
+      </nav>
+
+      <nav ref={containerRef} className="flex items-center gap-0.5 flex-1 min-w-0">
+        {visible.map(({ to, label, badge }) => {
+          const active = location.pathname === to || location.pathname.startsWith(to + "/");
+          return (
+            <NavLink key={to} to={to} data-testid={`nav-${label.toLowerCase().replace(/\s+/g, "-")}`} className={itemClass}>
+              {active && (
+                <motion.span layoutId="nav-pill" className="absolute inset-0 bg-slate-900 rounded-full shadow-lg shadow-slate-900/25"
+                  transition={{ type: "spring", stiffness: 400, damping: 34 }} />
+              )}
+              <span className={`relative z-10 flex items-center gap-1.5 ${active ? "text-white" : "text-slate-500"}`}>
+                {label}
+                {badge > 0 && (
+                  <span data-testid="messages-unread-badge" className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${active ? "bg-white text-slate-900" : "bg-brand-600 text-white"}`}>{badge > 99 ? "99+" : badge}</span>
+                )}
+              </span>
+            </NavLink>
+          );
+        })}
+
+        {overflow.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button data-testid="nav-more" className={`relative flex items-center gap-1 px-3 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${overflowActive ? "bg-slate-900 text-white" : "text-slate-500 hover:text-slate-900"}`}>
+                More <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              {overflow.map(({ to, label, badge }) => {
+                const active = location.pathname === to || location.pathname.startsWith(to + "/");
+                return (
+                  <DropdownMenuItem key={to} data-testid={`nav-more-${label.toLowerCase().replace(/\s+/g, "-")}`} onClick={() => navigate(to)}
+                    className={`cursor-pointer flex items-center justify-between ${active ? "text-brand-600 font-semibold" : ""}`}>
+                    <span>{label}</span>
+                    {badge > 0 && <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-brand-600 text-white">{badge > 99 ? "99+" : badge}</span>}
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </nav>
+    </div>
+  );
+}
 
 export default function AppLayout({ children, title, subtitle, actions }) {
   const navigate = useNavigate();
@@ -100,27 +192,7 @@ export default function AppLayout({ children, title, subtitle, actions }) {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <nav className="hidden xl:flex items-center gap-0.5 ml-3 flex-1">
-            {navItems.map(({ to, label, badge }) => {
-              const active = location.pathname === to || location.pathname.startsWith(to + "/");
-              return (
-                <NavLink key={to} to={to} data-testid={`nav-${label.toLowerCase().replace(/\s+/g, "-")}`}
-                  className="relative flex items-center px-3.5 py-2 rounded-full text-sm font-medium transition-colors hover:text-slate-900 whitespace-nowrap">
-                  {active && (
-                    <motion.span layoutId="nav-pill"
-                      className="absolute inset-0 bg-slate-900 rounded-full shadow-lg shadow-slate-900/25"
-                      transition={{ type: "spring", stiffness: 400, damping: 34 }} />
-                  )}
-                  <span className={`relative z-10 flex items-center gap-1.5 ${active ? "text-white" : "text-slate-500"}`}>
-                    {label}
-                    {badge > 0 && (
-                      <span data-testid="messages-unread-badge" className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${active ? "bg-white text-slate-900" : "bg-brand-600 text-white"}`}>{badge > 99 ? "99+" : badge}</span>
-                    )}
-                  </span>
-                </NavLink>
-              );
-            })}
-          </nav>
+          <DesktopNav navItems={navItems} location={location} navigate={navigate} />
 
           <div className="flex items-center gap-3 ml-auto">
             <button onClick={() => navigate("/help")} className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors">
