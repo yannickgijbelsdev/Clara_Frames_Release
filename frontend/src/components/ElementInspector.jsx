@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2 } from "lucide-react";
 import { FONTS } from "@/lib/elementDefs";
+import { fontValue } from "@/lib/fonts";
 
 function RoundingControl({ sel, updateStyle }) {
   const r = sel.style?.borderRadius ?? 0;
@@ -23,7 +24,7 @@ function RoundingControl({ sel, updateStyle }) {
   );
 }
 
-export default function ElementInspector({ sel, sources = [], overlays = [], forms = [], updateProps, updateStyle, updateEl, delEl, footer = null, allowTiming = false }) {
+export default function ElementInspector({ sel, sources = [], overlays = [], forms = [], customFonts = [], updateProps, updateStyle, updateEl, delEl, footer = null, allowTiming = false }) {
   const rawFields = (sources.find((s) => s.id === sel?.props?.sourceId)?.fields || []).filter((f) => (f.key || "").trim());
   const srcFields = rawFields.length ? rawFields : [{ key: "text", label: "Response text" }];
   const triggerSrcId = sel?.timing?.triggerSource || sel?.props?.sourceId;
@@ -214,8 +215,12 @@ export default function ElementInspector({ sel, sources = [], overlays = [], for
           </div>
           <div className="space-y-1.5"><Label>Font</Label>
             <Select value={sel.style.fontFamily || FONTS[0]} onValueChange={(v) => updateStyle({ fontFamily: v })}>
-              <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
-              <SelectContent>{FONTS.map((f) => <SelectItem key={f} value={f}><span style={{ fontFamily: f }}>{f.split(",")[0].replace(/'/g, "")}</span></SelectItem>)}</SelectContent>
+              <SelectTrigger className="rounded-xl" data-testid="prop-font"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {FONTS.map((f) => <SelectItem key={f} value={f}><span style={{ fontFamily: f }}>{f.split(",")[0].replace(/'/g, "")}</span></SelectItem>)}
+                {customFonts.length > 0 && <div className="px-2 py-1 text-[10px] uppercase tracking-widest text-slate-400 font-bold">Your fonts</div>}
+                {customFonts.map((f) => { const v = fontValue(f.family); return <SelectItem key={f.id} value={v}><span style={{ fontFamily: v }}>{f.family}</span></SelectItem>; })}
+              </SelectContent>
             </Select></div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5"><Label>Weight</Label>

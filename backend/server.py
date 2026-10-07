@@ -627,6 +627,77 @@ async def delete_overlay(overlay_id: str, user: dict = Depends(get_current_user)
     return {"ok": True}
 
 
+# Custom fonts (upload .ttf/.otf/.woff/.woff2, usable in any text element)
+_FONT_FORMATS = {"woff2": "woff2", "woff": "woff", "ttf": "truetype", "otf": "opentype"}
+
+def _font_family_from_name(filename: str) -> str:
+    base = re.sub(r"\.[^.]+$", "", filename or "Font")
+    base = re.sub(r"[_\-]+", " ", base).strip()
+    base = re.sub(r"[^A-Za-z0-9 ]", "", base)[:40].strip()
+    return base or "Custom Font"
+
+@api_router.post("/fonts/upload")
+async def upload_font(file: UploadFile = File(...), workspace_id: str = Form(...), family: Optional[str] = Form(None), user: dict = Depends(get_current_user)):
+    name = (file.filename or "").lower()
+    ext = re.sub(r"[^a-z0-9]", "", name.rsplit(".", 1)[-1] if "." in name else "")[:5]
+    if ext not in _FONT_FORMATS:
+        raise HTTPException(status_code=400, detail="Only .ttf, .otf, .woff or .woff2 font files are allowed")
+    data = await file.read()
+    if len(data) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Font too large (max 10 MB)")
+    fam = _font_family_from_name(family or file.filename or "Custom Font")
+    key = f"fonts/{user['id']}/{uuid.uuid4().hex}.{ext}"
+    try:
+        await asyncio.to_thread(
+            get_s3().put_object,
+            Bucket=S3_BUCKET, Key=key, Body=data,
+            ContentType="font/" + ext, ACL="public-read",
+        )
+    except Exception as e:
+        logger.error(f"S3 font upload failed: {e}")
+        raise HTTPException(status_code=502, detail="Upload to storage failed")
+    url = f"{S3_ENDPOINT.rstrip('/')}/{S3_BUCKET}/{key}"
+    doc = {
+        "id": str(uuid.uuid4()), "user_id": user["id"], "workspace_id": workspace_id,
+        "key": key, "url": url, "family": fam, "format": _FONT_FORMATS[ext],
+        "size": len(data), "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.fonts.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+@api_router.get("/fonts")
+async def list_fonts(workspace_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+    q = {"user_id": user["id"]}
+    if workspace_id:
+        q["workspace_id"] = workspace_id
+    docs = await db.fonts.find(q, {"_id": 0}).sort("created_at", -1).to_list(200)
+    return docs
+
+@api_router.delete("/fonts/{font_id}")
+async def delete_font(font_id: str, user: dict = Depends(get_current_user)):
+    doc = await db.fonts.find_one({"id": font_id, "user_id": user["id"]})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Font not found")
+    try:
+        await asyncio.to_thread(get_s3().delete_object, Bucket=S3_BUCKET, Key=doc["key"])
+    except Exception as e:
+        logger.error(f"S3 font delete failed: {e}")
+    await db.fonts.delete_one({"id": font_id})
+    return {"ok": True}
+
+
+def _font_faces_css(fonts: list) -> str:
+    out = []
+    for f in fonts or []:
+        fam = (f.get("family") or "").replace("'", "")
+        url = f.get("url") or ""
+        fmt = f.get("format") or "woff2"
+        if fam and url:
+            out.append(f"@font-face{{font-family:'{fam}';src:url('{url}') format('{fmt}');font-display:swap;}}")
+    return "".join(out)
+
+
 # ---------------------------------------------------------------------------
 # API Sources
 # ---------------------------------------------------------------------------
@@ -1232,7 +1303,10 @@ async def public_overlay(token: str):
     import json as _json
     scene_json = _json.dumps(scene)
     backend = os.environ.get("FRONTEND_URL", "")
-    html = OVERLAY_HTML.replace("__SCENE__", scene_json).replace("__TOKEN__", token).replace("__BACKEND__", backend)
+    fonts = await db.fonts.find({"workspace_id": scene.get("workspace_id")}, {"_id": 0}).to_list(200)
+    html = (OVERLAY_HTML
+            .replace("__FONTFACES__", _font_faces_css(fonts))
+            .replace("__SCENE__", scene_json).replace("__TOKEN__", token).replace("__BACKEND__", backend))
     return HTMLResponse(html, headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache"})
 
 # ---------------------------------------------------------------------------
@@ -1242,6 +1316,7 @@ OVERLAY_HTML = r"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"/>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
 <style>
+  __FONTFACES__
   html,body{margin:0;padding:0;background:transparent;overflow:hidden;font-family:'Plus Jakarta Sans',Arial,sans-serif;}
   #stage{position:absolute;top:0;left:0;transform-origin:top left;}
   .el{position:absolute;box-sizing:border-box;display:flex;}

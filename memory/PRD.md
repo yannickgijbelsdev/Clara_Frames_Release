@@ -196,6 +196,12 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Fix (frontend): ElementInspector field dropdown filters blank keys and falls back to a selectable "text" option; Sources.jsx hint tells users to leave mappings empty for plain-text APIs.
 - Verified e2e in preview: source test, /values.json, /element/{id}.txt and /data.json all return the live song. NEEDS REDEPLOY for the live site.
 
+## 2026-06 — Custom font upload
+- New **Fonts** page (nav + /fonts route): upload .ttf/.otf/.woff/.woff2 (≤10MB) to Hetzner S3, list with a live preview, delete. Backend: `db.fonts` + POST /fonts/upload, GET /fonts, DELETE /fonts/{id}; family name auto-derived from filename.
+- Uploaded fonts appear in every text element's **Font** picker (ElementInspector gets `customFonts`; value = `'<family>', sans-serif`), under a "Your fonts" group. Editors inject `@font-face` into the document (`/lib/fonts.js injectFontFaces`) so previews render.
+- Overlay: `public_overlay` fetches the scene workspace's fonts and injects `@font-face` CSS via `__FONTFACES__` placeholder → vMix renders custom fonts.
+- Verified end-to-end: uploaded BebasNeue, listed with preview, appeared in picker, and `@font-face` injected into a same-workspace scene's overlay.
+
 ## 2026-06 — Exit animations + timing for every element
 - **Exit animation per element**: new `props.exit` (none/fade/slide-up/down/left/right/zoom) + `props.exitDuration`. Plays when the element leaves via timing (interval end or onchange window end). Overlay JS: `exitAnim()` + `clara-ex-*` keyframes; `setElVis` plays the exit anim then sets display:none after the duration, and on re-show resets the animation (clears the `both`-fill leftover so opacity returns to 1). ElementInspector: "Exit (plays when it leaves)" section (all elements).
 - **Timing for all element types**: removed the api_field/image/overlay restriction on the "On-screen timing" section — interval and onchange are now selectable for every element (still gated by `allowTiming`, i.e. only in the Scene editor).

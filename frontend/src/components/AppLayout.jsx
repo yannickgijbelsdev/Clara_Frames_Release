@@ -47,6 +47,7 @@ export default function AppLayout({ children, title, subtitle, actions }) {
     { to: "/messages", label: "Messages", badge: unread },
     { to: "/sources", label: "API Sources" },
     { to: "/overlays", label: "Overlays" },
+    { to: "/fonts", label: "Fonts" },
     { to: "/media", label: "Media" },
     { to: "/help", label: "vMix Help" },
     ...(user?.role === "admin" ? [{ to: "/users", label: "Users" }] : []),

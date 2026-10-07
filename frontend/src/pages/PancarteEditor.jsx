@@ -5,6 +5,7 @@ import AppLayout from "@/components/AppLayout";
 import { PrimaryButton, SecondaryButton } from "@/components/PrimaryButton";
 import SceneCanvas from "@/components/SceneCanvas";
 import ElementInspector from "@/components/ElementInspector";
+import { injectFontFaces } from "@/lib/fonts";
 import LayersPanel from "@/components/LayersPanel";
 import { ImageUpload } from "@/components/ImageUpload";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ export default function PancarteEditor() {
   const [pan, setPan] = useState(null);
   const [sources, setSources] = useState([]);
   const [overlays, setOverlays] = useState([]);
+  const [customFonts, setCustomFonts] = useState([]);
   const [sourceValues, setSourceValues] = useState({});
   const [formsList, setFormsList] = useState([]);
   const [selId, setSelId] = useState(null);
@@ -33,6 +35,7 @@ export default function PancarteEditor() {
   useEffect(() => {
     if (!pan?.workspace_id) return;
     api.get(`/overlays?workspace_id=${pan.workspace_id}`).then(({ data }) => setOverlays(data)).catch(() => {});
+    api.get(`/fonts?workspace_id=${pan.workspace_id}`).then(({ data }) => { setCustomFonts(data); injectFontFaces(data); }).catch(() => {});
     api.get(`/forms?workspace_id=${pan.workspace_id}`).then(({ data }) => setFormsList(data)).catch(() => {});
     const fetchVals = () => api.get(`/sources/values?workspace_id=${pan.workspace_id}`).then(({ data }) => setSourceValues(data)).catch(() => {});
     fetchVals();
@@ -136,7 +139,7 @@ export default function PancarteEditor() {
           {!sel ? (
             <p className="text-sm text-slate-400 text-center py-8">Select an element to edit its properties.</p>
           ) : (
-            <ElementInspector sel={sel} sources={sources} overlays={overlays} forms={formsList} updateProps={updateProps} updateStyle={updateStyle} updateEl={updateEl} delEl={delEl} />
+            <ElementInspector sel={sel} sources={sources} overlays={overlays} forms={formsList} customFonts={customFonts} updateProps={updateProps} updateStyle={updateStyle} updateEl={updateEl} delEl={delEl} />
           )}
         </div>
       </div>

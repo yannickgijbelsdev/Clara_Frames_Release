@@ -5,6 +5,7 @@ import AppLayout from "@/components/AppLayout";
 import { PrimaryButton, SecondaryButton } from "@/components/PrimaryButton";
 import SceneCanvas from "@/components/SceneCanvas";
 import ElementInspector from "@/components/ElementInspector";
+import { injectFontFaces } from "@/lib/fonts";
 import LayersPanel from "@/components/LayersPanel";
 import { ImageUpload } from "@/components/ImageUpload";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,7 @@ export default function SceneEditor() {
   const [scene, setScene] = useState(null);
   const [sources, setSources] = useState([]);
   const [overlays, setOverlays] = useState([]);
+  const [customFonts, setCustomFonts] = useState([]);
   const [sourceValues, setSourceValues] = useState({});
   const [formsList, setFormsList] = useState([]);
   const [flows, setFlows] = useState([]);
@@ -41,6 +43,7 @@ export default function SceneEditor() {
     api.get(`/flows?workspace_id=${scene.workspace_id}`).then(({ data }) => setFlows(data)).catch(() => {});
     api.get(`/pancartes?workspace_id=${scene.workspace_id}`).then(({ data }) => setPancartes(data)).catch(() => {});
     api.get(`/overlays?workspace_id=${scene.workspace_id}`).then(({ data }) => setOverlays(data)).catch(() => {});
+    api.get(`/fonts?workspace_id=${scene.workspace_id}`).then(({ data }) => { setCustomFonts(data); injectFontFaces(data); }).catch(() => {});
     api.get(`/forms?workspace_id=${scene.workspace_id}`).then(({ data }) => setFormsList(data)).catch(() => {});
     const fetchVals = () => api.get(`/sources/values?workspace_id=${scene.workspace_id}`).then(({ data }) => setSourceValues(data)).catch(() => {});
     fetchVals();
@@ -348,7 +351,7 @@ export default function SceneEditor() {
           ) : !sel ? (
             <p className="text-sm text-slate-400 text-center py-8">Select an element or flow to edit its properties.</p>
           ) : (
-            <ElementInspector sel={sel} sources={sources} overlays={overlays} forms={formsList} updateProps={updateProps} updateStyle={updateStyle} updateEl={updateEl} delEl={delEl} allowTiming
+            <ElementInspector sel={sel} sources={sources} overlays={overlays} forms={formsList} customFonts={customFonts} updateProps={updateProps} updateStyle={updateStyle} updateEl={updateEl} delEl={delEl} allowTiming
               footer={
                 <div className="pt-3 border-t border-slate-100">
                   <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">vMix output URL</Label>
