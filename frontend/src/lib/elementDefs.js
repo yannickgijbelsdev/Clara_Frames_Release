@@ -14,7 +14,7 @@ export const templates = {
     props: { name: "promo", text: "Timed message", image: "", imagePosition: "left", start: "", end: "", timezone: "Europe/Brussels" },
     style: { color: "#ffffff", fontSize: 48, fontWeight: 600, fontFamily: FONTS[1], backgroundColor: "#5f6da6", borderRadius: 18, padding: 24, textAlign: "left" } }),
   api_field: () => ({ id: uid(), type: "api_field", x: 200, y: 400, w: 600, h: 100, rotation: 0, opacity: 1,
-    props: { name: "api", sourceId: "", fieldKey: "", prefix: "", suffix: "" }, style: { color: "#ffffff", fontSize: 56, fontWeight: 700, fontFamily: FONTS[0], textAlign: "left" } }),
+    props: { name: "api", sourceId: "", fieldKey: "", prefix: "", suffix: "", display: "text" }, style: { color: "#ffffff", fontSize: 56, fontWeight: 700, fontFamily: FONTS[0], textAlign: "left" } }),
   overlay: () => ({ id: uid(), type: "overlay", x: 0, y: 0, w: 1920, h: 1080, rotation: 0, opacity: 1,
     props: { name: "overlay", overlayId: "", url: "", kind: "" }, style: { objectFit: "contain" } }),
   ticker: () => ({ id: uid(), type: "ticker", x: 0, y: 960, w: 1920, h: 120, rotation: 0, opacity: 1,

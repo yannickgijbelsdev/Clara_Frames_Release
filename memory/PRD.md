@@ -196,6 +196,12 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Fix (frontend): ElementInspector field dropdown filters blank keys and falls back to a selectable "text" option; Sources.jsx hint tells users to leave mappings empty for plain-text APIs.
 - Verified e2e in preview: source test, /values.json, /element/{id}.txt and /data.json all return the live song. NEEDS REDEPLOY for the live site.
 
+## 2026-06 — API field can render as image (artwork/presenter photos)
+- Problem: the "Now Playing" template binds artwork to an Image element (works), but manually users add an "API field" element → it rendered the image URL as text ("a URL appears"). Same for presenter photos.
+- Fix: api_field now has a "Display as" option (Text | Image). In Image mode it renders the bound value as a picture with Fit + Corner radius controls.
+- Files: elementDefs.js (default props.display="text"), ElementInspector.jsx (Display-as select + image controls), elementRender.jsx (editor img render), server.py overlay JS buildElementNode (api_field image → registered as imgApi, updated live via updateImages).
+- Verified: editor screenshot shows the artwork <img> rendered when display=image bound to Nu Speelt artwork.
+
 ## 2026-06 — Timed flow fix (clock-aligned, explicit show duration)
 - Problem: pancarte flows "kept looping" — the scene flow was in "Always on" mode, and the Timed mode derived its visible duration implicitly from pancartes×interval (confusing, and `showSeconds` was dead config).
 - Fix (overlay JS in server.py everyX branch): visible window now = explicit `schedule.showSeconds`; pancartes cycle within it (`floor((phase-lead)/per) % count`); cycle phase is clock-aligned to local midnight (`secOfDay % cycle`) so it fires on fixed clock moments (12:00, 12:05, …) per the vMix machine timezone.

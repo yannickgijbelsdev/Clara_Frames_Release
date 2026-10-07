@@ -103,6 +103,10 @@ export function ElementContent({ el, sourceValues }) {
   if (el.type === "api_field") {
     const key = `${p.sourceId}:${p.fieldKey}`;
     const v = sourceValues?.[key];
+    if (p.display === "image") {
+      return v ? <img src={v} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: (el.style?.objectFit) || "contain", pointerEvents: "none", userSelect: "none", WebkitUserDrag: "none" }} /> :
+        <span style={{ fontSize: 16, opacity: .6 }}>image field</span>;
+    }
     return <span>{(p.prefix || "") + (v != null && v !== "" ? v : "…") + (p.suffix || "")}</span>;
   }
   if (el.type === "timed_text") {

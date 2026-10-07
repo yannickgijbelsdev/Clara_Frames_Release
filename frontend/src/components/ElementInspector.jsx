@@ -107,10 +107,31 @@ export default function ElementInspector({ sel, sources = [], overlays = [], for
               <SelectTrigger className="rounded-xl" data-testid="prop-field"><SelectValue placeholder="Choose field" /></SelectTrigger>
               <SelectContent>{srcFields.map((f) => <SelectItem key={f.key} value={f.key}>{f.key}</SelectItem>)}</SelectContent>
             </Select></div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1.5"><Label>Prefix</Label><Input value={sel.props.prefix || ""} onChange={(e) => updateProps({ prefix: e.target.value })} className="rounded-xl text-sm" /></div>
-            <div className="space-y-1.5"><Label>Suffix</Label><Input value={sel.props.suffix || ""} onChange={(e) => updateProps({ suffix: e.target.value })} className="rounded-xl text-sm" /></div>
+          <div className="space-y-1.5"><Label>Display as</Label>
+            <Select value={sel.props.display || "text"} onValueChange={(v) => updateProps({ display: v })}>
+              <SelectTrigger className="rounded-xl" data-testid="prop-display"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="text">Text</SelectItem>
+                <SelectItem value="image">Image (render URL as picture)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-slate-400">Choose <b>Image</b> when the field is a picture URL (e.g. <code className="font-mono">artwork</code> or a presenter photo).</p>
           </div>
+          {sel.props.display === "image" ? (
+            <>
+              <div className="space-y-1.5"><Label>Fit</Label>
+                <Select value={sel.style?.objectFit || "contain"} onValueChange={(v) => updateStyle({ objectFit: v })}>
+                  <SelectTrigger className="rounded-xl" data-testid="prop-apiimg-fit"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="contain">Contain</SelectItem><SelectItem value="cover">Cover</SelectItem></SelectContent>
+                </Select></div>
+              <RoundingControl sel={sel} updateStyle={updateStyle} />
+            </>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5"><Label>Prefix</Label><Input value={sel.props.prefix || ""} onChange={(e) => updateProps({ prefix: e.target.value })} className="rounded-xl text-sm" /></div>
+              <div className="space-y-1.5"><Label>Suffix</Label><Input value={sel.props.suffix || ""} onChange={(e) => updateProps({ suffix: e.target.value })} className="rounded-xl text-sm" /></div>
+            </div>
+          )}
         </>
       )}
 

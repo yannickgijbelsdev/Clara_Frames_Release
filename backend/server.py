@@ -1420,8 +1420,16 @@ function buildElementNode(el){
     inner.appendChild(wrap);
     ref.timed = {d:d, p:p, ent:ent};
   } else if(el.type==='api_field'){
-    inner.textContent = (p.prefix||'') + '\u2026' + (p.suffix||'');
-    ref.api = {d:inner, p:p};
+    if(p.display==='image'){
+      var aim=document.createElement('img'); aim.style.width='100%'; aim.style.height='100%';
+      aim.style.objectFit=(el.style&&el.style.objectFit)||'contain';
+      if(p.src) aim.src=p.src;
+      inner.appendChild(aim);
+      ref.imgApi={img:aim, p:p};
+    } else {
+      inner.textContent = (p.prefix||'') + '\u2026' + (p.suffix||'');
+      ref.api = {d:inner, p:p};
+    }
   } else if(el.type==='overlay'){
     var ok = p.kind||''; var ofit = (el.style&&el.style.objectFit)||'contain';
     if(ok==='html' && p.url){ var fr=document.createElement('iframe'); fr.src=p.url; fr.setAttribute('scrolling','no');
