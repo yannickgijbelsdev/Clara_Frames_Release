@@ -196,6 +196,13 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Fix (frontend): ElementInspector field dropdown filters blank keys and falls back to a selectable "text" option; Sources.jsx hint tells users to leave mappings empty for plain-text APIs.
 - Verified e2e in preview: source test, /values.json, /element/{id}.txt and /data.json all return the live song. NEEDS REDEPLOY for the live site.
 
+## 2026-06 — Link any element (image/overlay background) to a now-playing trigger
+- Extended per-element "On-screen timing" to the **overlay** element type (was api_field/image only) and added a **Trigger source + field** picker for `onchange` mode. This lets a STATIC background image or an uploaded overlay (no data binding of its own) be linked to a source field (e.g. Nu Speelt `title`) so it only appears when that field changes — i.e. only on a new song — for the configured seconds, then hides.
+- Backend: `timedEl.key` for onchange = `timing.triggerSource:triggerField` (fallback to the element's own `sourceId:fieldKey`). `values.json` now also resolves any element's `timing.triggerSource/triggerField` so the trigger value is polled even when no element is bound to it.
+- Frontend ElementInspector: `onchange` shows `el-trigger-source` + `el-trigger-field` selects; `allowTiming` now also covers overlay elements.
+- Now-Playing template untouched (user builds it as loose elements).
+- Verified live: a static image linked to Nu Speelt `title` shows ~4s on load, hides, and re-appears when the song changes to a new title (poll-driven).
+
 ## 2026-06 — Ticker fixes + per-element on-screen timing
 - **Ticker raw chars fixed**: separator used `\\u00A0`/`\\u25CF` (double backslash in the raw Python overlay string) → vMix showed literal `\u00A0●`. Changed to single-backslash `\u00A0`/`\u25CF` so it renders as " ● ".
 - **Ticker bar too thick fixed**: ticker `inner` was `display:block`, so the text sat at the TOP of the bar leaving empty dark space below. Changed to `display:flex; align-items:center` (track `flex:0 0 auto`) → text vertically centered, bar hugs it.

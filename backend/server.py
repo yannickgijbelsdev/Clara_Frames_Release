@@ -1492,7 +1492,9 @@ function buildElementNode(el){
   }
   ent.appendChild(inner); d.appendChild(ent);
   if(el.timing && el.timing.mode && el.timing.mode!=='always'){
-    var tkey = (p.sourceId && p.fieldKey) ? (p.sourceId+':'+p.fieldKey) : null;
+    var tkey = null;
+    if(el.timing.triggerSource && el.timing.triggerField){ tkey = el.timing.triggerSource+':'+el.timing.triggerField; }
+    else if(p.sourceId && p.fieldKey){ tkey = p.sourceId+':'+p.fieldKey; }
     d.style.display='none';
     ref.timedEl = {d:d, ent:ent, p:p, timing:el.timing, key:tkey, _vis:null, _lastVal:undefined, _showUntil:0};
   }
@@ -1709,18 +1711,21 @@ async def public_values(token: str):
     out: Dict[str, Any] = {}
     cache: Dict[str, Dict[str, Any]] = {}
 
-    async def add_el(el):
-        if el.get("type") not in ("api_field", "image"):
-            return
-        p = el.get("props", {})
-        sid = p.get("sourceId")
-        fk = p.get("fieldKey")
+    async def add_key(sid, fk):
         if not sid or not fk:
             return
         if sid not in cache:
             src_doc = await db.sources.find_one({"id": sid})
             cache[sid] = await resolve_source_values(src_doc) if src_doc else {}
         out[f"{sid}:{fk}"] = cache.get(sid, {}).get(fk, "")
+
+    async def add_el(el):
+        p = el.get("props", {})
+        if el.get("type") in ("api_field", "image"):
+            await add_key(p.get("sourceId"), p.get("fieldKey"))
+        tm = el.get("timing") or {}
+        if tm.get("triggerSource") and tm.get("triggerField"):
+            await add_key(tm["triggerSource"], tm["triggerField"])
 
     for el in scene.get("elements", []):
         await add_el(el)

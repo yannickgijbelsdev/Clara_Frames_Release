@@ -26,6 +26,9 @@ function RoundingControl({ sel, updateStyle }) {
 export default function ElementInspector({ sel, sources = [], overlays = [], forms = [], updateProps, updateStyle, updateEl, delEl, footer = null, allowTiming = false }) {
   const rawFields = (sources.find((s) => s.id === sel?.props?.sourceId)?.fields || []).filter((f) => (f.key || "").trim());
   const srcFields = rawFields.length ? rawFields : [{ key: "text", label: "Response text" }];
+  const triggerSrcId = sel?.timing?.triggerSource || sel?.props?.sourceId;
+  const triggerRaw = (sources.find((s) => s.id === triggerSrcId)?.fields || []).filter((f) => (f.key || "").trim());
+  const triggerFields = triggerRaw.length ? triggerRaw : [{ key: "text", label: "Response text" }];
   return (
     <div className="space-y-3" data-testid="properties-panel">
       <div className="flex items-center justify-between">
@@ -234,7 +237,7 @@ export default function ElementInspector({ sel, sources = [], overlays = [], for
         </>
       )}
 
-      {allowTiming && (sel.type === "api_field" || sel.type === "image") && (
+      {allowTiming && (sel.type === "api_field" || sel.type === "image" || sel.type === "overlay") && (
         <div className="space-y-1.5 pt-3 border-t border-slate-100">
           <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">On-screen timing</Label>
           <Select value={sel.timing?.mode || "always"}
@@ -273,7 +276,21 @@ export default function ElementInspector({ sel, sources = [], overlays = [], for
             </>
           )}
           {sel.timing?.mode === "onchange" && (
-            <p className="text-[11px] text-slate-400">Verschijnt {sel.timing?.showSeconds ?? 10}s zodra de data verandert (bv. een nieuw Now Playing-nummer), daarna weg tot de volgende wijziging.</p>
+            <>
+              <div className="space-y-1.5"><Label>Trigger source</Label>
+                <Select value={sel.timing?.triggerSource || sel.props?.sourceId || ""}
+                  onValueChange={(v) => updateEl(sel.id, { timing: { ...sel.timing, triggerSource: v, triggerField: "" } })}>
+                  <SelectTrigger className="rounded-xl" data-testid="el-trigger-source"><SelectValue placeholder="Choose source" /></SelectTrigger>
+                  <SelectContent>{sources.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+                </Select></div>
+              <div className="space-y-1.5"><Label>Trigger field</Label>
+                <Select value={sel.timing?.triggerField || sel.props?.fieldKey || ""}
+                  onValueChange={(v) => updateEl(sel.id, { timing: { ...sel.timing, triggerField: v } })}>
+                  <SelectTrigger className="rounded-xl" data-testid="el-trigger-field"><SelectValue placeholder="Choose field" /></SelectTrigger>
+                  <SelectContent>{triggerFields.map((f) => <SelectItem key={f.key} value={f.key}>{f.key}</SelectItem>)}</SelectContent>
+                </Select></div>
+              <p className="text-[11px] text-slate-400">Verschijnt {sel.timing?.showSeconds ?? 10}s zodra dit veld verandert (bv. de titel van een nieuw Now-Playing-nummer), daarna weg. Koppel hier je achtergrond-afbeelding of overlay aan je now-playing-bron.</p>
+            </>
           )}
         </div>
       )}
