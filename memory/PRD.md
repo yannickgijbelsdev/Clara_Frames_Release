@@ -196,6 +196,11 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Fix (frontend): ElementInspector field dropdown filters blank keys and falls back to a selectable "text" option; Sources.jsx hint tells users to leave mappings empty for plain-text APIs.
 - Verified e2e in preview: source test, /values.json, /element/{id}.txt and /data.json all return the live song. NEEDS REDEPLOY for the live site.
 
+## 2026-06 — Responsive top nav ("More" overflow dropdown)
+- Problem: with 11-12 nav items the desktop menu overflowed and pushed content off-screen.
+- Fix: new `DesktopNav` in AppLayout measures available width (hidden measuring nav + ResizeObserver) and renders only the items that fit; the rest move into a **"More ▾"** DropdownMenu (`data-testid nav-more`, items `nav-more-<label>`). Overflow button highlights when an overflow route is active. Mobile scroll-nav unchanged.
+- Verified by testing_agent (iteration_19): 100% frontend pass — no horizontal overflow at 1920/1536/1366/1280/390, account-menu always visible, More dropdown appears and navigates correctly.
+
 ## 2026-06 — Custom font upload
 - New **Fonts** page (nav + /fonts route): upload .ttf/.otf/.woff/.woff2 (≤10MB) to Hetzner S3, list with a live preview, delete. Backend: `db.fonts` + POST /fonts/upload, GET /fonts, DELETE /fonts/{id}; family name auto-derived from filename.
 - Uploaded fonts appear in every text element's **Font** picker (ElementInspector gets `customFonts`; value = `'<family>', sans-serif`), under a "Your fonts" group. Editors inject `@font-face` into the document (`/lib/fonts.js injectFontFaces`) so previews render.
