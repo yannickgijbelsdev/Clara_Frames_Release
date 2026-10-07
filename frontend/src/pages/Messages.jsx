@@ -6,8 +6,9 @@ import { SecondaryButton } from "@/components/PrimaryButton";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SongList } from "@/components/SongPicker";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Inbox, ChevronDown, ChevronUp, Trash2, Check, Mail, Radio, X, ScrollText } from "lucide-react";
+import { Inbox, ChevronDown, ChevronUp, Trash2, Check, Mail, Radio, X, ScrollText, Pencil, Save } from "lucide-react";
 
 function renderValue(field, value) {
   if (value === undefined || value === null || value === "") return "—";
@@ -40,6 +41,8 @@ export default function Messages() {
   const [filter, setFilter] = useState("all");
   const [expanded, setExpanded] = useState({});
   const [live, setLive] = useState(null);
+  const [editing, setEditing] = useState(null); // submission id
+  const [draft, setDraft] = useState({});
 
   const loadLive = () => {
     if (!current) return;
@@ -94,6 +97,18 @@ export default function Messages() {
     catch (e) { toast.error("Failed"); setSubs((arr) => arr.map((x) => x.id === s.id ? { ...x, ticker: !on } : x)); }
   };
 
+  const startEdit = (s) => { setEditing(s.id); setDraft({ ...(s.data || {}) }); setExpanded((e) => ({ ...e, [s.id]: true })); };
+  const cancelEdit = () => { setEditing(null); setDraft({}); };
+  const saveEdit = async (s) => {
+    try {
+      const { data } = await api.put(`/submissions/${s.id}`, { data: draft });
+      setSubs((arr) => arr.map((x) => x.id === s.id ? { ...x, data: data.data } : x));
+      toast.success("Bericht bijgewerkt");
+      setEditing(null); setDraft({});
+    } catch (e) { toast.error("Opslaan mislukt"); }
+  };
+  const setDraftVal = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
+
   const unreadTotal = subs.filter((s) => !s.read).length;
 
   return (
@@ -139,6 +154,7 @@ export default function Messages() {
             const knownKeys = new Set(fields.map((f) => f.key));
             const extraKeys = Object.keys(s.data || {}).filter((k) => !knownKeys.has(k));
             const isOpen = !!expanded[s.id];
+            const isEditing = editing === s.id;
             const hasDetails = detailFields.length > 0 || extraKeys.length > 0;
             return (
               <motion.div key={s.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }}
@@ -154,6 +170,27 @@ export default function Messages() {
                       <span className="text-xs text-slate-400">{new Date(s.created_at).toLocaleString()}</span>
                       {!s.read && <span className="text-[10px] font-bold text-brand-600 uppercase tracking-wide">New</span>}
                     </div>
+                    {isEditing ? (
+                      <div className="mt-3 space-y-2.5" data-testid={`message-edit-${s.id}`}>
+                        {[...fields, ...extraKeys.map((k) => ({ key: k, label: k }))].map((f) => {
+                          const val = draft[f.key];
+                          if (f.type === "song_pick") return <div key={f.key} className="text-xs text-slate-400">{f.label}: nummers kunnen hier niet bewerkt worden.</div>;
+                          if (f.type === "checkbox") return (
+                            <label key={f.key} className="flex items-center gap-2 text-sm text-slate-700">
+                              <input type="checkbox" checked={val === true || val === "true" || val === "on"} onChange={(e) => setDraftVal(f.key, e.target.checked)} className="h-4 w-4 accent-brand-600" data-testid={`edit-field-${f.key}`} />{f.label}
+                            </label>
+                          );
+                          return (
+                            <div key={f.key} className="space-y-1">
+                              <div className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">{f.label}</div>
+                              <Input value={val == null ? "" : (typeof val === "object" ? JSON.stringify(val) : String(val))}
+                                onChange={(e) => setDraftVal(f.key, e.target.value)} className="rounded-xl text-sm" data-testid={`edit-field-${f.key}`} />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                    <>
                     <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
                       {listFields.length === 0 ? (
                         <div className="text-sm text-slate-400">No preview fields configured — open details.</div>
@@ -181,20 +218,32 @@ export default function Messages() {
                         ))}
                       </div>
                     )}
+                    </>
+                    )}
 
                     <div className="mt-4 flex items-center gap-2">
-                      {hasDetails && (
-                        <SecondaryButton data-testid={`message-more-${s.id}`} onClick={() => toggle(s)} icon={isOpen ? ChevronUp : ChevronDown} className="text-xs py-1.5">
-                          {isOpen ? "Hide details" : "More details"}
-                        </SecondaryButton>
+                      {isEditing ? (
+                        <>
+                          <button data-testid={`message-save-${s.id}`} onClick={() => saveEdit(s)} className="text-xs font-semibold inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-brand-600 text-white hover:bg-brand-700 transition-colors"><Save className="h-3.5 w-3.5" />Opslaan</button>
+                          <button data-testid={`message-cancel-${s.id}`} onClick={cancelEdit} className="text-xs font-medium text-slate-500 hover:text-slate-800 inline-flex items-center gap-1"><X className="h-3.5 w-3.5" />Annuleer</button>
+                        </>
+                      ) : (
+                        <>
+                          {hasDetails && (
+                            <SecondaryButton data-testid={`message-more-${s.id}`} onClick={() => toggle(s)} icon={isOpen ? ChevronUp : ChevronDown} className="text-xs py-1.5">
+                              {isOpen ? "Hide details" : "More details"}
+                            </SecondaryButton>
+                          )}
+                          <button data-testid={`message-edit-btn-${s.id}`} onClick={() => startEdit(s)} className="text-xs font-medium text-slate-500 hover:text-brand-600 inline-flex items-center gap-1"><Pencil className="h-3.5 w-3.5" />Bewerk</button>
+                          {!s.read && (
+                            <button data-testid={`message-markread-${s.id}`} onClick={() => markRead(s)} className="text-xs font-medium text-slate-500 hover:text-brand-600 inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" />Mark read</button>
+                          )}
+                          <button data-testid={`message-ticker-${s.id}`} onClick={() => toggleTicker(s)}
+                            className={`text-xs font-semibold inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full transition-colors ${s.ticker ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+                            <ScrollText className="h-3.5 w-3.5" />{s.ticker ? "Live in ticker" : "Live"}
+                          </button>
+                        </>
                       )}
-                      {!s.read && (
-                        <button data-testid={`message-markread-${s.id}`} onClick={() => markRead(s)} className="text-xs font-medium text-slate-500 hover:text-brand-600 inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" />Mark read</button>
-                      )}
-                      <button data-testid={`message-ticker-${s.id}`} onClick={() => toggleTicker(s)}
-                        className={`text-xs font-semibold inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full transition-colors ${s.ticker ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
-                        <ScrollText className="h-3.5 w-3.5" />{s.ticker ? "Live in ticker" : "Live"}
-                      </button>
                       <button data-testid={`message-delete-${s.id}`} onClick={() => remove(s)} className="ml-auto h-8 w-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   </div>

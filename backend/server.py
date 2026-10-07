@@ -24,7 +24,7 @@ import requests
 import boto3
 from botocore.config import Config
 from bson import ObjectId
-from fastapi import FastAPI, APIRouter, Request, Response, HTTPException, Depends, UploadFile, File, Form
+from fastapi import FastAPI, APIRouter, Request, Response, HTTPException, Depends, UploadFile, File, Form, Body
 from fastapi.responses import HTMLResponse, PlainTextResponse, JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -1109,8 +1109,11 @@ async def expand_scene_flows(scene: dict) -> dict:
             flow = await db.flows.find_one({"id": pl["flow_id"]}, {"_id": 0})
         pl["_flow"] = flow
         pans = []
-        if flow:
+        disabled = set(pl.get("disabledPancartes") or [])
+        if flow and pl.get("enabled", True) is not False:
             for pid in flow.get("pancarte_ids", []):
+                if pid in disabled:
+                    continue
                 pan = await db.pancartes.find_one({"id": pid}, {"_id": 0})
                 if pan:
                     pans.append(pan)
@@ -1237,6 +1240,7 @@ async def public_overlay(token: str):
 # ---------------------------------------------------------------------------
 OVERLAY_HTML = r"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"/>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
 <style>
   html,body{margin:0;padding:0;background:transparent;overflow:hidden;font-family:'Plus Jakarta Sans',Arial,sans-serif;}
   #stage{position:absolute;top:0;left:0;transform-origin:top left;}
@@ -1289,7 +1293,29 @@ const stage = document.getElementById('stage');
 stage.style.width = SCENE.width + 'px';
 stage.style.height = SCENE.height + 'px';
 if (SCENE.background && SCENE.background.color) stage.style.background = SCENE.background.color;
-if (SCENE.background && SCENE.background.src) {
+if (SCENE.background && SCENE.background.type === 'stream' && SCENE.background.src) {
+  var sb = document.createElement('div');
+  sb.style.position='absolute'; sb.style.top=0; sb.style.left=0; sb.style.width='100%'; sb.style.height='100%'; sb.style.overflow='hidden';
+  var surl = SCENE.background.src;
+  if (SCENE.background.stream === 'vimeo') {
+    var vm = (surl.match(/vimeo\.com\/(?:video\/)?(\d+)/) || [])[1] || (surl.match(/(\d{6,})/) || [])[1];
+    var ifr = document.createElement('iframe');
+    ifr.src = 'https://player.vimeo.com/video/' + vm + '?background=1&autoplay=1&loop=1&muted=1&autopause=0';
+    ifr.setAttribute('allow','autoplay; fullscreen'); ifr.setAttribute('frameborder','0');
+    ifr.style.position='absolute'; ifr.style.width='100vw'; ifr.style.height='56.25vw'; ifr.style.minHeight='100vh'; ifr.style.minWidth='177.78vh';
+    ifr.style.top='50%'; ifr.style.left='50%'; ifr.style.transform='translate(-50%,-50%)'; ifr.style.border='0';
+    sb.appendChild(ifr);
+  } else {
+    var sv = document.createElement('video');
+    sv.autoplay=true; sv.loop=true; sv.muted=true; sv.setAttribute('playsinline',''); sv.setAttribute('muted','');
+    sv.style.width='100%'; sv.style.height='100%'; sv.style.objectFit=(SCENE.background.fit==='contain'?'contain':'cover');
+    if (window.Hls && window.Hls.isSupported()) { var h=new window.Hls(); h.loadSource(surl); h.attachMedia(sv); }
+    else { sv.src = surl; }
+    sb.appendChild(sv);
+  }
+  stage.appendChild(sb);
+}
+if (SCENE.background && SCENE.background.src && SCENE.background.type !== 'stream') {
   var bfit = SCENE.background.fit || 'cover';
   var bg;
   if (SCENE.background.type === 'video') {
@@ -1543,6 +1569,7 @@ var placements = [];
   cont.style.position='absolute'; cont.style.left=pl.x+'px'; cont.style.top=pl.y+'px';
   cont.style.width=pl.w+'px'; cont.style.height=pl.h+'px'; cont.style.overflow='hidden';
   stage.appendChild(cont);
+  if(pl.enabled===false){ cont.style.display='none'; return; }
 
   var seriesLayer=document.createElement('div'); seriesLayer.style.position='absolute'; seriesLayer.style.top=0; seriesLayer.style.left=0; seriesLayer.style.width='100%'; seriesLayer.style.height='100%';
   cont.appendChild(seriesLayer);
@@ -1599,21 +1626,20 @@ function tick(){
       var cycle=Math.max(1,(sc.everyMinutes||5))*60;
       var per=Math.max(1,(f.flow&&f.flow.interval)||5);
       var count=f.pans.length;
-      var lead=(f.introNode && sc.intro)?Math.max(0,(sc.intro.leadSeconds!=null?sc.intro.leadSeconds:10)):0;
+      var introSec=(f.introNode && sc.intro)?Math.max(0,(sc.intro.leadSeconds!=null?sc.intro.leadSeconds:5)):0;
       var showDur=Math.max(1,(sc.showSeconds!=null?sc.showSeconds:20));
-      var outroDur=(f.outroNode && sc.outro)?Math.max(1,(sc.outro.seconds!=null?sc.outro.seconds:5)):0;
+      var outroSec=(f.outroNode && sc.outro)?Math.max(0,(sc.outro.seconds!=null?sc.outro.seconds:5)):0;
       var d=new Date();
       var secOfDay=d.getHours()*3600+d.getMinutes()*60+d.getSeconds();
       var phase=secOfDay%cycle;
-      var state='none', panIdx=0;
-      if(lead>0 && phase<lead){ state='intro'; }
-      else if(count>0 && phase>=lead && phase<lead+showDur){ state='series'; panIdx=Math.floor((phase-lead)/per)%count; }
-      else if(phase<lead+showDur+outroDur){ state='outro'; }
-      showTimedPart(f.introNode, state==='intro');
-      showTimedPart(f.outroNode, state==='outro');
-      if(state==='series'){ if(f._state!=='series') f.seriesLayer.style.display='block'; f.setIdx(panIdx); }
-      else if(f._state==='series'){ f.seriesLayer.style.display='none'; }
-      f._state=state;
+      var on=phase<showDur;
+      var showSeries=on && count>0;
+      var panIdx=showSeries?Math.floor(phase/per)%count:0;
+      // Intro/outro overlap the pancarte series (crossfade), they do not add extra time
+      showTimedPart(f.introNode, on && phase<introSec);
+      showTimedPart(f.outroNode, on && phase>=(showDur-outroSec));
+      if(showSeries){ if(f._state!=='series') f.seriesLayer.style.display='block'; f.setIdx(panIdx); f._state='series'; }
+      else { if(f._state==='series') f.seriesLayer.style.display='none'; f._state='none'; }
     }
     var cur=f.getCur(); cur.clocks.forEach(function(c){ c.d.textContent=fmtClock(c.p.timezone,c.p.format); });
   });
@@ -1760,6 +1786,17 @@ async def unread_count(workspace_id: Optional[str] = None, user: dict = Depends(
 async def mark_submission_read(sid: str, user: dict = Depends(get_current_user)):
     await db.submissions.update_one({"id": sid, "user_id": user["id"]}, {"$set": {"read": True}})
     return {"ok": True}
+
+@api_router.put("/submissions/{sid}")
+async def edit_submission(sid: str, body: Dict[str, Any] = Body(...), user: dict = Depends(get_current_user)):
+    data = body.get("data")
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="data object required")
+    res = await db.submissions.update_one({"id": sid, "user_id": user["id"]}, {"$set": {"data": data}})
+    if not res.matched_count:
+        raise HTTPException(status_code=404, detail="Message not found")
+    doc = await db.submissions.find_one({"id": sid}, {"_id": 0})
+    return doc
 
 @api_router.delete("/submissions/{sid}")
 async def delete_submission(sid: str, user: dict = Depends(get_current_user)):

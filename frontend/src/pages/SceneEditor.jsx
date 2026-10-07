@@ -11,8 +11,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Save, Upload, Trash2, ArrowLeft, Loader2, Copy, Film, Layers } from "lucide-react";
+import { Save, Upload, Trash2, ArrowLeft, Loader2, Copy, Film, Layers, Radio, Power } from "lucide-react";
 import { templates, TOOLS, uid } from "@/lib/elementDefs";
+import { Switch } from "@/components/ui/switch";
+import LiveViewDialog from "@/components/LiveViewDialog";
 
 export default function SceneEditor() {
   const { id } = useParams();
@@ -27,6 +29,7 @@ export default function SceneEditor() {
   const [selId, setSelId] = useState(null);
   const [selFlowId, setSelFlowId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [liveOpen, setLiveOpen] = useState(false);
 
   useEffect(() => {
     api.get(`/scenes/${id}`).then(({ data }) => setScene(data)).catch(() => { toast.error("Scene not found"); nav("/scenes"); });
@@ -56,7 +59,7 @@ export default function SceneEditor() {
   const selFlow = scene?.flows?.find((f) => f.id === selFlowId) || null;
 
   const addFlow = () => {
-    const f = { id: uid(), flow_id: "", x: 480, y: 720, w: 960, h: 540, schedule: { mode: "always", everyMinutes: 5, showSeconds: 20 } };
+    const f = { id: uid(), flow_id: "", x: 480, y: 720, w: 960, h: 540, enabled: true, disabledPancartes: [], schedule: { mode: "always", everyMinutes: 5, showSeconds: 20 } };
     setScene((s) => ({ ...s, flows: [...(s.flows || []), f] }));
     setSelId(null); setSelFlowId(f.id);
   };
@@ -99,6 +102,7 @@ export default function SceneEditor() {
       actions={<>
         <SecondaryButton icon={ArrowLeft} onClick={() => nav("/scenes")}>Back</SecondaryButton>
         <SecondaryButton icon={Save} data-testid="save-scene-btn" onClick={() => save(false)}>{saving ? "Saving…" : "Save"}</SecondaryButton>
+        <SecondaryButton icon={Radio} data-testid="live-view-btn" onClick={async () => { await save(true); setLiveOpen(true); }}>Live view</SecondaryButton>
         <PrimaryButton icon={Upload} data-testid="export-scene-btn" onClick={goExport}>Export to vMix</PrimaryButton>
       </>}>
 
@@ -159,6 +163,21 @@ export default function SceneEditor() {
                 </div>
               </div>
             )}
+            <div className="space-y-1 pt-2 border-t border-slate-100">
+              <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Stream background (Vimeo / HLS)</Label>
+              <Input data-testid="bg-stream" placeholder="https://vimeo.com/123… or https://…/stream.m3u8"
+                value={scene.background?.type === "stream" ? (scene.background?.src || "") : ""}
+                onChange={(e) => {
+                  const url = e.target.value.trim();
+                  if (!url) { setScene({ ...scene, background: { color: scene.background?.color || "#0b1020" } }); return; }
+                  const stream = /vimeo\.com/i.test(url) ? "vimeo" : "hls";
+                  setScene({ ...scene, background: { color: scene.background?.color || "#0b1020", type: "stream", stream, src: url, fit: scene.background?.fit || "cover" } });
+                }}
+                className="rounded-xl text-sm" />
+              {scene.background?.type === "stream" && (
+                <p className="text-[11px] text-slate-400">{scene.background?.stream === "vimeo" ? "Vimeo" : "HLS"}-stream op de volledige achtergrond. Vimeo speelt automatisch, gedempt en in loop.</p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -191,6 +210,37 @@ export default function SceneEditor() {
                   {(selFlowDef.pancarte_ids || []).length} pancarte(s) · {selFlowDef.interval || 5}s each · entrance: {selFlowDef.entrance || "none"}
                 </div>
               )}
+
+              <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2">
+                <span className="text-sm font-medium text-slate-700 inline-flex items-center gap-2"><Power className="h-4 w-4 text-brand-600" />Flow enabled in this scene</span>
+                <Switch data-testid="flow-enabled-toggle" checked={selFlow.enabled !== false} onCheckedChange={(v) => updateFlow(selFlow.id, { enabled: v })} />
+              </div>
+
+              {selFlowDef && (selFlowDef.pancarte_ids || []).length > 0 && (
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Pancartes in this scene</Label>
+                  <div className="space-y-1" data-testid="flow-pancarte-toggles">
+                    {(selFlowDef.pancarte_ids || []).map((pid) => {
+                      const p = pancartesById[pid];
+                      if (!p) return null;
+                      const off = (selFlow.disabledPancartes || []).includes(pid);
+                      return (
+                        <label key={pid} data-testid={`flow-pancarte-toggle-${pid}`}
+                          className="flex items-center gap-2 rounded-lg border border-slate-100 px-2.5 py-1.5 cursor-pointer hover:bg-slate-50">
+                          <input type="checkbox" checked={!off} onChange={(e) => {
+                            const cur = new Set(selFlow.disabledPancartes || []);
+                            if (e.target.checked) cur.delete(pid); else cur.add(pid);
+                            updateFlow(selFlow.id, { disabledPancartes: [...cur] });
+                          }} className="h-4 w-4 rounded accent-brand-600" />
+                          <span className={`text-sm truncate ${off ? "text-slate-400 line-through" : "text-slate-700"}`}>{p.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[11px] text-slate-400">Uitgezette pancartes worden overgeslagen — enkel in deze scène.</p>
+                </div>
+              )}
+
               <div className="space-y-1.5"><Label>When to show</Label>
                 <Select value={selFlow.schedule?.mode || "always"} onValueChange={(v) => updateSchedule({ mode: v })}>
                   <SelectTrigger className="rounded-xl" data-testid="flow-schedule"><SelectValue /></SelectTrigger>
@@ -202,13 +252,13 @@ export default function SceneEditor() {
                 const per = selFlowDef?.interval || 5;
                 const show = sch.showSeconds ?? 20;
                 const every = sch.everyMinutes || 5;
-                const lead = sch.intro?.url ? (sch.intro.leadSeconds ?? 10) : 0;
+                const lead = sch.intro?.url ? (sch.intro.leadSeconds ?? 5) : 0;
                 const outro = sch.outro?.url ? (sch.outro.seconds ?? 5) : 0;
-                const total = lead + show + outro;
+                const total = show;
                 const overflow = total >= every * 60;
                 const setOverlay = (slot, id) => {
                   const o = overlays.find((x) => x.id === id);
-                  const extra = slot === "intro" ? { leadSeconds: sch.intro?.leadSeconds ?? 10 } : { seconds: sch.outro?.seconds ?? 5 };
+                  const extra = slot === "intro" ? { leadSeconds: sch.intro?.leadSeconds ?? 5 } : { seconds: sch.outro?.seconds ?? 5 };
                   updateSchedule({ [slot]: id === "none" ? null : { overlayId: id, url: o?.url || "", kind: o?.kind || "", name: o?.name || "", fit: o?.kind === "html" ? undefined : "contain", ...extra } });
                 };
                 return (
@@ -222,36 +272,36 @@ export default function SceneEditor() {
                     <p className="text-[11px] text-slate-400">Aligns to the clock from midnight (e.g. every 5 min → 12:00, 12:05, 12:10 …). Pancartes cycle within the show window every {per}s.</p>
 
                     <div className="space-y-1.5 pt-2 border-t border-slate-100">
-                      <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Intro overlay (before pancartes)</Label>
+                      <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Intro overlay (overlaps start)</Label>
                       <Select value={sch.intro?.overlayId || "none"} onValueChange={(v) => setOverlay("intro", v)}>
                         <SelectTrigger className="rounded-xl" data-testid="flow-intro-overlay"><SelectValue placeholder="None" /></SelectTrigger>
                         <SelectContent><SelectItem value="none">None</SelectItem>{overlays.map((o) => <SelectItem key={o.id} value={o.id}>{o.name} · {o.kind}</SelectItem>)}</SelectContent>
                       </Select>
                       {sch.intro?.url && (
-                        <div className="space-y-1.5"><Label>Starts … sec before</Label>
-                          <Input type="number" min="0" value={sch.intro?.leadSeconds ?? 10} onChange={(e) => updateSchedule({ intro: { ...sch.intro, leadSeconds: parseInt(e.target.value) || 0 } })} className="rounded-xl text-sm" data-testid="flow-intro-lead" /></div>
+                        <div className="space-y-1.5"><Label>Overlaps first … sec</Label>
+                          <Input type="number" min="0" value={sch.intro?.leadSeconds ?? 5} onChange={(e) => updateSchedule({ intro: { ...sch.intro, leadSeconds: parseInt(e.target.value) || 0 } })} className="rounded-xl text-sm" data-testid="flow-intro-lead" /></div>
                       )}
                       {overlays.length === 0 && <p className="text-[11px] text-slate-400">Upload overlays on the Overlays page to use them here.</p>}
                     </div>
 
                     <div className="space-y-1.5 pt-2 border-t border-slate-100">
-                      <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">End overlay (after pancartes)</Label>
+                      <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">End overlay (overlaps end)</Label>
                       <Select value={sch.outro?.overlayId || "none"} onValueChange={(v) => setOverlay("outro", v)}>
                         <SelectTrigger className="rounded-xl" data-testid="flow-outro-overlay"><SelectValue placeholder="None" /></SelectTrigger>
                         <SelectContent><SelectItem value="none">None</SelectItem>{overlays.map((o) => <SelectItem key={o.id} value={o.id}>{o.name} · {o.kind}</SelectItem>)}</SelectContent>
                       </Select>
                       {sch.outro?.url && (
-                        <div className="space-y-1.5"><Label>Show for … sec</Label>
+                        <div className="space-y-1.5"><Label>Overlaps last … sec</Label>
                           <Input type="number" min="1" value={sch.outro?.seconds ?? 5} onChange={(e) => updateSchedule({ outro: { ...sch.outro, seconds: parseInt(e.target.value) || 1 } })} className="rounded-xl text-sm" data-testid="flow-outro-seconds" /></div>
                       )}
                     </div>
 
                     <div className="rounded-xl bg-brand-50/60 border border-brand-100 p-2.5 text-xs text-slate-600" data-testid="flow-timeline-summary">
-                      Every {every} min: {lead > 0 ? `${lead}s intro → ` : ""}shows {show}s ({count} pancarte{count === 1 ? "" : "s"} × {per}s){outro > 0 ? ` → ${outro}s end` : ""} → closes automatically ({total}s total).
+                      Every {every} min: shows {show}s ({count} pancarte{count === 1 ? "" : "s"} × {per}s){lead > 0 ? `, intro overlaps first ${lead}s` : ""}{outro > 0 ? `, end overlaps last ${outro}s` : ""} → closes automatically.
                     </div>
                     {overflow && (
                       <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-700" data-testid="flow-overflow-warning">
-                        ⚠ The visible time ({total}s) is ≥ the {every} min cycle, so it never closes. Lower "Show for" or raise "Appear every".
+                        ⚠ The show time ({total}s) is ≥ the {every} min cycle, so it never closes. Lower "Show for" or raise "Appear every".
                       </div>
                     )}
                   </div>
@@ -281,6 +331,8 @@ export default function SceneEditor() {
           )}
         </div>
       </div>
+
+      <LiveViewDialog open={liveOpen} onOpenChange={setLiveOpen} token={scene.public_token} name={scene.name} />
     </AppLayout>
   );
 }

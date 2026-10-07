@@ -1,6 +1,46 @@
 import { formatClock } from "@/lib/clock";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import Hls from "hls.js";
 import api from "@/lib/api";
+
+function vimeoId(url) {
+  if (!url) return "";
+  const m = url.match(/vimeo\.com\/(?:video\/)?(\d+)/) || url.match(/(\d{6,})/);
+  return m ? m[1] : "";
+}
+
+export function StreamBackground({ background }) {
+  const bg = background || {};
+  const videoRef = useRef(null);
+  const isHls = bg.stream === "hls";
+  useEffect(() => {
+    if (!isHls || !videoRef.current || !bg.src) return;
+    const video = videoRef.current;
+    let hls;
+    if (Hls.isSupported()) {
+      hls = new Hls();
+      hls.loadSource(bg.src);
+      hls.attachMedia(video);
+    } else {
+      video.src = bg.src;
+    }
+    return () => { if (hls) hls.destroy(); };
+  }, [isHls, bg.src]);
+  if (!bg.src) return null;
+  if (bg.stream === "vimeo") {
+    const id = vimeoId(bg.src);
+    return (
+      <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+        <iframe title="vimeo-bg" src={`https://player.vimeo.com/video/${id}?background=1&autoplay=1&loop=1&muted=1&autopause=0`}
+          allow="autoplay; fullscreen" frameBorder="0"
+          style={{ position: "absolute", top: "50%", left: "50%", width: "100vw", height: "56.25vw", minHeight: "100%", minWidth: "177.78vh", transform: "translate(-50%,-50%)", border: 0, pointerEvents: "none" }} />
+      </div>
+    );
+  }
+  return <video ref={videoRef} autoPlay loop muted playsInline
+    style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: bg.fit === "contain" ? "contain" : "cover" }} />;
+}
+
 
 function Ticker({ el }) {
   const p = el.props || {};
@@ -122,6 +162,7 @@ export function ElementContent({ el, sourceValues }) {
 
 export function BackgroundLayer({ background }) {
   const bg = background;
+  if (bg?.type === "stream" && bg?.src) return <StreamBackground background={bg} />;
   if (!bg?.src) return null;
   const fit = bg.fit || "cover";
   if (bg.type === "video") {

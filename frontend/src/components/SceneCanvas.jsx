@@ -15,43 +15,43 @@ const PREVIEW_GAP = 1.5; // compact pause between timed cycles in the editor pre
 
 function FlowRegion({ placement, flowData, editable, selected, onPointerDownRegion, sourceValues }) {
   const flow = flowData?.flow || null;
-  const pancartes = flowData?.pancartes || [];
   const sc = placement.schedule || {};
+  const disabled = new Set(placement.disabledPancartes || []);
+  const allPancartes = flowData?.pancartes || [];
+  const pancartes = allPancartes.filter((p) => p && !disabled.has(p.id));
+  const flowOff = placement.enabled === false;
   const timed = sc.mode === "everyX";
   const per = Math.max(1, flow?.interval || 5);
-  const lead = timed && sc.intro?.url ? Math.max(0, sc.intro.leadSeconds ?? 10) : 0;
-  const outroS = timed && sc.outro?.url ? Math.max(1, sc.outro.seconds ?? 5) : 0;
+  const introSec = timed && sc.intro?.url ? Math.max(0, sc.intro.leadSeconds ?? 5) : 0;
+  const outroSec = timed && sc.outro?.url ? Math.max(0, sc.outro.seconds ?? 5) : 0;
+  const showDur = timed ? Math.max(1, sc.showSeconds ?? 20) : 0;
 
-  // build the timeline segments
-  const segments = [];
-  if (timed) {
-    if (lead > 0) segments.push({ kind: "intro", dur: lead });
-    pancartes.forEach((_, i) => segments.push({ kind: "pan", dur: per, idx: i }));
-    if (outroS > 0) segments.push({ kind: "outro", dur: outroS });
-    if (segments.length) segments.push({ kind: "gap", dur: PREVIEW_GAP });
-  } else {
-    pancartes.forEach((_, i) => segments.push({ kind: "pan", dur: per, idx: i }));
-  }
-  const total = segments.reduce((a, s) => a + s.dur, 0);
+  const cycleLen = timed ? showDur + PREVIEW_GAP : (pancartes.length * per);
 
   const [clock, setClock] = useState(0);
   useEffect(() => {
-    if (total <= 0) return;
+    if (cycleLen <= 0) return;
     const t = setInterval(() => setClock((c) => c + 0.25), 250);
     return () => clearInterval(t);
-  }, [total]);
+  }, [cycleLen]);
 
-  let cur = null, acc = 0, segKey = 0;
-  if (total > 0) {
-    const phase = clock % total;
-    for (let i = 0; i < segments.length; i++) {
-      if (phase < acc + segments[i].dur) { cur = segments[i]; segKey = i; break; }
-      acc += segments[i].dur;
+  let pan = null, showIntro = false, showOutro = false, closed = false, label = "";
+  if (!flowOff && pancartes.length) {
+    if (timed) {
+      const t = clock % cycleLen;
+      if (t < showDur) {
+        const idx = Math.floor(t / per) % pancartes.length;
+        pan = pancartes[idx];
+        showIntro = t < introSec;
+        showOutro = t >= showDur - outroSec;
+        label = `Pancarte ${idx + 1}/${pancartes.length}`;
+      } else { closed = true; label = "Closed"; }
+    } else {
+      const idx = Math.floor(clock / per) % pancartes.length;
+      pan = pancartes[idx];
     }
   }
-
-  const pan = cur?.kind === "pan" ? pancartes[cur.idx] : null;
-  const showingSomething = cur && cur.kind !== "gap";
+  const showingSomething = !flowOff && (pan || showIntro || showOutro);
 
   return (
     <div data-testid={`canvas-flow-${placement.id}`}
@@ -59,29 +59,39 @@ function FlowRegion({ placement, flowData, editable, selected, onPointerDownRegi
       onClick={(e) => e.stopPropagation()}
       style={{ position: "absolute", left: placement.x, top: placement.y, width: placement.w, height: placement.h, overflow: "hidden",
         cursor: editable ? "move" : "default", outline: selected ? "2px dashed #5f6da6" : "none", outlineOffset: 3,
+        opacity: flowOff ? 0.4 : 1,
         background: showingSomething ? "transparent" : "rgba(148,163,184,.12)" }}>
       {!flow ? (
         <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8",
           border: "2px dashed rgba(148,163,184,.5)", borderRadius: 12, fontSize: 14, textAlign: "center", padding: 8 }}>
           Pick a flow in the panel →
         </div>
-      ) : (!segments.length ? (
+      ) : flowOff ? (
         <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8",
           border: "2px dashed rgba(148,163,184,.5)", borderRadius: 12, fontSize: 14, textAlign: "center", padding: 8 }}>
-          Flow has no pancartes yet
+          Flow disabled in this scene
+        </div>
+      ) : (!pancartes.length ? (
+        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8",
+          border: "2px dashed rgba(148,163,184,.5)", borderRadius: 12, fontSize: 14, textAlign: "center", padding: 8 }}>
+          {allPancartes.length ? "All pancartes turned off" : "Flow has no pancartes yet"}
         </div>
       ) : (
-        <div key={segKey} style={{ position: "absolute", inset: 0, ...(cur?.kind === "pan" ? flowEntranceStyle(flow) : { animation: "clara-in-fade .4s ease-out both" }) }}>
-          {cur?.kind === "intro" && <OverlaySurface ov={sc.intro} />}
-          {cur?.kind === "outro" && <OverlaySurface ov={sc.outro} />}
-          {pan && <PancarteView pancarte={pan} sourceValues={sourceValues} />}
+        <div style={{ position: "absolute", inset: 0 }}>
+          {pan && (
+            <div key={pan.id} style={{ position: "absolute", inset: 0, ...flowEntranceStyle(flow) }}>
+              <PancarteView pancarte={pan} sourceValues={sourceValues} />
+            </div>
+          )}
+          {showIntro && <div style={{ position: "absolute", inset: 0, animation: "clara-in-fade .4s ease-out both" }}><OverlaySurface ov={sc.intro} /></div>}
+          {showOutro && <div style={{ position: "absolute", inset: 0, animation: "clara-in-fade .4s ease-out both" }}><OverlaySurface ov={sc.outro} /></div>}
         </div>
       ))}
-      {timed && showingSomething && (
+      {timed && !flowOff && showingSomething && (
         <span data-testid={`flow-phase-${placement.id}`}
           style={{ position: "absolute", top: 6, left: 6, fontSize: 11, fontWeight: 700, letterSpacing: ".04em", textTransform: "uppercase",
             color: "#fff", background: "rgba(15,23,42,.72)", padding: "2px 8px", borderRadius: 999, pointerEvents: "none" }}>
-          {cur.kind === "intro" ? "Intro" : cur.kind === "outro" ? "End" : `Pancarte ${cur.idx + 1}/${pancartes.length}`}
+          {showIntro ? "Intro + " : ""}{showOutro ? "End + " : ""}{label}
         </span>
       )}
       {selected && editable && (

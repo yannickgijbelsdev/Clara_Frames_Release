@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, MonitorPlay } from "lucide-react";
+import { Plus, Pencil, Trash2, MonitorPlay, Radio } from "lucide-react";
+import LiveViewDialog from "@/components/LiveViewDialog";
 
 export default function Scenes() {
   const nav = useNavigate();
@@ -18,6 +19,7 @@ export default function Scenes() {
   const [scenes, setScenes] = useState([]);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const [liveScene, setLiveScene] = useState(null);
 
   const load = () => { if (current) api.get(`/scenes?workspace_id=${current}`).then(({ data }) => setScenes(data)).catch(() => {}); };
   useEffect(() => { load(); }, [current]);
@@ -66,6 +68,8 @@ export default function Scenes() {
                   <div className="font-semibold text-slate-900 truncate">{s.name}</div>
                   <div className="text-xs text-slate-400">{(s.elements || []).length} element(s)</div>
                 </div>
+                <button data-testid={`live-scene-${s.id}`} onClick={() => setLiveScene(s)} title="Live view"
+                  className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors"><Radio className="h-4 w-4" /></button>
                 <SecondaryButton icon={Pencil} data-testid={`edit-scene-${s.id}`} onClick={() => nav(`/scenes/${s.id}`)}>Edit</SecondaryButton>
                 <button data-testid={`del-scene-${s.id}`} onClick={() => remove(s.id)} className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"><Trash2 className="h-4 w-4" /></button>
               </div>
@@ -87,6 +91,9 @@ export default function Scenes() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <LiveViewDialog open={!!liveScene} onOpenChange={(o) => !o && setLiveScene(null)}
+        token={liveScene?.public_token} name={liveScene?.name} />
     </AppLayout>
   );
 }
