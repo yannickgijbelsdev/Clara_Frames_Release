@@ -237,7 +237,7 @@ export default function ElementInspector({ sel, sources = [], overlays = [], for
         </>
       )}
 
-      {allowTiming && (sel.type === "api_field" || sel.type === "image" || sel.type === "overlay") && (
+      {allowTiming && (
         <div className="space-y-1.5 pt-3 border-t border-slate-100">
           <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">On-screen timing</Label>
           <Select value={sel.timing?.mode || "always"}
@@ -324,6 +324,23 @@ export default function ElementInspector({ sel, sources = [], overlays = [], for
             </div>
           </div>
         )}
+      </div>
+
+      <div className="space-y-1.5 pt-3 border-t border-slate-100">
+        <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Exit (plays when it leaves)</Label>
+        <Select value={sel.props.exit || "none"} onValueChange={(v) => updateProps({ exit: v })}>
+          <SelectTrigger className="rounded-xl" data-testid="prop-exit"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {["none", "fade", "slide-up", "slide-down", "slide-left", "slide-right", "zoom"].map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        {sel.props.exit && sel.props.exit !== "none" && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 w-24 shrink-0">Duration {sel.props.exitDuration || 0.6}s</span>
+            <input type="range" min="0.2" max="3" step="0.1" value={sel.props.exitDuration ?? 0.6} onChange={(e) => updateProps({ exitDuration: parseFloat(e.target.value) })} className="flex-1 accent-brand-600" data-testid="prop-exit-dur" />
+          </div>
+        )}
+        <p className="text-[11px] text-slate-400">Speelt af wanneer het element verdwijnt (via timing: interval of bij data-wijziging).</p>
       </div>
 
       <div className="space-y-1.5 pt-3 border-t border-slate-100">

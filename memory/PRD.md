@@ -196,6 +196,11 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Fix (frontend): ElementInspector field dropdown filters blank keys and falls back to a selectable "text" option; Sources.jsx hint tells users to leave mappings empty for plain-text APIs.
 - Verified e2e in preview: source test, /values.json, /element/{id}.txt and /data.json all return the live song. NEEDS REDEPLOY for the live site.
 
+## 2026-06 — Exit animations + timing for every element
+- **Exit animation per element**: new `props.exit` (none/fade/slide-up/down/left/right/zoom) + `props.exitDuration`. Plays when the element leaves via timing (interval end or onchange window end). Overlay JS: `exitAnim()` + `clara-ex-*` keyframes; `setElVis` plays the exit anim then sets display:none after the duration, and on re-show resets the animation (clears the `both`-fill leftover so opacity returns to 1). ElementInspector: "Exit (plays when it leaves)" section (all elements).
+- **Timing for all element types**: removed the api_field/image/overlay restriction on the "On-screen timing" section — interval and onchange are now selectable for every element (still gated by `allowTiming`, i.e. only in the Scene editor).
+- Verified live: element shows at opacity 1 for the window, fades out (opacity 0.77→hidden) at the end, resets to opacity 1 for the next trigger.
+
 ## 2026-06 — Link any element (image/overlay background) to a now-playing trigger
 - Extended per-element "On-screen timing" to the **overlay** element type (was api_field/image only) and added a **Trigger source + field** picker for `onchange` mode. This lets a STATIC background image or an uploaded overlay (no data binding of its own) be linked to a source field (e.g. Nu Speelt `title`) so it only appears when that field changes — i.e. only on a new song — for the configured seconds, then hides.
 - Backend: `timedEl.key` for onchange = `timing.triggerSource:triggerField` (fallback to the element's own `sourceId:fieldKey`). `values.json` now also resolves any element's `timing.triggerSource/triggerField` so the trigger value is polled even when no element is bound to it.

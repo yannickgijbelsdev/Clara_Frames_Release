@@ -1259,6 +1259,12 @@ OVERLAY_HTML = r"""<!DOCTYPE html>
   @keyframes clara-in-left{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
   @keyframes clara-in-right{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:translateX(0)}}
   @keyframes clara-in-zoom{from{opacity:0;transform:scale(0.8)}to{opacity:1;transform:scale(1)}}
+  @keyframes clara-ex-fade{from{opacity:1}to{opacity:0}}
+  @keyframes clara-ex-up{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-40px)}}
+  @keyframes clara-ex-down{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(40px)}}
+  @keyframes clara-ex-left{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(-40px)}}
+  @keyframes clara-ex-right{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(40px)}}
+  @keyframes clara-ex-zoom{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(0.8)}}
   @keyframes clara-ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 </style></head>
 <script>
@@ -1281,6 +1287,13 @@ function entranceAnim(p){
 function retriggerEntrance(node, p){
   var a = entranceAnim(p); if(!a) return;
   node.style.animation = 'none'; void node.offsetWidth; node.style.animation = a;
+}
+function exitAnim(p){
+  var e = p.exit; if(!e || e==='none') return null;
+  var map = {fade:'clara-ex-fade','slide-up':'clara-ex-up','slide-down':'clara-ex-down','slide-left':'clara-ex-left','slide-right':'clara-ex-right',zoom:'clara-ex-zoom'};
+  var name = map[e]; if(!name) return null;
+  var dur = p.exitDuration || 0.6;
+  return name+' '+dur+'s ease-in both';
 }
 </script>
 <body>
@@ -1623,8 +1636,23 @@ function showTimedPart(node, on){
 }
 function elGapSeconds(tm){ var g=Math.max(0, parseFloat(tm.gap)||0); var u=tm.gapUnit||'min'; return u==='hour'?g*3600:(u==='min'?g*60:g); }
 function setElVis(t, vis){
-  if(vis && t._vis!==true){ t.d.style.display='flex'; retriggerEntrance(t.ent, t.p); t._vis=true; }
-  else if(!vis && t._vis!==false){ t.d.style.display='none'; t._vis=false; }
+  if(vis && t._vis!==true){
+    if(t._exT){ clearTimeout(t._exT); t._exT=null; }
+    t.d.style.display='flex';
+    var ea=entranceAnim(t.p);
+    t.ent.style.animation='none'; void t.ent.offsetWidth;
+    if(ea) t.ent.style.animation=ea;
+    t._vis=true;
+  } else if(!vis && t._vis!==false){
+    t._vis=false;
+    var ex = exitAnim(t.p);
+    if(ex){
+      t.ent.style.animation='none'; void t.ent.offsetWidth; t.ent.style.animation=ex;
+      var dur=(t.p.exitDuration||0.6)*1000;
+      if(t._exT) clearTimeout(t._exT);
+      t._exT=setTimeout(function(){ if(t._vis===false) t.d.style.display='none'; }, dur+40);
+    } else { t.d.style.display='none'; }
+  }
 }
 
 function tick(){
