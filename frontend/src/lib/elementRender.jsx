@@ -32,7 +32,7 @@ export function StreamBackground({ background }) {
     return (
       <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
         <iframe title="vimeo-bg" src={`https://player.vimeo.com/video/${id}?background=1&autoplay=1&loop=1&muted=1&autopause=0`}
-          allow="autoplay; fullscreen" frameBorder="0"
+          allow="autoplay; fullscreen; encrypted-media; picture-in-picture" frameBorder="0"
           style={{ position: "absolute", top: "50%", left: "50%", width: "100vw", height: "56.25vw", minHeight: "100%", minWidth: "177.78vh", transform: "translate(-50%,-50%)", border: 0, pointerEvents: "none" }} />
       </div>
     );

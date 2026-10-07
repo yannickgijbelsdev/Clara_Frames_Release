@@ -1301,7 +1301,7 @@ if (SCENE.background && SCENE.background.type === 'stream' && SCENE.background.s
     var vm = (surl.match(/vimeo\.com\/(?:video\/)?(\d+)/) || [])[1] || (surl.match(/(\d{6,})/) || [])[1];
     var ifr = document.createElement('iframe');
     ifr.src = 'https://player.vimeo.com/video/' + vm + '?background=1&autoplay=1&loop=1&muted=1&autopause=0';
-    ifr.setAttribute('allow','autoplay; fullscreen'); ifr.setAttribute('frameborder','0');
+    ifr.setAttribute('allow','autoplay; fullscreen; encrypted-media; picture-in-picture'); ifr.setAttribute('frameborder','0');
     ifr.style.position='absolute'; ifr.style.width='100vw'; ifr.style.height='56.25vw'; ifr.style.minHeight='100vh'; ifr.style.minWidth='177.78vh';
     ifr.style.top='50%'; ifr.style.left='50%'; ifr.style.transform='translate(-50%,-50%)'; ifr.style.border='0';
     sb.appendChild(ifr);

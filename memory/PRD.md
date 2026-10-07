@@ -196,6 +196,14 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Fix (frontend): ElementInspector field dropdown filters blank keys and falls back to a selectable "text" option; Sources.jsx hint tells users to leave mappings empty for plain-text APIs.
 - Verified e2e in preview: source test, /values.json, /element/{id}.txt and /data.json all return the live song. NEEDS REDEPLOY for the live site.
 
+## 2026-06 — Scenes/Messages batch (5 features)
+- **Overlay in/out overlap**: timed pancarte-flow intro/outro overlays now CROSSFADE over the pancarte series (lie on top, no separate added time). Overlay JS everyX branch: series visible whole `showSeconds`, intro visible first `intro.leadSeconds`, outro visible last `outro.seconds`. SceneEditor labels → "(overlaps start)/(overlaps end)", summary + overflow (show>=cycle) updated. SceneCanvas FlowRegion preview rewritten to match (overlays stacked on top of cycling pancartes).
+- **Messages inline edit**: PUT /api/submissions/{sid} {data:{...}} (scoped by user_id, 404 if missing). Messages.jsx: Bewerk → per-field inputs (edit-field-<key>) → Opslaan/Annuleer.
+- **Live view**: LiveViewDialog.jsx renders the real /api/public/scene/{token}/overlay in an iframe over a transparency checkerboard (as vMix receives it) + Herlaad/Open-in-tab. Buttons: Scenes card (live-scene-<id>) and SceneEditor header (live-view-btn, saves first).
+- **Flow + pancarte on/off per scene**: placement gains `enabled` (whole flow) + `disabledPancartes[]`. expand_scene_flows filters them; overlay JS hides disabled flow (`pl.enabled===false`). SceneEditor: flow-enabled-toggle + flow-pancarte-toggle-<id> list.
+- **Vimeo/HLS scene background**: background.type='stream', stream='vimeo'|'hls'. Overlay JS: vimeo background iframe / hls.js video (hls.js CDN in <head>); editor preview via StreamBackground (hls.js npm). SceneEditor: bg-stream input (auto-detects vimeo vs .m3u8). Vimeo iframes use allow='autoplay; fullscreen; encrypted-media; picture-in-picture'.
+- Verified: testing_agent iteration_18 — backend 10/10, all frontend flows pass, no bugs.
+
 ## 2026-06 — API field can render as image (artwork/presenter photos)
 - Problem: the "Now Playing" template binds artwork to an Image element (works), but manually users add an "API field" element → it rendered the image URL as text ("a URL appears"). Same for presenter photos.
 - Fix: api_field now has a "Display as" option (Text | Image). In Image mode it renders the bound value as a picture with Fit + Corner radius controls.

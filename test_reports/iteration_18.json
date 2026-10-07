@@ -1,0 +1,25 @@
+{
+  "summary": "Verified iteration-18 features (Messages inline edit, Live view dialogs, Flow enabled/disabled + per-pancarte toggles, Timed-flow overlap settings + summary + overflow warning, Vimeo/HLS stream background). Backend: 10/10 pytest tests pass (test_scene_flows_live.py). Frontend: full flow executed with Yannick admin + MFA — login, Messages Bewerk/Opslaan/Annuleer, Scenes 'live-scene-<id>' dialog with iframe pointing to /api/public/scene/<token>/overlay, SceneEditor bg-stream recognises vimeo URL and persists as background.type=stream/stream=vimeo, canvas-flow click opens flow panel with flow-enabled-toggle and per-pancarte toggles, flow-schedule Timed option exposes flow-every/flow-show-seconds, flow-timeline-summary renders 'Every 5 min: shows 15s (2 pancartes × 5s) → closes automatically.', flow-overflow-warning appears when showSeconds>=everyMin*60, '(overlaps start)' and '(overlaps end)' labels present, live-view-btn opens dialog with live-view-surface/live-view-iframe. API GET /scenes/<id> confirms persistence of flows[0].disabledPancartes, flows[0].enabled, flows[0].schedule, and background. Overlay HTML (GET /api/public/scene/<token>/overlay) contains 'on && phase<introSec', 'pl.enabled===false', 'hls.js@1', and 'player.vimeo.com'.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_scene_flows_live.py",
+    "/app/test_reports/pytest/iter18_scene_flows.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "edit_submission (server.py L1790) correctly scopes by {id, user_id} and returns 404 on no match; raw body['data'] is stored verbatim without per-field validation against form.fields — acceptable for inline-typo fix but allows adding arbitrary keys. Low priority.",
+    "expand_scene_flows (L1104) short-circuits pancartes when pl.enabled is False (adds pans=[] to the placement) AND the overlay JS also hides via 'pl.enabled===false' — belt-and-braces is correct.",
+    "SceneEditor flow-schedule dropdown uses a Radix Select; the first attempt to pick the Timed option by get_by_text('Timed') erroneously targeted the sidebar 'Timed text + photo' button. Not a bug — just a selector-ambiguity note for future tests (use role=option).",
+    "bg-stream Input visually overflows its narrow column (full URL truncated to 'h'); value is correct in the DOM. Consider adding text-overflow:ellipsis or a slightly wider container so operators can confirm the URL at a glance.",
+    "Vimeo embed in the Live-view iframe produced console errors 'Permissions policy violation: encrypted-media is not allowed in this document.' Vimeo tries to use EME; the overlay iframe would benefit from allow='autoplay; encrypted-media' when embedded. Low priority (overlay still renders in vMix which is a Chromium Web Browser input with permissive policy)."
+  ],
+  "updated_files": ["/app/backend/tests/test_scene_flows_live.py"],
+  "success_rate": {"backend": "100% (10/10)", "frontend": "100% (all flows verified end-to-end)"},
+  "test_credentials": "yannick.gijbels@koodh.com / KYLovie13monx + TOTP NKSPU7UH4M5BJ3X3353DNTNA54YNIJSY",
+  "seed_data_creation": "Created and TORE DOWN: form 004ac700, submission 8c835f48, pancartes b8a9d2ca & 76fca883, flow a28d3a6a, scene 0c43a8c2 inside workspace 83e9d223-ae96-4e12-a0ff-198a959582c5.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All iteration-18 features working. Key testids verified: message-edit-btn-<sid>, edit-field-<key>, message-save-<sid>, message-cancel-<sid>, live-scene-<sid>, live-view-iframe, live-view-refresh, live-view-open, live-view-btn, live-view-surface, bg-stream, canvas-flow-<placementId>, flow-enabled-toggle, flow-pancarte-toggle-<pancarteId>, flow-schedule, flow-every, flow-show-seconds, flow-timeline-summary, flow-overflow-warning. SceneEditor stores timed-flow data under flows[].schedule (not flat everyMin/showSec). Overlay HTML contains the required 4 string markers. When testing SceneEditor dropdowns, prefer role=option over text-content get_by_text to avoid matching sidebar buttons.",
+  "rca of the issue": "N/A — no bugs found."
+}

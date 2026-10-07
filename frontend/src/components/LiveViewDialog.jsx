@@ -30,6 +30,7 @@ export default function LiveViewDialog({ open, onOpenChange, token, name }) {
             }}>
             {src && (
               <iframe key={nonce} title="live-view" src={src} data-testid="live-view-iframe"
+                allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
                 style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0, background: "transparent" }} />
             )}
           </div>
