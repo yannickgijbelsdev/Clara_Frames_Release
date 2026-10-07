@@ -687,14 +687,35 @@ async def delete_font(font_id: str, user: dict = Depends(get_current_user)):
     return {"ok": True}
 
 
-def _font_faces_css(fonts: list) -> str:
+@api_router.get("/public/font/{font_id}")
+async def public_font(font_id: str):
+    doc = await db.fonts.find_one({"id": font_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Font not found")
+    try:
+        r = await asyncio.to_thread(requests.get, doc["url"], timeout=10)
+        r.raise_for_status()
+    except Exception as e:
+        logger.error(f"Font proxy fetch failed: {e}")
+        raise HTTPException(status_code=502, detail="Font fetch failed")
+    ext = (doc.get("url") or "").rsplit(".", 1)[-1].lower()
+    ctype = {"woff2": "font/woff2", "woff": "font/woff", "ttf": "font/ttf", "otf": "font/otf"}.get(ext, "application/octet-stream")
+    return Response(content=r.content, media_type=ctype, headers={
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, max-age=86400",
+    })
+
+
+def _font_faces_css(fonts: list, backend: str = "") -> str:
     out = []
+    base = (backend or "").rstrip("/")
     for f in fonts or []:
         fam = (f.get("family") or "").replace("'", "")
-        url = f.get("url") or ""
         fmt = f.get("format") or "woff2"
-        if fam and url:
-            out.append(f"@font-face{{font-family:'{fam}';src:url('{url}') format('{fmt}');font-display:swap;}}")
+        fid = f.get("id")
+        src = f"{base}/api/public/font/{fid}" if (base and fid) else (f.get("url") or "")
+        if fam and src:
+            out.append(f"@font-face{{font-family:'{fam}';src:url('{src}') format('{fmt}');font-display:swap;}}")
     return "".join(out)
 
 
@@ -1310,7 +1331,7 @@ async def public_overlay(token: str):
     backend = os.environ.get("FRONTEND_URL", "")
     fonts = await db.fonts.find({"workspace_id": scene.get("workspace_id")}, {"_id": 0}).to_list(200)
     html = (OVERLAY_HTML
-            .replace("__FONTFACES__", _font_faces_css(fonts))
+            .replace("__FONTFACES__", _font_faces_css(fonts, backend))
             .replace("__SCENE__", scene_json).replace("__TOKEN__", token).replace("__BACKEND__", backend))
     return HTMLResponse(html, headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache"})
 
