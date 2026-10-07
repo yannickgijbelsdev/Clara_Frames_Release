@@ -202,6 +202,12 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Fix: `_fetch_source_sync` now sends a browser `User-Agent` + `Accept`, and sets `allow_redirects=True` explicitly.
 - Verified (preview): `/sources/{id}/test` on that exact URL returns song/artist/title + iTunes artwork. User must REDEPLOY (they saw the 404 from un-redeployed production); as an immediate workaround they can enter the `https://` URL directly to skip the redirect.
 
+## 2026-06 — Custom fonts not showing in vMix (CORS) — FIXED
+- Symptom: uploaded fonts did not apply in the vMix overlay.
+- Root cause: overlay `@font-face` src pointed at the raw Hetzner S3 URL, which returns NO `Access-Control-Allow-Origin` header → cross-origin font load blocked in the overlay/vMix browser → fallback font.
+- Fix: new public same-origin proxy `GET /api/public/font/{font_id}` streams the font bytes with `Access-Control-Allow-Origin: *`. Both `_font_faces_css(fonts, backend)` (overlay) and `injectFontFaces` (editor, `/lib/fonts.js`) now build `src` from `{backend}/api/public/font/{id}`.
+- Verified by testing_agent (iteration_20): 100% backend + frontend — proxy returns ACAO:*, overlay HTML has zero raw objectstorage refs, `document.fonts.check("'BebasNeue'")` true and renders correctly, Fonts page + editor picker render the custom font.
+
 ## 2026-06 — Responsive top nav ("More" overflow dropdown)
 - Problem: with 11-12 nav items the desktop menu overflowed and pushed content off-screen.
 - Fix: new `DesktopNav` in AppLayout measures available width (hidden measuring nav + ResizeObserver) and renders only the items that fit; the rest move into a **"More ▾"** DropdownMenu (`data-testid nav-more`, items `nav-more-<label>`). Overflow button highlights when an overflow route is active. Mobile scroll-nav unchanged.

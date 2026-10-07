@@ -1,0 +1,25 @@
+{
+  "summary": "Verified font-proxy CORS fix end-to-end. All 5 assertions pass: (1) /api/public/font/{id} returns 200 TTF with Access-Control-Allow-Origin:* and 404 for bogus id; (2) overlay HTML @font-face points to /api/public/font/{id} with ZERO raw your-objectstorage.com references; (3) overlay page in real browser: document.fonts.ready completes, document.fonts.check(\"100px 'BebasNeue'\") === true, 'BebasNeue' entry status='loaded', BEBASCHECK renders in condensed BebasNeue typeface (visually confirmed in screenshot); (4) /fonts page logged in shows BebasNeue card with 'AA BB 123' preview rendered in BebasNeue (loaded in document.fonts); (5) Scene editor font picker (data-testid=prop-font) opens, lists BebasNeue under 'YOUR FONTS' group with checkmark, canvas preview renders BEBASCHECK in BebasNeue typeface.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Scene editor", "issues": ["Repeated console warning: color input value '#111' not conforming to '#rrggbb' format. Cosmetic only; expand to #111111."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Font proxy correctly streams S3 bytes with ACAO:* and font/ttf content-type; cache-control is no-store which is safe but could be relaxed to public/immutable for perf since font ids are stable.",
+    "Minor: color inputs in ElementInspector should normalise 3-char hex (#111) to 6-char (#111111) before binding to <input type='color'> to silence browser warnings."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "yannick.gijbels@koodh.com / KYLovie13monx + TOTP(NKSPU7UH4M5BJ3X3353DNTNA54YNIJSY)",
+  "seed_data_creation": "Used pre-existing font 8b5c7acc-3535-4f28-a7f0-ab44fcac26ee (BebasNeue) and scene token 9bb47ee998a448e497b5264caab6c2f8 in workspace 83e9d223-ae96-4e12-a0ff-198a959582c5.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Font CORS bug fully resolved. Overlay @font-face uses same-origin proxy /api/public/font/{id} which returns ACAO:*. Browser-side document.fonts.check confirms custom font loads in overlay — the previously broken flow is now green. Only minor cosmetic console warning (#111 color input) found; unrelated to font bug.",
+  "rca of the issue": "Original bug: @font-face src pointed at Hetzner S3 (your-objectstorage.com) which omits Access-Control-Allow-Origin, so the browser aborted the cross-origin font fetch inside overlay/editor and fell back to default sans-serif. Fix: added public backend proxy GET /api/public/font/{font_id} that streams bytes with ACAO:* (same origin as the overlay HTML). Both _font_faces_css server-side and injectFontFaces client-side now build src from REACT_APP_BACKEND_URL + /api/public/font/{id}. Verified: 0 occurrences of your-objectstorage.com in overlay HTML, document.fonts loads BebasNeue, visual rendering is condensed BebasNeue."
+}
