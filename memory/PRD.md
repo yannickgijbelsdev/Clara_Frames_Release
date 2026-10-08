@@ -279,6 +279,9 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Media type detection is extension-based (URL without known ext defaults to image).
 
 ## Backlog / next
+### 2026-06 — Real data in editor/list previews
+- The inline `PancarteView` previews (Overlays list, Sequences list + sequence editor live preview & thumbnails, Scene Overview overlay thumbnails) now load live source values via `/api/sources/values` (polled every 5s) and pass them to `PancarteView`, so api_field text and bound/Now-Playing artwork images render real data instead of placeholders. Verified: a live "Bohemian Rhapsody" song + cover showed correctly in the Overlays card preview.
+
 ### 2026-06 — Koodh favicon
 - Generated a centered, square favicon from the Koodh beak logo (`src/assets/koodh-beak.png`): trimmed + padded, exported to `public/favicon.ico` (16/32/48), `favicon.png` (64), `apple-touch-icon.png` (180), and 192/512 PWA icons. Added `<link rel="icon">` + apple-touch-icon in `index.html` and set `theme-color` to the brand blue (#6f7fbf). Verified all assets serve 200.
 

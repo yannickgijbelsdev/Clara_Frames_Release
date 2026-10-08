@@ -12,7 +12,7 @@ import { Save, ArrowLeft, Loader2, ArrowUp, ArrowDown, X, Plus, LayoutTemplate, 
 
 const DEFAULT_SEC = 5;
 
-function LivePreview({ pancartes, durations, defaultSec, repeat, entranceKey }) {
+function LivePreview({ pancartes, durations, defaultSec, repeat, entranceKey, sourceValues }) {
   const [idx, setIdx] = useState(0);
   useEffect(() => {
     setIdx(0);
@@ -32,7 +32,7 @@ function LivePreview({ pancartes, durations, defaultSec, repeat, entranceKey }) 
   const pan = pancartes.length ? pancartes[idx % pancartes.length] : null;
   return (
     <div className="relative w-full rounded-2xl overflow-hidden ring-1 ring-slate-300 bg-slate-900" style={{ aspectRatio: "16 / 9" }}>
-      {pan ? <div key={`${idx}:${entranceKey}`} style={{ position: "absolute", inset: 0 }}><PancarteView pancarte={pan} /></div>
+      {pan ? <div key={`${idx}:${entranceKey}`} style={{ position: "absolute", inset: 0 }}><PancarteView pancarte={pan} sourceValues={sourceValues} /></div>
         : <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">Add overlays to preview</div>}
     </div>
   );
@@ -94,6 +94,7 @@ export default function FlowEditor() {
   const [pancartes, setPancartes] = useState([]);
   const [assets, setAssets] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [sourceValues, setSourceValues] = useState({});
 
   useEffect(() => {
     api.get(`/flows/${id}`).then(({ data }) => {
@@ -102,6 +103,15 @@ export default function FlowEditor() {
     }).catch(() => { toast.error("Sequence not found"); nav("/sequences"); });
     api.get("/overlays").then(({ data }) => setAssets((data || []).filter((o) => o.kind === "html"))).catch(() => {});
   }, [id]);
+
+  const ws = flow?.workspace_id;
+  useEffect(() => {
+    if (!ws) return;
+    const fetchVals = () => api.get(`/sources/values?workspace_id=${ws}`).then(({ data }) => setSourceValues(data)).catch(() => {});
+    fetchVals();
+    const t = setInterval(fetchVals, 5000);
+    return () => clearInterval(t);
+  }, [ws]);
 
   const panById = Object.fromEntries(pancartes.map((p) => [p.id, p]));
   const seq = flow?.pancarte_ids || [];
@@ -191,7 +201,7 @@ export default function FlowEditor() {
           </div>
           <div className="bg-white rounded-3xl clara-soft p-4">
             <div className="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-2">Live preview</div>
-            <LivePreview pancartes={seqPancartes} durations={norm(durs, baseDur)} defaultSec={flow.interval} repeat={repeat} entranceKey={flow.entrance} />
+            <LivePreview pancartes={seqPancartes} durations={norm(durs, baseDur)} defaultSec={flow.interval} repeat={repeat} entranceKey={flow.entrance} sourceValues={sourceValues} />
           </div>
         </div>
 
@@ -209,7 +219,7 @@ export default function FlowEditor() {
                     <div key={`${pid}-${i}`} data-testid={`seq-item-${i}`} className="flex items-center gap-2 rounded-2xl border border-slate-200 p-2">
                       <span className="text-[11px] font-bold text-slate-400 w-5 text-center shrink-0">{i + 1}</span>
                       <div className="relative w-20 rounded-lg overflow-hidden ring-1 ring-slate-200 shrink-0 bg-slate-900" style={{ aspectRatio: `${p?.width || 1920} / ${p?.height || 1080}` }}>
-                        {p ? <PancarteView pancarte={p} /> : null}
+                        {p ? <PancarteView pancarte={p} sourceValues={sourceValues} /> : null}
                       </div>
                       <div className="flex-1 min-w-0 text-sm font-medium text-slate-800 truncate">{p?.name || "Deleted overlay"}</div>
                       <div className="flex items-center gap-1 shrink-0">
@@ -242,7 +252,7 @@ export default function FlowEditor() {
                   <button key={p.id} data-testid={`lib-add-${p.id}`} onClick={() => addPan(p.id)}
                     className="group text-left rounded-2xl border border-slate-200 hover:border-brand-300 hover:bg-brand-50/30 overflow-hidden transition-colors">
                     <div className="relative w-full bg-slate-900" style={{ aspectRatio: `${p.width || 1920} / ${p.height || 1080}` }}>
-                      <PancarteView pancarte={p} />
+                      <PancarteView pancarte={p} sourceValues={sourceValues} />
                       <div className="absolute inset-0 bg-brand-600/0 group-hover:bg-brand-600/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                         <span className="h-8 w-8 rounded-full bg-white text-brand-600 flex items-center justify-center shadow"><Plus className="h-4 w-4" /></span>
                       </div>

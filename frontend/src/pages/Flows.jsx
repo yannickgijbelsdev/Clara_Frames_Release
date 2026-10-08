@@ -19,6 +19,7 @@ export default function Flows() {
   const [pancartes, setPancartes] = useState([]);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const [sourceValues, setSourceValues] = useState({});
 
   const load = () => {
     if (!current) return;
@@ -26,6 +27,13 @@ export default function Flows() {
     api.get(`/pancartes?workspace_id=${current}`).then(({ data }) => setPancartes(data)).catch(() => {});
   };
   useEffect(() => { load(); }, [current]);
+  useEffect(() => {
+    if (!current) return;
+    const fetchVals = () => api.get(`/sources/values?workspace_id=${current}`).then(({ data }) => setSourceValues(data)).catch(() => {});
+    fetchVals();
+    const t = setInterval(fetchVals, 5000);
+    return () => clearInterval(t);
+  }, [current]);
   const panById = Object.fromEntries(pancartes.map((p) => [p.id, p]));
 
   const create = async () => {
@@ -55,7 +63,7 @@ export default function Flows() {
                 className="bg-white rounded-3xl clara-soft clara-hover clara-trans overflow-hidden">
                 <div className="p-3 bg-slate-100">
                   <div className="relative w-full rounded-2xl overflow-hidden ring-1 ring-slate-200 bg-slate-900" style={{ aspectRatio: "16 / 9" }}>
-                    {first ? <PancarteView pancarte={first} /> : <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">No overlays</div>}
+                    {first ? <PancarteView pancarte={first} sourceValues={sourceValues} /> : <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">No overlays</div>}
                   </div>
                 </div>
                 <div className="p-4 flex items-center gap-3">

@@ -26,6 +26,7 @@ export default function SceneOverview() {
   const [flows, setFlows] = useState([]);
   const [pancartes, setPancartes] = useState([]);
   const [live, setLive] = useState(null); // { token, name, kind }
+  const [sourceValues, setSourceValues] = useState({});
 
   useEffect(() => {
     api.get(`/scenes/${id}`).then(({ data }) => {
@@ -35,6 +36,15 @@ export default function SceneOverview() {
       api.get(`/pancartes?workspace_id=${ws}`).then(({ data: p }) => setPancartes(p)).catch(() => {});
     }).catch(() => { toast.error("Scene not found"); nav("/scenes"); });
   }, [id]);
+
+  const ws = scene?.workspace_id;
+  useEffect(() => {
+    if (!ws) return;
+    const fetchVals = () => api.get(`/sources/values?workspace_id=${ws}`).then(({ data }) => setSourceValues(data)).catch(() => {});
+    fetchVals();
+    const t = setInterval(fetchVals, 5000);
+    return () => clearInterval(t);
+  }, [ws]);
 
   const panById = useMemo(() => Object.fromEntries(pancartes.map((p) => [p.id, p])), [pancartes]);
   const flowById = useMemo(() => Object.fromEntries(flows.map((f) => [f.id, f])), [flows]);
@@ -112,7 +122,7 @@ export default function SceneOverview() {
                               data-testid={`overview-overlay-${p.id}`}
                               className={`rounded-2xl border overflow-hidden ${off ? "border-slate-200 opacity-50" : "border-slate-200"}`}>
                               <div className="relative w-full bg-slate-900" style={{ aspectRatio: `${p.width || 1920} / ${p.height || 1080}` }}>
-                                <PancarteView pancarte={p} />
+                                <PancarteView pancarte={p} sourceValues={sourceValues} />
                               </div>
                               <div className="p-3 space-y-2">
                                 <div className="flex items-center gap-2">

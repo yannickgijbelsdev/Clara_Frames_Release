@@ -22,9 +22,17 @@ export default function Pancartes() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [liveItem, setLiveItem] = useState(null);
+  const [sourceValues, setSourceValues] = useState({});
 
   const load = () => { if (current) api.get(`/pancartes?workspace_id=${current}`).then(({ data }) => setItems(data)).catch(() => {}); };
   useEffect(() => { load(); }, [current]);
+  useEffect(() => {
+    if (!current) return;
+    const fetchVals = () => api.get(`/sources/values?workspace_id=${current}`).then(({ data }) => setSourceValues(data)).catch(() => {});
+    fetchVals();
+    const t = setInterval(fetchVals, 5000);
+    return () => clearInterval(t);
+  }, [current]);
 
   const create = async () => {
     if (!name.trim()) return;
@@ -96,7 +104,7 @@ export default function Pancartes() {
               className="bg-white rounded-3xl clara-soft clara-hover clara-trans overflow-hidden">
               <div className="p-3 bg-slate-100">
                 <div className="relative w-full rounded-2xl overflow-hidden ring-1 ring-slate-200" style={{ aspectRatio: `${p.width || 1920} / ${p.height || 1080}` }}>
-                  <PancarteView pancarte={p} />
+                  <PancarteView pancarte={p} sourceValues={sourceValues} />
                 </div>
               </div>
               <div className="p-4 flex items-center gap-2">
