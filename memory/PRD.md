@@ -279,7 +279,14 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Media type detection is extension-based (URL without known ext defaults to image).
 
 ## Backlog / next
-### 2026-06 — "Overlay-first" restructure (pancarte concept removed)
+### 2026-06 — Sequence timing rework (fix "repeats after seconds / never plays out")
+- Root cause: timing was split between the sequence (per-item seconds) and a scene-placement everyX/showSeconds schedule that ignored per-item durations and chopped playback at 20s. Timing now lives entirely on the sequence (reeks).
+- New per-sequence model (FlowInput + create/update + overlay generator): `durations[]` (per-item seconds), `playouts[]` (per-item "play out" = wait for the overlay's `<video>` to end), `repeat` = loop | once | interval, `repeatEvery` (minutes for interval), and HTML `intro`/`transition`/`outro` overlays ({overlayId,url,kind,fit,seconds}). Transition plays between each overlay; intro once before; outro once after.
+- Overlay HTML rewritten to a per-placement state machine: `buildSteps()` → `play()` → `onEnd()` → `start()`; `durFor()` uses per-item duration (falls back to interval); `playoutFor()` waits for `<video>` 'ended' via `waitMediaEnd()`; `restartPart()` restarts transition video/iframe. Old everyX/setIdx/showSeconds tick path removed.
+- SceneEditor: the everyX "When to show / Appear every / Show for" UI replaced by a hint + "Edit sequence timing" link. FlowEditor: per-item duration with sec/min unit toggle + Play-out toggle, repeat select (+ wait minutes), and intro/transition/outro HTML pickers.
+- Verified: testing agent iteration 22 — backend 12/12, frontend 100%, no bugs.
+
+
 - Terminology/routes: designs are now **Overlays** (`/overlays`), timed sequences are **Reeksen** (`/reeksen`), uploaded HTML/video/image files are **Assets** (`/assets`). Nav + all page labels updated (Dutch). Backend collections (pancartes/flows/overlays) reused under the new UI names; no data loss (auto-migration by relabel).
 - Each Overlay (design) now has its OWN vMix link, individually selectable in vMix: `GET /api/public/overlay/{token}/overlay` + `/version` + `/values.json` + `/ticker/{form_id}`. Tokens backfilled on `GET /api/pancartes`. Shared renderer `_render_overlay_html(scene, token, pubkind)`; OVERLAY_HTML uses `PUBKIND`/`PUBBASE` so one template serves both scene and single-overlay outputs.
 - Now Playing is a selectable Overlay (one-click "Now Playing overlay" template on `/overlays`).

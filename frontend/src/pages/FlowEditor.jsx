@@ -68,7 +68,11 @@ function PartPicker({ label, hint, value, assets, onChange, testid }) {
       <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">{label}</Label>
       <Select value={value?.overlayId || "none"} onValueChange={setAsset}>
         <SelectTrigger className="rounded-xl" data-testid={testid}><SelectValue placeholder="None" /></SelectTrigger>
-        <SelectContent><SelectItem value="none">None</SelectItem>{assets.map((o) => <SelectItem key={o.id} value={o.id}>{o.name} · {o.kind}</SelectItem>)}</SelectContent>
+        <SelectContent>
+          <SelectItem value="none">None</SelectItem>
+          {assets.map((o) => <SelectItem key={o.id} value={o.id}>{o.name} · {o.kind}</SelectItem>)}
+          {value?.overlayId && !assets.some((o) => o.id === value.overlayId) && <SelectItem value={value.overlayId}>{value.name || "Linked asset"} (missing)</SelectItem>}
+        </SelectContent>
       </Select>
       {value?.url && (
         <div className="flex items-center gap-2">

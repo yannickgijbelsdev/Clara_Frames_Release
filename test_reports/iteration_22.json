@@ -1,0 +1,29 @@
+{
+  "summary": "Verified the sequence-timing rework end-to-end. Backend: 12/12 pytest passed in /app/backend/tests/test_sequence_timing.py — new FlowInput fields (durations[], playouts[], repeat, repeatEvery, intro/transition/outro) round-trip via POST/GET/PUT /api/flows; overlay HTML /api/public/scene/{token}/overlay returns 200 and embeds the new client cycler (buildSteps, durFor, waitMediaEnd, playoutFor) and the flow durations (300s for the Timing Test flow); the old everyX schedule leak check 'setIdx' is absent. A freshly-created scene with a 2-overlay durations=[4,4] loop flow also serves overlay HTML with the new cycler. Regression: /overlays, /flows, /scenes, and scene public overlay endpoints all 200. Frontend (Playwright, admin + MFA): sequence editor (/sequences/93794d1f…) exposes flow-repeat-field (loop/once/interval), flow-repeatevery (shows when 'interval', hides when 'loop'), flow-intro, flow-transition, flow-outro, and per-item seq-playout-i / seq-dur-i-val / seq-dur-i-unit for every row; Play out toggle disables the duration input; min-unit value 5 persists as 300s backend-side and still renders '5 min' after reload. Scene editor (/scenes/e2c39a24…) for a placed Overlay sequence shows the new flow-timing-hint + flow-edit-timing link; the old 'Appear every / Show for / When to show / everyMinutes' fields are gone. Flows list card shows the repeat text ('repeat every 5m' etc.) instead of '5s each'. Timing bug sanity: overlay HTML contains buildSteps/durFor/waitMediaEnd and no setIdx — the chop-after-20s path is removed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "FlowEditor PartPicker (intro/transition/outro)", "issues": ["When a flow already has an intro/transition/outro object pointing to an overlayId that is NOT in the current html-assets list (e.g. the Timing Test flow references a non-existent/non-html asset), the Select shows 'None' while the 'Show for … sec' field still renders — gives a confusing mixed state. Cosmetic/UX only; backend keeps the value. Consider showing an inline warning ('Linked asset not found — pick again') or auto-clearing when the asset disappears."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_sequence_timing.py",
+    "/app/test_reports/pytest/sequence_timing.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "FlowInput still carries legacy `loop` for back-compat but create_flow/update_flow force it to True whenever it is None — if a client sends {loop:false, repeat:'loop'} the two can disagree. Only `repeat` is now used by the overlay generator, so consider dropping the legacy field or deriving it from `repeat` to avoid drift.",
+    "FlowEditor save() always sends intro/transition/outro as `flow.intro || null` — selecting then deselecting (choosing 'None') correctly posts null, but if the user never touches the field it still echoes whatever the server loaded, which is fine. No action, just noting.",
+    "SceneEditor.addFlow() still seeds `schedule: { mode:'always', everyMinutes:5, showSeconds:20 }` even though the overlay generator ignores it now. Harmless but dead data — consider removing to keep the scene document clean."
+  ],
+  "updated_files": ["/app/backend/tests/test_sequence_timing.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "yannick.gijbels@koodh.com / KYLovie13monx + TOTP(NKSPU7UH4M5BJ3X3353DNTNA54YNIJSY)",
+  "seed_data_creation": "Transient test data created inside TestTimingSanity (2 TEST_P* pancartes, 1 TEST_SanityFlow flow, 1 TEST_SanityScene scene) and 1 TEST_Timing_Flow in TestFlowTimingFields — all deleted at the end of each test class. Timing Test flow (93794d1f-4b3c-40f1-9cdf-d3b5492ea439) was re-saved from the UI (same values: item0=5min timed, item1=10s play-out, repeat=interval every 5m).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Rework is production-green. The overlay cycler lives entirely in the overlay HTML via buildSteps()/play()/restartPart()/waitMediaEnd(); durFor uses flow.durations[pos] with flow.interval fallback; playoutFor waits for a <video> 'ended' event with a safety fallback. Scene flow placements still carry an unused `schedule` object — don't rely on it. Flow fields that persist: durations[], playouts[], repeat ('loop'|'once'|'interval'), repeatEvery (minutes), intro/transition/outro ({overlayId,url,kind,fit,seconds}|null). Sequence editor testids: flow-repeat-field, flow-repeatevery, flow-intro, flow-transition, flow-outro, flow-intro-sec/flow-transition-sec/flow-outro-sec, seq-playout-{i}, seq-dur-{i}-val, seq-dur-{i}-unit. Scene editor flow-panel testids: flow-select, flow-enabled-toggle, flow-timing-hint, flow-edit-timing, flow-pancarte-toggle-{pid}.",
+  "rca of the issue": "N/A — the originally reported 'overlay repeats after a few seconds / never plays out' bug was fixed before this iteration by moving all timing onto the sequence (durations[] + playouts[] + repeat) and rewriting the overlay HTML to a per-placement state machine (buildSteps/play/onEnd/start). This test iteration independently verified: (a) the new flow fields round-trip through the API, (b) the overlay HTML embeds them and ships the new helpers, (c) the old everyX/setIdx/showSeconds chop path is no longer generated, and (d) the UI exposes the new per-item unit toggle and intro/transition/outro pickers with full data-testid coverage and save-reload persistence."
+}
