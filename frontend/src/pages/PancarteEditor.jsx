@@ -12,8 +12,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Save, ArrowLeft, Loader2 } from "lucide-react";
+import { Save, ArrowLeft, Loader2, Link2, Radio } from "lucide-react";
 import { templates, TOOLS, uid } from "@/lib/elementDefs";
+import { BACKEND } from "@/lib/api";
+import LiveViewDialog from "@/components/LiveViewDialog";
 
 export default function PancarteEditor() {
   const { id } = useParams();
@@ -26,9 +28,10 @@ export default function PancarteEditor() {
   const [formsList, setFormsList] = useState([]);
   const [selId, setSelId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [liveOpen, setLiveOpen] = useState(false);
 
   useEffect(() => {
-    api.get(`/pancartes/${id}`).then(({ data }) => setPan(data)).catch(() => { toast.error("Pancarte not found"); nav("/pancartes"); });
+    api.get(`/pancartes/${id}`).then(({ data }) => setPan(data)).catch(() => { toast.error("Overlay not found"); nav("/overlays"); });
     api.get("/sources").then(({ data }) => setSources(data)).catch(() => {});
   }, [id]);
 
@@ -60,7 +63,7 @@ export default function PancarteEditor() {
     setSaving(true);
     try {
       await api.put(`/pancartes/${id}`, { name: pan.name, width: pan.width, height: pan.height, background: pan.background, elements: pan.elements });
-      if (!silent) toast.success("Pancarte saved");
+      if (!silent) toast.success("Overlay saved");
     } catch (e) { toast.error("Save failed"); }
     setSaving(false);
   };
@@ -68,9 +71,11 @@ export default function PancarteEditor() {
   if (!pan) return <AppLayout title="Loading…"><div className="h-40 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div></AppLayout>;
 
   return (
-    <AppLayout title={pan.name} subtitle="Design this pancarte — its own background and freely-placed elements."
+    <AppLayout title={pan.name} subtitle="Ontwerp deze overlay — eigen achtergrond en vrij plaatsbare elementen."
       actions={<>
-        <SecondaryButton icon={ArrowLeft} onClick={() => nav("/pancartes")}>Back</SecondaryButton>
+        <SecondaryButton icon={ArrowLeft} onClick={() => nav("/overlays")}>Back</SecondaryButton>
+        <SecondaryButton icon={Link2} data-testid="copy-overlay-link" onClick={() => { navigator.clipboard.writeText(`${BACKEND}/api/public/overlay/${pan.public_token}/overlay`); toast.success("vMix overlay-link gekopieerd"); }}>vMix-link</SecondaryButton>
+        <SecondaryButton icon={Radio} data-testid="live-overlay-btn" onClick={async () => { await save(true); setLiveOpen(true); }}>Live view</SecondaryButton>
         <PrimaryButton icon={Save} data-testid="save-pancarte-btn" onClick={() => save(false)}>{saving ? "Saving…" : "Save"}</PrimaryButton>
       </>}>
 
@@ -131,7 +136,7 @@ export default function PancarteEditor() {
           <div className="rounded-2xl overflow-hidden ring-1 ring-slate-300 shadow-inner">
             <SceneCanvas scene={pan} editable selectedId={selId} onSelect={setSelId} onUpdate={updateEl} sourceValues={sourceValues} />
           </div>
-          <p className="text-xs text-slate-400 mt-2 text-center">Pancarte {pan.width}×{pan.height} · click an element to edit · drag the corner to resize</p>
+          <p className="text-xs text-slate-400 mt-2 text-center">Overlay {pan.width}×{pan.height} · click an element to edit · drag the corner to resize</p>
         </div>
 
         {/* properties */}
@@ -143,6 +148,8 @@ export default function PancarteEditor() {
           )}
         </div>
       </div>
+
+      <LiveViewDialog open={liveOpen} onOpenChange={setLiveOpen} token={pan.public_token} name={pan.name} kind="overlay" />
     </AppLayout>
   );
 }

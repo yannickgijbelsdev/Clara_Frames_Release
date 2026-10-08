@@ -50,7 +50,7 @@ export default function Overlays() {
       fd.append("workspace_id", current);
       const { data } = await api.post("/overlays/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
       setOverlays((l) => [data, ...l]);
-      toast.success("Overlay uploaded");
+      toast.success("Asset geüpload");
     } catch (err) {
       toast.error(err.response?.data?.detail || "Upload failed");
     }
@@ -59,18 +59,18 @@ export default function Overlays() {
   };
 
   const remove = async (o) => {
-    try { await api.delete(`/overlays/${o.id}`); setOverlays((l) => l.filter((x) => x.id !== o.id)); toast.success("Overlay deleted"); }
+    try { await api.delete(`/overlays/${o.id}`); setOverlays((l) => l.filter((x) => x.id !== o.id)); toast.success("Asset verwijderd"); }
     catch (e) { toast.error("Delete failed"); }
   };
   const copy = (url) => { navigator.clipboard.writeText(url); toast.success("URL copied"); };
   const fmtSize = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 
   return (
-    <AppLayout title="Overlays" subtitle="Upload HTML, video or image overlays — drop them into any scene or pancarte"
+    <AppLayout title="Assets" subtitle="Upload HTML-, video- of afbeeldingsbestanden — bruikbaar als intro/outro in reeksen & scenes"
       actions={
         <PrimaryButton icon={uploading ? Loader2 : UploadCloud} data-testid="upload-overlay-btn"
           onClick={() => !uploading && fileRef.current?.click()}>
-          {uploading ? "Uploading…" : "Upload overlay"}
+          {uploading ? "Uploading…" : "Upload asset"}
         </PrimaryButton>
       }>
       <input ref={fileRef} type="file" className="hidden" data-testid="overlay-file-input"
@@ -82,7 +82,7 @@ export default function Overlays() {
       ) : overlays.length === 0 ? (
         <div className="bg-white rounded-3xl clara-soft p-12 text-center" data-testid="overlays-empty">
           <MonitorPlay className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-          <p className="text-slate-500">No overlays yet. Upload an <b>.html</b>, <b>.mp4</b> or image to reuse it as an overlay element.</p>
+          <p className="text-slate-500">Nog geen assets. Upload een <b>.html</b>, <b>.mp4</b> of afbeelding om als intro/outro te gebruiken.</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">

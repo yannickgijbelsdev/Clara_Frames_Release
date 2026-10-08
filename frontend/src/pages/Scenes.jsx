@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, MonitorPlay, Radio } from "lucide-react";
+import { Plus, Pencil, Trash2, MonitorPlay, Radio, Layers } from "lucide-react";
 import LiveViewDialog from "@/components/LiveViewDialog";
 
 export default function Scenes() {
@@ -68,6 +68,8 @@ export default function Scenes() {
                   <div className="font-semibold text-slate-900 truncate">{s.name}</div>
                   <div className="text-xs text-slate-400">{(s.elements || []).length} element(s)</div>
                 </div>
+                <button data-testid={`overview-scene-${s.id}`} onClick={() => nav(`/scenes/${s.id}/overview`)} title="Overzicht"
+                  className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors"><Layers className="h-4 w-4" /></button>
                 <button data-testid={`live-scene-${s.id}`} onClick={() => setLiveScene(s)} title="Live view"
                   className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors"><Radio className="h-4 w-4" /></button>
                 <SecondaryButton icon={Pencil} data-testid={`edit-scene-${s.id}`} onClick={() => nav(`/scenes/${s.id}`)}>Edit</SecondaryButton>

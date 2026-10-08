@@ -254,6 +254,8 @@ class FlowInput(BaseModel):
     entrance: str = "fade"
     entranceDuration: float = 0.6
     pancarte_ids: List[str] = []
+    durations: Optional[List[float]] = None   # per-item seconds (parallel to pancarte_ids)
+    loop: Optional[bool] = True
     workspace_id: Optional[str] = None
 
 class FormInput(BaseModel):
@@ -1117,6 +1119,9 @@ async def list_pancartes(workspace_id: Optional[str] = None, user: dict = Depend
     docs = await db.pancartes.find(q).to_list(500)
     for d in docs:
         d.pop("_id", None)
+        if not d.get("public_token"):
+            d["public_token"] = uuid.uuid4().hex
+            await db.pancartes.update_one({"id": d["id"]}, {"$set": {"public_token": d["public_token"]}})
     return docs
 
 @api_router.post("/pancartes")
@@ -1126,6 +1131,7 @@ async def create_pancarte(body: PancarteInput, user: dict = Depends(get_current_
         "id": str(uuid.uuid4()), "user_id": user["id"], "workspace_id": body.workspace_id,
         "name": body.name, "width": body.width, "height": body.height,
         "background": body.background, "elements": body.elements,
+        "public_token": uuid.uuid4().hex,
         "created_at": now, "updated_at": now,
     }
     await db.pancartes.insert_one(doc)
@@ -1137,6 +1143,9 @@ async def get_pancarte(pid: str, user: dict = Depends(get_current_user)):
     doc = await db.pancartes.find_one({"id": pid, "user_id": user["id"]}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Pancarte not found")
+    if not doc.get("public_token"):
+        doc["public_token"] = uuid.uuid4().hex
+        await db.pancartes.update_one({"id": pid}, {"$set": {"public_token": doc["public_token"]}})
     return doc
 
 @api_router.put("/pancartes/{pid}")
@@ -1175,6 +1184,7 @@ async def create_flow(body: FlowInput, user: dict = Depends(get_current_user)):
         "id": str(uuid.uuid4()), "user_id": user["id"], "workspace_id": body.workspace_id,
         "name": body.name, "interval": body.interval, "entrance": body.entrance,
         "entranceDuration": body.entranceDuration, "pancarte_ids": body.pancarte_ids,
+        "durations": body.durations, "loop": True if body.loop is None else bool(body.loop),
         "created_at": now, "updated_at": now,
     }
     await db.flows.insert_one(doc)
@@ -1196,6 +1206,7 @@ async def update_flow(fid: str, body: FlowInput, user: dict = Depends(get_curren
     await db.flows.update_one({"id": fid}, {"$set": {
         "name": body.name, "interval": body.interval, "entrance": body.entrance,
         "entranceDuration": body.entranceDuration, "pancarte_ids": body.pancarte_ids,
+        "durations": body.durations, "loop": True if body.loop is None else bool(body.loop),
         "updated_at": datetime.now(timezone.utc).isoformat()}})
     return await db.flows.find_one({"id": fid}, {"_id": 0})
 
@@ -1328,17 +1339,51 @@ async def public_settings(token: str):
     headers = {"Content-Disposition": f'attachment; filename="{_sanitize_key(scene.get("name","scene"))}.vmixoverlay.json"'}
     return JSONResponse(scene, headers=headers)
 
-@api_router.get("/public/scene/{token}/overlay", response_class=HTMLResponse)
-async def public_overlay(token: str):
-    scene = await _get_public_scene(token)
+def _pancarte_as_scene(pan: dict) -> dict:
+    """Wrap a single design (pancarte) into a scene-shaped dict so the overlay
+    renderer / data endpoints can serve it as its own standalone vMix overlay."""
+    return {
+        "id": pan.get("id"),
+        "name": pan.get("name", "overlay"),
+        "width": pan.get("width", 1920),
+        "height": pan.get("height", 1080),
+        "background": pan.get("background") or {"mode": "transparent"},
+        "elements": pan.get("elements", []),
+        "flows": [],
+        "workspace_id": pan.get("workspace_id"),
+        "user_id": pan.get("user_id"),
+        "public_token": pan.get("public_token"),
+        "updated_at": pan.get("updated_at") or "",
+    }
+
+async def _get_public_overlay_scene(token: str) -> dict:
+    pan = await db.pancartes.find_one({"public_token": token}, {"_id": 0})
+    if not pan:
+        raise HTTPException(status_code=404, detail="Overlay not found")
+    return _pancarte_as_scene(pan)
+
+async def _render_overlay_html(scene: dict, token: str, pubkind: str) -> str:
     scene = await expand_scene_flows(scene)
     import json as _json
     scene_json = _json.dumps(scene)
     backend = os.environ.get("FRONTEND_URL", "")
     fonts = await db.fonts.find({"workspace_id": scene.get("workspace_id")}, {"_id": 0}).to_list(200)
-    html = (OVERLAY_HTML
+    return (OVERLAY_HTML
             .replace("__FONTFACES__", _font_faces_css(fonts, backend))
+            .replace("__PUBKIND__", pubkind)
             .replace("__SCENE__", scene_json).replace("__TOKEN__", token).replace("__BACKEND__", backend))
+
+@api_router.get("/public/scene/{token}/overlay", response_class=HTMLResponse)
+async def public_overlay(token: str):
+    scene = await _get_public_scene(token)
+    html = await _render_overlay_html(scene, token, "scene")
+    return HTMLResponse(html, headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache"})
+
+# ---- Standalone per-overlay (design) public endpoints — individually selectable in vMix ----
+@api_router.get("/public/overlay/{token}/overlay", response_class=HTMLResponse)
+async def public_overlay_single(token: str):
+    scene = await _get_public_overlay_scene(token)
+    html = await _render_overlay_html(scene, token, "overlay")
     return HTMLResponse(html, headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache"})
 
 # ---------------------------------------------------------------------------
@@ -1409,6 +1454,8 @@ function exitAnim(p){
 const SCENE = __SCENE__;
 const TOKEN = "__TOKEN__";
 const BACKEND = "__BACKEND__";
+const PUBKIND = "__PUBKIND__";
+const PUBBASE = BACKEND + '/api/public/' + PUBKIND + '/' + TOKEN;
 const stage = document.getElementById('stage');
 stage.style.width = SCENE.width + 'px';
 stage.style.height = SCENE.height + 'px';
@@ -1604,7 +1651,7 @@ function buildElementNode(el){
     renderTicker([]);
     if(p.formId){
       var fq = (p.fields && p.fields.length) ? ('?fields=' + encodeURIComponent(p.fields.join(','))) : '';
-      function pullTicker(){ fetch(BACKEND + '/api/public/scene/' + TOKEN + '/ticker/' + p.formId + fq).then(function(r){return r.json();}).then(function(d){ renderTicker(d.items||[]); }).catch(function(){}); }
+      function pullTicker(){ fetch(PUBBASE + '/ticker/' + p.formId + fq).then(function(r){return r.json();}).then(function(d){ renderTicker(d.items||[]); }).catch(function(){}); }
       pullTicker(); setInterval(pullTicker, 10000);
     }
   } else {
@@ -1723,9 +1770,23 @@ var placements = [];
     updateApis(cur.apis, lastValues);
     updateImages(cur.images, lastValues);
   }
-  function advance(){ render(idx+1); idx++; }
-  function startAdv(){ if(!adv && pans.length>1){ adv=setInterval(advance, Math.max(1,(flow&&flow.interval)||5)*1000); } }
-  function stopAdv(){ if(adv){ clearInterval(adv); adv=null; } }
+  function durFor(i){
+    var d = (flow && flow.interval!=null) ? flow.interval : 5;
+    if(flow && flow.durations && flow.durations.length && pans.length){
+      var pan = pans[((i%pans.length)+pans.length)%pans.length];
+      var pos = (flow.pancarte_ids||[]).indexOf(pan.id);
+      if(pos>=0 && flow.durations[pos]!=null && flow.durations[pos]>0) d = flow.durations[pos];
+    }
+    return Math.max(0.2, d);
+  }
+  function schedule(){ stopAdv(); if(pans.length>1){ adv=setTimeout(advance, durFor(idx)*1000); } }
+  function advance(){
+    var next = idx+1;
+    if(flow && flow.loop===false && next>=pans.length){ return; }
+    render(next); idx=next; schedule();
+  }
+  function startAdv(){ schedule(); }
+  function stopAdv(){ if(adv){ clearTimeout(adv); adv=null; } }
 
   if(sc.mode==='everyX'){
     cont.style.display='block'; seriesLayer.style.display='none';
@@ -1811,7 +1872,7 @@ setInterval(tick, 1000); tick();
 
 async function poll(){
   try{
-    const r = await fetch(BACKEND + '/api/public/scene/' + TOKEN + '/values.json');
+    const r = await fetch(PUBBASE + '/values.json');
     const data = await r.json();
     lastValues = data;
     updateApis(apiEls, data);
@@ -1825,7 +1886,7 @@ setInterval(poll, 5000); poll();
 (function(){
   var _ver = SCENE.updated_at || '';
   setInterval(function(){
-    fetch(BACKEND + '/api/public/scene/' + TOKEN + '/version', {cache:'no-store'})
+    fetch(PUBBASE + '/version', {cache:'no-store'})
       .then(function(r){ return r.json(); })
       .then(function(d){ if(!d || !d.v) return; if(!_ver){ _ver = d.v; return; } if(d.v !== _ver){ location.reload(true); } })
       .catch(function(){});
@@ -1839,10 +1900,12 @@ async def public_version(token: str):
     scene = await _get_public_scene(token)
     return JSONResponse({"v": scene.get("updated_at") or ""}, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
 
-@api_router.get("/public/scene/{token}/values.json")
-async def public_values(token: str):
-    """Raw source values keyed by sourceId:fieldKey for overlay polling (scene + pancarte elements)."""
-    scene = await _get_public_scene(token)
+@api_router.get("/public/overlay/{token}/version")
+async def public_overlay_version(token: str):
+    scene = await _get_public_overlay_scene(token)
+    return JSONResponse({"v": scene.get("updated_at") or ""}, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
+
+async def _scene_values(scene: dict) -> Dict[str, Any]:
     out: Dict[str, Any] = {}
     cache: Dict[str, Dict[str, Any]] = {}
 
@@ -1876,7 +1939,18 @@ async def public_values(token: str):
                 continue
             for el in pan.get("elements", []):
                 await add_el(el)
-    return JSONResponse(out)
+    return out
+
+@api_router.get("/public/scene/{token}/values.json")
+async def public_values(token: str):
+    """Raw source values keyed by sourceId:fieldKey for overlay polling (scene + pancarte elements)."""
+    scene = await _get_public_scene(token)
+    return JSONResponse(await _scene_values(scene))
+
+@api_router.get("/public/overlay/{token}/values.json")
+async def public_overlay_values(token: str):
+    scene = await _get_public_overlay_scene(token)
+    return JSONResponse(await _scene_values(scene))
 
 @api_router.get("/public/scene/{token}/element/{element_id}.txt", response_class=PlainTextResponse)
 async def public_element_txt(token: str, element_id: str):
@@ -2040,6 +2114,14 @@ async def public_ticker_items(token: str, form_id: str, fields: Optional[str] = 
     if not scene:
         raise HTTPException(status_code=404, detail="Scene not found")
     form = await db.forms.find_one({"id": form_id, "user_id": scene.get("user_id")})
+    return {"items": await _ticker_items_for_form(form, _parse_keys(fields))}
+
+@api_router.get("/public/overlay/{token}/ticker/{form_id}")
+async def public_overlay_ticker_items(token: str, form_id: str, fields: Optional[str] = None):
+    pan = await db.pancartes.find_one({"public_token": token})
+    if not pan:
+        raise HTTPException(status_code=404, detail="Overlay not found")
+    form = await db.forms.find_one({"id": form_id, "user_id": pan.get("user_id")})
     return {"items": await _ticker_items_for_form(form, _parse_keys(fields))}
 
 # ---- Public form endpoints (consumed by external websites, permissive CORS) ----

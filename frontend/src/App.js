@@ -9,6 +9,7 @@ import Register from "@/pages/Register";
 import Dashboard from "@/pages/Dashboard";
 import Scenes from "@/pages/Scenes";
 import SceneEditor from "@/pages/SceneEditor";
+import SceneOverview from "@/pages/SceneOverview";
 import Pancartes from "@/pages/Pancartes";
 import PancarteEditor from "@/pages/PancarteEditor";
 import Flows from "@/pages/Flows";
@@ -53,17 +54,18 @@ function App() {
               <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
               <Route path="/scenes" element={<Protected><Scenes /></Protected>} />
               <Route path="/scenes/:id" element={<Protected><SceneEditor /></Protected>} />
+              <Route path="/scenes/:id/overview" element={<Protected><SceneOverview /></Protected>} />
               <Route path="/scenes/:id/export" element={<Protected><ExportPage /></Protected>} />
-              <Route path="/pancartes" element={<Protected><Pancartes /></Protected>} />
-              <Route path="/pancartes/:id" element={<Protected><PancarteEditor /></Protected>} />
-              <Route path="/flows" element={<Protected><Flows /></Protected>} />
-              <Route path="/flows/:id" element={<Protected><FlowEditor /></Protected>} />
+              <Route path="/overlays" element={<Protected><Pancartes /></Protected>} />
+              <Route path="/overlays/:id" element={<Protected><PancarteEditor /></Protected>} />
+              <Route path="/reeksen" element={<Protected><Flows /></Protected>} />
+              <Route path="/reeksen/:id" element={<Protected><FlowEditor /></Protected>} />
               <Route path="/forms" element={<Protected><Forms /></Protected>} />
               <Route path="/forms/:id" element={<Protected><FormEditor /></Protected>} />
               <Route path="/messages" element={<Protected><Messages /></Protected>} />
               <Route path="/sources" element={<Protected><Sources /></Protected>} />
               <Route path="/media" element={<Protected><MediaLibrary /></Protected>} />
-              <Route path="/overlays" element={<Protected><Overlays /></Protected>} />
+              <Route path="/assets" element={<Protected><Overlays /></Protected>} />
               <Route path="/fonts" element={<Protected><Fonts /></Protected>} />
               <Route path="/settings" element={<Protected><Settings /></Protected>} />
               <Route path="/users" element={<Protected><Users /></Protected>} />

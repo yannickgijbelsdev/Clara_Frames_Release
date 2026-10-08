@@ -10,19 +10,28 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Save, ArrowLeft, Loader2, ArrowUp, ArrowDown, X, Plus, LayoutTemplate } from "lucide-react";
 
-function LivePreview({ pancartes, interval, entranceKey }) {
+function LivePreview({ pancartes, durations, defaultSec, loop, entranceKey }) {
   const [idx, setIdx] = useState(0);
   useEffect(() => {
     setIdx(0);
     if (pancartes.length <= 1) return;
-    const t = setInterval(() => setIdx((i) => (i + 1) % pancartes.length), Math.max(1, interval || 5) * 1000);
-    return () => clearInterval(t);
-  }, [pancartes.length, interval]);
+    let i = 0, t;
+    const step = () => {
+      const next = i + 1;
+      if (loop === false && next >= pancartes.length) return;
+      i = next % pancartes.length; setIdx(i);
+      const sec = Math.max(0.2, (durations?.[i] ?? defaultSec ?? 5));
+      t = setTimeout(step, sec * 1000);
+    };
+    const first = Math.max(0.2, (durations?.[0] ?? defaultSec ?? 5));
+    t = setTimeout(step, first * 1000);
+    return () => clearTimeout(t);
+  }, [pancartes.length, JSON.stringify(durations), defaultSec, loop]);
   const pan = pancartes.length ? pancartes[idx % pancartes.length] : null;
   return (
     <div className="relative w-full rounded-2xl overflow-hidden ring-1 ring-slate-300 bg-slate-900" style={{ aspectRatio: "16 / 9" }}>
       {pan ? <div key={`${idx}:${entranceKey}`} style={{ position: "absolute", inset: 0 }}><PancarteView pancarte={pan} /></div>
-        : <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">Add pancartes to preview</div>}
+        : <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">Voeg overlays toe om te previewen</div>}
     </div>
   );
 }
@@ -38,26 +47,30 @@ export default function FlowEditor() {
     api.get(`/flows/${id}`).then(({ data }) => {
       setFlow(data);
       api.get(`/pancartes?workspace_id=${data.workspace_id || ""}`).then(({ data: pans }) => setPancartes(pans)).catch(() => {});
-    }).catch(() => { toast.error("Flow not found"); nav("/flows"); });
+    }).catch(() => { toast.error("Reeks niet gevonden"); nav("/reeksen"); });
   }, [id]);
 
   const panById = Object.fromEntries(pancartes.map((p) => [p.id, p]));
   const seq = flow?.pancarte_ids || [];
+  const durs = flow?.durations || [];
 
-  const setSeq = (next) => setFlow((f) => ({ ...f, pancarte_ids: next }));
-  const addPan = (pid) => setSeq([...seq, pid]);
-  const removeAt = (i) => setSeq(seq.filter((_, idx) => idx !== i));
+  const setSeqDur = (nextSeq, nextDurs) => setFlow((f) => ({ ...f, pancarte_ids: nextSeq, durations: nextDurs }));
+  const addPan = (pid) => setSeqDur([...seq, pid], [...durs, flow?.interval || 5]);
+  const removeAt = (i) => setSeqDur(seq.filter((_, idx) => idx !== i), durs.filter((_, idx) => idx !== i));
+  const setDur = (i, val) => setSeqDur(seq, seq.map((_, idx) => idx === i ? val : (durs[idx] ?? (flow?.interval || 5))));
   const move = (i, dir) => {
     const j = i + dir;
     if (j < 0 || j >= seq.length) return;
-    const next = [...seq]; [next[i], next[j]] = [next[j], next[i]]; setSeq(next);
+    const ns = [...seq]; [ns[i], ns[j]] = [ns[j], ns[i]];
+    const nd = seq.map((_, idx) => durs[idx] ?? (flow?.interval || 5)); [nd[i], nd[j]] = [nd[j], nd[i]];
+    setSeqDur(ns, nd);
   };
 
   const save = async (silent) => {
     setSaving(true);
     try {
-      await api.put(`/flows/${id}`, { name: flow.name, interval: flow.interval, entrance: flow.entrance, entranceDuration: flow.entranceDuration, pancarte_ids: flow.pancarte_ids });
-      if (!silent) toast.success("Flow saved");
+      await api.put(`/flows/${id}`, { name: flow.name, interval: flow.interval, entrance: flow.entrance, entranceDuration: flow.entranceDuration, pancarte_ids: flow.pancarte_ids, durations: flow.durations || [], loop: flow.loop !== false });
+      if (!silent) toast.success("Reeks opgeslagen");
     } catch (e) { toast.error("Save failed"); }
     setSaving(false);
   };
@@ -67,9 +80,9 @@ export default function FlowEditor() {
   const seqPancartes = seq.map((pid) => panById[pid]).filter(Boolean);
 
   return (
-    <AppLayout title={flow.name} subtitle="Order pancartes and set the timing. Then place this flow inside a scene."
+    <AppLayout title={flow.name} subtitle="Zet overlays op volgorde en stel de timing in. Plaats deze reeks daarna in een scene."
       actions={<>
-        <SecondaryButton icon={ArrowLeft} onClick={() => nav("/flows")}>Back</SecondaryButton>
+        <SecondaryButton icon={ArrowLeft} onClick={() => nav("/reeksen")}>Back</SecondaryButton>
         <PrimaryButton icon={Save} data-testid="save-flow-btn" onClick={() => save(false)}>{saving ? "Saving…" : "Save"}</PrimaryButton>
       </>}>
 
@@ -77,10 +90,15 @@ export default function FlowEditor() {
         {/* settings + preview */}
         <div className="space-y-4">
           <div className="bg-white rounded-3xl clara-soft p-4 space-y-3">
-            <div className="space-y-1.5"><Label>Flow name</Label>
+            <div className="space-y-1.5"><Label>Reeks naam</Label>
               <Input value={flow.name || ""} onChange={(e) => setFlow({ ...flow, name: e.target.value })} className="rounded-xl text-sm" data-testid="flow-name-field" /></div>
-            <div className="space-y-1.5"><Label>Seconds per pancarte</Label>
-              <Input type="number" min="1" value={flow.interval || 5} onChange={(e) => setFlow({ ...flow, interval: parseInt(e.target.value) || 5 })} className="rounded-xl text-sm" data-testid="flow-interval-field" /></div>
+            <div className="space-y-1.5"><Label>Standaard seconden per overlay</Label>
+              <Input type="number" min="1" value={flow.interval || 5} onChange={(e) => setFlow({ ...flow, interval: parseInt(e.target.value) || 5 })} className="rounded-xl text-sm" data-testid="flow-interval-field" />
+              <p className="text-[11px] text-slate-400">Geldt voor overlays zonder eigen tijd. Stel per overlay een eigen duur in rechts.</p></div>
+            <label className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 cursor-pointer" data-testid="flow-loop-field">
+              <span className="text-sm font-medium text-slate-700">Herhaal in loop</span>
+              <input type="checkbox" checked={flow.loop !== false} onChange={(e) => setFlow({ ...flow, loop: e.target.checked })} className="h-4 w-4 rounded accent-brand-600" />
+            </label>
             <div className="space-y-1.5"><Label>Entrance transition</Label>
               <Select value={flow.entrance || "none"} onValueChange={(v) => setFlow({ ...flow, entrance: v })}>
                 <SelectTrigger className="rounded-xl" data-testid="flow-entrance-field"><SelectValue /></SelectTrigger>
@@ -95,16 +113,16 @@ export default function FlowEditor() {
           </div>
           <div className="bg-white rounded-3xl clara-soft p-4">
             <div className="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-2">Live preview</div>
-            <LivePreview pancartes={seqPancartes} interval={flow.interval} entranceKey={flow.entrance} />
+            <LivePreview pancartes={seqPancartes} durations={durs} defaultSec={flow.interval} loop={flow.loop !== false} entranceKey={flow.entrance} />
           </div>
         </div>
 
         {/* sequence + library */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="bg-white rounded-3xl clara-soft p-4">
-            <div className="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-3">Sequence ({seq.length})</div>
+            <div className="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-3">Reeks ({seq.length})</div>
             {seq.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-8">Click a pancarte from the library to add it here.</p>
+              <p className="text-sm text-slate-400 text-center py-8">Klik een overlay in de bibliotheek om hem toe te voegen.</p>
             ) : (
               <div className="space-y-2" data-testid="flow-sequence">
                 {seq.map((pid, i) => {
@@ -112,11 +130,13 @@ export default function FlowEditor() {
                   return (
                     <div key={`${pid}-${i}`} data-testid={`seq-item-${i}`} className="flex items-center gap-2 rounded-2xl border border-slate-200 p-2">
                       <span className="text-[11px] font-bold text-slate-400 w-5 text-center shrink-0">{i + 1}</span>
-                      <div className="relative w-24 rounded-lg overflow-hidden ring-1 ring-slate-200 shrink-0 bg-slate-900" style={{ aspectRatio: `${p?.width || 1920} / ${p?.height || 1080}` }}>
+                      <div className="relative w-20 rounded-lg overflow-hidden ring-1 ring-slate-200 shrink-0 bg-slate-900" style={{ aspectRatio: `${p?.width || 1920} / ${p?.height || 1080}` }}>
                         {p ? <PancarteView pancarte={p} /> : null}
                       </div>
-                      <div className="flex-1 min-w-0 text-sm font-medium text-slate-800 truncate">{p?.name || "Deleted pancarte"}</div>
-                      <div className="flex items-center gap-0.5 shrink-0">
+                      <div className="flex-1 min-w-0 text-sm font-medium text-slate-800 truncate">{p?.name || "Verwijderde overlay"}</div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Input type="number" min="0.2" step="0.1" value={durs[i] ?? (flow.interval || 5)} onChange={(e) => setDur(i, parseFloat(e.target.value) || (flow.interval || 5))} className="w-16 rounded-lg text-xs px-2 h-8" data-testid={`seq-dur-${i}`} title="Seconden" />
+                        <span className="text-[10px] text-slate-400">s</span>
                         <button data-testid={`seq-up-${i}`} onClick={() => move(i, -1)} className="h-7 w-7 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"><ArrowUp className="h-4 w-4" /></button>
                         <button data-testid={`seq-down-${i}`} onClick={() => move(i, 1)} className="h-7 w-7 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"><ArrowDown className="h-4 w-4" /></button>
                         <button data-testid={`seq-remove-${i}`} onClick={() => removeAt(i)} className="h-7 w-7 flex items-center justify-center rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-600"><X className="h-4 w-4" /></button>
@@ -130,11 +150,11 @@ export default function FlowEditor() {
 
           <div className="bg-white rounded-3xl clara-soft p-4">
             <div className="flex items-center justify-between mb-3">
-              <div className="text-[11px] uppercase tracking-widest text-slate-400 font-bold">Pancarte library</div>
-              <button onClick={() => nav("/pancartes")} className="text-xs text-brand-600 font-medium inline-flex items-center gap-1"><LayoutTemplate className="h-3 w-3" />Manage</button>
+              <div className="text-[11px] uppercase tracking-widest text-slate-400 font-bold">Overlay-bibliotheek</div>
+              <button onClick={() => nav("/overlays")} className="text-xs text-brand-600 font-medium inline-flex items-center gap-1"><LayoutTemplate className="h-3 w-3" />Beheer</button>
             </div>
             {pancartes.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-8">No pancartes yet. Create some on the Pancartes page.</p>
+              <p className="text-sm text-slate-400 text-center py-8">Nog geen overlays. Maak er een op de Overlays-pagina.</p>
             ) : (
               <div className="grid grid-cols-2 gap-2" data-testid="flow-library">
                 {pancartes.map((p) => (

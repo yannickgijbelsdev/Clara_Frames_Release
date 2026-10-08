@@ -5,9 +5,9 @@ import { Monitor, RefreshCw, ExternalLink } from "lucide-react";
 const BACKEND = process.env.REACT_APP_BACKEND_URL;
 
 // Simulates how vMix receives the transparent overlay (checkerboard = transparency)
-export default function LiveViewDialog({ open, onOpenChange, token, name }) {
+export default function LiveViewDialog({ open, onOpenChange, token, name, kind = "scene" }) {
   const [nonce, setNonce] = useState(0);
-  const src = token ? `${BACKEND}/api/public/scene/${token}/overlay?v=${nonce}` : "";
+  const src = token ? `${BACKEND}/api/public/${kind}/${token}/overlay?v=${nonce}` : "";
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="rounded-3xl max-w-5xl">
