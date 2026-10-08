@@ -6,7 +6,7 @@ import AppLayout from "@/components/AppLayout";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { nextStartMs, nextStarts, fmtCountdown, fmtClock, sequenceDuration } from "@/lib/schedule";
 import { toast } from "sonner";
-import { Clock, Film, Radio, Repeat, CalendarClock, Layers, Database, ChevronDown, ChevronRight, Zap, Play } from "lucide-react";
+import { Clock, Film, Radio, Repeat, CalendarClock, Layers, Database, ChevronDown, ChevronRight, Zap, Play, Square, RotateCcw } from "lucide-react";
 
 const unitMult = (u) => (u === "hour" ? 3600 : u === "min" ? 60 : 1);
 
@@ -98,12 +98,35 @@ export default function Timeline() {
 
   const toggle = (id) => setExpanded((e) => ({ ...e, [id]: !e[id] }));
 
+  const reloadFlows = () => { if (current) api.get(`/flows?workspace_id=${current}`).then(({ data }) => setFlows(data)).catch(() => {}); };
+
   const triggerNow = async (flow) => {
     try {
       await api.post(`/flows/${flow.id}/trigger`);
       toast.success(`"${flow.name}" triggered — live overlays start now`);
+      reloadFlows();
     } catch (e) {
       toast.error("Trigger failed");
+    }
+  };
+
+  const stopSeq = async (flow) => {
+    try {
+      await api.post(`/flows/${flow.id}/stop`);
+      toast.success(`"${flow.name}" interrupted — countdown stopped, playing the outro`);
+      reloadFlows();
+    } catch (e) {
+      toast.error("Stop failed");
+    }
+  };
+
+  const resumeSeq = async (flow) => {
+    try {
+      await api.post(`/flows/${flow.id}/resume`);
+      toast.success(`"${flow.name}" resumed`);
+      reloadFlows();
+    } catch (e) {
+      toast.error("Resume failed");
     }
   };
 
@@ -139,11 +162,27 @@ export default function Timeline() {
                       <span className="text-xs text-slate-400 truncate">in {scene.name} · {repeatLabel(flow)}</span>
                       <div className="ml-auto flex items-center gap-2 shrink-0">
                         <span className="text-xs text-slate-400">next {fmtClock(next)}</span>
-                        <span className="text-lg font-bold tabular-nums text-brand-700 bg-brand-50 rounded-lg px-2 py-0.5" data-testid={`nextup-cd-${flow.id}`}>{fmtCountdown(next - now)}</span>
-                        <button data-testid={`nextup-trigger-${flow.id}`} onClick={() => triggerNow(flow)}
-                          className="inline-flex items-center gap-1 text-xs font-semibold rounded-lg px-2.5 py-1 bg-brand-600 text-white hover:bg-brand-700 transition-colors">
-                          <Play className="h-3 w-3" />Now
-                        </button>
+                        {flow.paused ? (
+                          <>
+                            <span className="text-sm font-bold text-amber-600 bg-amber-50 rounded-lg px-2 py-0.5" data-testid={`nextup-paused-${flow.id}`}>Paused</span>
+                            <button data-testid={`nextup-resume-${flow.id}`} onClick={() => resumeSeq(flow)} title="Resume this sequence"
+                              className="inline-flex items-center gap-1 text-xs font-semibold rounded-lg px-2.5 py-1 bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">
+                              <RotateCcw className="h-3 w-3" />Resume
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-lg font-bold tabular-nums text-brand-700 bg-brand-50 rounded-lg px-2 py-0.5" data-testid={`nextup-cd-${flow.id}`}>{fmtCountdown(next - now)}</span>
+                            <button data-testid={`nextup-trigger-${flow.id}`} onClick={() => triggerNow(flow)} title="Start this sequence now"
+                              className="inline-flex items-center gap-1 text-xs font-semibold rounded-lg px-2.5 py-1 bg-brand-600 text-white hover:bg-brand-700 transition-colors">
+                              <Play className="h-3 w-3" />Now
+                            </button>
+                            <button data-testid={`nextup-stop-${flow.id}`} onClick={() => stopSeq(flow)} title="Interrupt: stop countdown and play the outro"
+                              className="inline-flex items-center gap-1 text-xs font-semibold rounded-lg px-2.5 py-1 bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors">
+                              <Square className="h-3 w-3" />Stop
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                     <MiniTimeline marks={marks} />
@@ -181,12 +220,30 @@ export default function Timeline() {
                             <div key={placement.id} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2" data-testid={`tl-seq-${flow.id}`}>
                               <button onClick={() => nav(`/sequences/${flow.id}`)} className="font-medium text-slate-800 hover:text-brand-600 truncate">{flow.name}</button>
                               <span className="text-xs text-slate-400 flex items-center gap-1 truncate"><Repeat className="h-3 w-3" />{repeatLabel(flow)} · ~{sequenceDuration(flow)}s / run{placement.enabled === false ? " · disabled" : ""}</span>
-                              {sched && <span className="ml-auto text-sm font-bold tabular-nums text-brand-700 bg-brand-50 rounded-lg px-2 py-0.5 shrink-0">{fmtCountdown(next - now)}</span>}
-                              {!sched && <span className="ml-auto text-xs text-slate-400 shrink-0">{r === "loop" ? "always on" : r === "once" ? "one-shot" : "cyclic"}</span>}
-                              <button data-testid={`tl-seq-trigger-${flow.id}`} onClick={() => triggerNow(flow)} title="Start this sequence now on live overlays"
-                                className="inline-flex items-center gap-1 text-xs font-semibold rounded-lg px-2.5 py-1 bg-brand-600 text-white hover:bg-brand-700 transition-colors shrink-0">
-                                <Play className="h-3 w-3" />Now
-                              </button>
+                              {flow.paused ? (
+                                <span className="ml-auto text-xs font-bold text-amber-600 bg-amber-50 rounded-lg px-2 py-0.5 shrink-0" data-testid={`tl-seq-paused-${flow.id}`}>Paused</span>
+                              ) : sched ? (
+                                <span className="ml-auto text-sm font-bold tabular-nums text-brand-700 bg-brand-50 rounded-lg px-2 py-0.5 shrink-0">{fmtCountdown(next - now)}</span>
+                              ) : (
+                                <span className="ml-auto text-xs text-slate-400 shrink-0">{r === "loop" ? "always on" : r === "once" ? "one-shot" : "cyclic"}</span>
+                              )}
+                              {flow.paused ? (
+                                <button data-testid={`tl-seq-resume-${flow.id}`} onClick={() => resumeSeq(flow)} title="Resume this sequence"
+                                  className="inline-flex items-center gap-1 text-xs font-semibold rounded-lg px-2.5 py-1 bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shrink-0">
+                                  <RotateCcw className="h-3 w-3" />Resume
+                                </button>
+                              ) : (
+                                <>
+                                  <button data-testid={`tl-seq-trigger-${flow.id}`} onClick={() => triggerNow(flow)} title="Start this sequence now on live overlays"
+                                    className="inline-flex items-center gap-1 text-xs font-semibold rounded-lg px-2.5 py-1 bg-brand-600 text-white hover:bg-brand-700 transition-colors shrink-0">
+                                    <Play className="h-3 w-3" />Now
+                                  </button>
+                                  <button data-testid={`tl-seq-stop-${flow.id}`} onClick={() => stopSeq(flow)} title="Interrupt: stop countdown and play the outro"
+                                    className="inline-flex items-center gap-1 text-xs font-semibold rounded-lg px-2.5 py-1 bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors shrink-0">
+                                    <Square className="h-3 w-3" />Stop
+                                  </button>
+                                </>
+                              )}
                             </div>
                           );
                         })}

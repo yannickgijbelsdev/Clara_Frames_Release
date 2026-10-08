@@ -1259,8 +1259,27 @@ async def trigger_flow(fid: str, user: dict = Depends(get_current_user)):
     if not existing:
         raise HTTPException(status_code=404, detail="Flow not found")
     ts = int(datetime.now(timezone.utc).timestamp() * 1000)
-    await db.flows.update_one({"id": fid}, {"$set": {"manual_trigger": ts}})
+    await db.flows.update_one({"id": fid}, {"$set": {"manual_trigger": ts, "paused": False}})
     return {"ok": True, "manual_trigger": ts}
+
+@api_router.post("/flows/{fid}/stop")
+async def stop_flow(fid: str, user: dict = Depends(get_current_user)):
+    """Interrupt a sequence: stop its countdown and break off now, playing the outro."""
+    existing = await db.flows.find_one({"id": fid, "user_id": user["id"]})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Flow not found")
+    ts = int(datetime.now(timezone.utc).timestamp() * 1000)
+    await db.flows.update_one({"id": fid}, {"$set": {"manual_stop": ts, "paused": True}})
+    return {"ok": True, "manual_stop": ts, "paused": True}
+
+@api_router.post("/flows/{fid}/resume")
+async def resume_flow(fid: str, user: dict = Depends(get_current_user)):
+    """Resume an interrupted sequence (re-enable its schedule / loop)."""
+    existing = await db.flows.find_one({"id": fid, "user_id": user["id"]})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Flow not found")
+    await db.flows.update_one({"id": fid}, {"$set": {"paused": False}})
+    return {"ok": True, "paused": False}
 
 async def expand_scene_flows(scene: dict) -> dict:
     """Attach resolved flow + pancarte docs to each scene flow placement (for the overlay)."""
@@ -1940,24 +1959,35 @@ var placements = [];
     }
   }
   function hideEverything(){ hideParts(); seriesLayer.style.display='none'; }
-  var waitUntil=0;
+  var waitUntil=0, stopped=false;
   function enterWait(untilMs){
     clearTmr(); hideEverything(); waitUntil=untilMs;
     if(flow && flow.showCountdown){ cdNode.style.display='flex'; cdLabel.textContent=(flow.countdownLabel||'Starts in'); }
   }
   function onEnd(){
+    if(stopped){ clearTmr(); hideEverything(); cdNode.style.display='none'; return; }
     if(repeat==='once'){ clearTmr(); hideEverything(); cdNode.style.display='none'; return; }
     if(repeat==='interval'){ enterWait(Date.now()+Math.max(1,(flow&&flow.repeatEvery!=null?flow.repeatEvery:5))*60000); return; }
     if(repeat==='schedule'){ enterWait(nextStartMs(flow, Date.now())); return; }
     start();
   }
-  function start(){ waitUntil=0; cdNode.style.display='none'; stepArr=buildSteps(); play(0); }
+  function start(){ if(stopped) return; waitUntil=0; cdNode.style.display='none'; stepArr=buildSteps(); play(0); }
+  // Interrupt: break off whatever is on screen now, play the outro (if any), then stay hidden.
+  function stopNow(){
+    stopped=true; clearTmr(); waitUntil=0; cdNode.style.display='none';
+    if(outroNode){ seriesLayer.style.display='none'; hideParts(); outroNode.style.display='block'; restartPart(outroNode);
+      tmr=setTimeout(function(){ if(outroNode) outroNode.style.display='none'; hideEverything(); }, partSec(fOutro,3)*1000); }
+    else { hideEverything(); }
+  }
+  function resume(){ stopped=false; if(repeat==='schedule'){ enterWait(nextStartMs(flow, Date.now())); } else { start(); } }
   if(pans.length){
-    if(repeat==='schedule'){ enterWait(nextStartMs(flow, Date.now())); }
+    if(flow && flow.paused){ stopped=true; hideEverything(); }
+    else if(repeat==='schedule'){ enterWait(nextStartMs(flow, Date.now())); }
     else { start(); }
   }
 
   function tickPlacement(nowMs){
+    if(stopped) return;
     if(waitUntil){
       if(flow && flow.showCountdown){ cdTime.textContent=fmtCountdown(waitUntil-nowMs); }
       if(nowMs>=waitUntil){ start(); }
@@ -1966,7 +1996,9 @@ var placements = [];
 
   placements.push({pl:pl, flow:flow, pans:pans, cont:cont, seriesLayer:seriesLayer,
     getCur:function(){return cur;}, tickPlacement:tickPlacement, _state:null,
-    _lastTrig:(flow && flow.manual_trigger) || 0, triggerNow:function(){ if(pans.length){ start(); } }});
+    _lastTrig:(flow && flow.manual_trigger) || 0, triggerNow:function(){ if(pans.length){ stopped=false; start(); } },
+    _lastStop:(flow && flow.manual_stop) || 0, stopNow:stopNow,
+    _paused:!!(flow && flow.paused), setPaused:function(p){ if(p){ if(!stopped) stopNow(); } else { resume(); } }});
 });
 
 function showTimedPart(node, on){
@@ -2050,6 +2082,8 @@ setInterval(poll, 5000); poll();
       .then(function(d){
         if(!d) return;
         if(d.triggers){ placements.forEach(function(f){ if(!f.flow) return; var t=d.triggers[f.flow.id]; if(t && t>(f._lastTrig||0)){ f._lastTrig=t; if(f.triggerNow) f.triggerNow(); } }); }
+        if(d.stops){ placements.forEach(function(f){ if(!f.flow) return; var t=d.stops[f.flow.id]; if(t && t>(f._lastStop||0)){ f._lastStop=t; if(f.stopNow) f.stopNow(); } }); }
+        if(d.paused){ placements.forEach(function(f){ if(!f.flow) return; var p=!!d.paused[f.flow.id]; if(p!==f._paused){ f._paused=p; if(f.setPaused) f.setPaused(p); } }); }
         if(!d.v) return;
         if(!_ver){ _ver = d.v; return; }
         if(d.v !== _ver){ location.reload(true); }
@@ -2060,27 +2094,39 @@ setInterval(poll, 5000); poll();
 </script>
 </body></html>"""
 
-async def _scene_triggers(scene: dict) -> Dict[str, int]:
-    """Latest manual-trigger timestamp per sequence used in this scene (ms epoch)."""
-    out: Dict[str, int] = {}
+async def _scene_control(scene: dict):
+    """Per-sequence control state used by overlays: triggers, stops, paused (keyed by flow_id)."""
+    trig: Dict[str, int] = {}
+    stops: Dict[str, int] = {}
+    paused: Dict[str, bool] = {}
+    seen = set()
     for pl in scene.get("flows", []):
         fid = pl.get("flow_id")
-        if not fid or fid in out:
+        if not fid or fid in seen:
             continue
-        flow = await db.flows.find_one({"id": fid}, {"manual_trigger": 1})
-        if flow and flow.get("manual_trigger"):
-            out[fid] = flow["manual_trigger"]
-    return out
+        seen.add(fid)
+        flow = await db.flows.find_one({"id": fid}, {"manual_trigger": 1, "manual_stop": 1, "paused": 1})
+        if not flow:
+            continue
+        if flow.get("manual_trigger"):
+            trig[fid] = flow["manual_trigger"]
+        if flow.get("manual_stop"):
+            stops[fid] = flow["manual_stop"]
+        if flow.get("paused"):
+            paused[fid] = True
+    return trig, stops, paused
 
 @api_router.get("/public/scene/{token}/version")
 async def public_version(token: str):
     scene = await _get_public_scene(token)
-    return JSONResponse({"v": scene.get("updated_at") or "", "triggers": await _scene_triggers(scene)}, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
+    trig, stops, paused = await _scene_control(scene)
+    return JSONResponse({"v": scene.get("updated_at") or "", "triggers": trig, "stops": stops, "paused": paused}, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
 
 @api_router.get("/public/overlay/{token}/version")
 async def public_overlay_version(token: str):
     scene = await _get_public_overlay_scene(token)
-    return JSONResponse({"v": scene.get("updated_at") or "", "triggers": await _scene_triggers(scene)}, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
+    trig, stops, paused = await _scene_control(scene)
+    return JSONResponse({"v": scene.get("updated_at") or "", "triggers": trig, "stops": stops, "paused": paused}, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
 
 async def _scene_values(scene: dict) -> Dict[str, Any]:
     out: Dict[str, Any] = {}
