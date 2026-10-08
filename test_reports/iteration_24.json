@@ -1,0 +1,25 @@
+{
+  "summary": "Verified all 3 fixes end-to-end for the vMix overlay platform (admin MFA auth). Backend pytest (5 passed, 1 skipped) in /app/backend/tests/test_trigger_sources.py: (1) POST /api/sources/{id}/test force-fresh — custom open-meteo source (https://api.open-meteo.com/v1/forecast?latitude=50.85&longitude=4.35&current=temperature_2m, field temp->current.temperature_2m) returns error=null and values.temp resolves to a numeric temp; repeated test also returns error=null (no stale error). (2) https:// fallback — builtin_nowplaying source with url http://clr.koodh.com/api/rds/grk/now-playing.txt + separator ' - ' + artwork=true resolves via https retry (title/song present, error=null). (3) POST /api/flows/{fid}/trigger returns {ok:true, manual_trigger:<ms>}, GET /api/flows/{fid} persists manual_trigger with the same ms value; unknown fid -> 404. Public /api/public/scene/{token}/version returns {v, triggers:{flow_id: ms}} and triggers[fid] equals the manual_trigger ms. Public overlay HTML smoke-check skipped only because the test workspace had no scene with a public_token exposed in /api/scenes list (not a defect of this turn's changes). Frontend (Playwright, admin+MFA): on /timeline for a scene with a sequence placement, 'tl-seq-trigger-<flowId>' button is present (collapsed scene -> 1 button after click-expand), clicking it fires POST /api/flows/{id}/trigger (200) and a success toast appears: '\"TEST_ui_flow\" triggered — live overlays start now'. In /scenes/<id> SceneEditor: 'toggle-flow-preview' button is present with default label 'Overlay preview: off'; a 'flow-handle-<placementId>' chip (pointer-events:auto) is rendered while the surrounding 'canvas-flow-<placementId>' region has computed pointer-events:none in BOTH OFF and ON states — so base elements beneath the sequence remain selectable while the preview still renders realistically when toggled on. Toggle flips label to 'Overlay preview: on' and the preview surface activates.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_trigger_sources.py",
+    "/app/test_reports/pytest/trigger_sources.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py:2497 lines — approaching the 700-line soft limit by a wide margin. Consider splitting into routers (auth/sources/scenes/flows/public) and keeping the OVERLAY_HTML blob in a separate /app/backend/overlay_template.py.",
+    "test_source() correctly forces a fresh fetch by shallow-copying the source with last_fetched=None/last_raw=None, then returning refreshed.get('last_error'). This correctly surfaces the latest error, and when the refresh succeeds last_error is cleared by resolve_source_values' refresh path — behavior matches the user's expectation.",
+    "_fetch_source_sync https:// fallback only retries on *any* exception for http:// URLs — fine but silently swallows the original error. Consider logging the http:// failure for debuggability."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_trigger_sources.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "yannick.gijbels@koodh.com / KYLovie13monx + TOTP(NKSPU7UH4M5BJ3X3353DNTNA54YNIJSY)",
+  "seed_data_creation": "Temporary scene (TEST_ui_scene) + flow (TEST_ui_flow) created via API for UI test, then deleted at end of run. Backend pytest also created and deleted TEST_openmeteo/TEST_nowplaying/TEST_trigger_flow/TEST_pub_trigger_* resources. No persistent seed data left behind.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Testids live now: Timeline nextup-trigger-<flowId> (scheduled sequences) and tl-seq-trigger-<flowId> (per-scene inside expanded timeline-scene-<id>). SceneEditor: toggle-flow-preview (text 'Overlay preview: on'|'off'), flow-handle-<placementId> (pointer-events:auto drag chip), canvas-flow-<placementId> (pointer-events:none region). Backend endpoints verified: POST /api/sources/{id}/test (force-fresh), POST /api/flows/{fid}/trigger (persists manual_trigger ms), GET /api/public/scene/{token}/version and /api/public/overlay/{token}/version (both include triggers map {flow_id:ms}). _fetch_source_sync transparently retries https:// when http:// fails. All backend behaviors pass.",
+  "rca of the issue": "N/A — feature verification pass. Root fixes: (1) test_source now bypasses the cache via probe={**source, last_fetched:None, last_raw:None} so a stale last_error cannot be returned once the upstream is reachable again. (2) _fetch_source_sync retries over https:// when http:// raises any requests exception. (3) Added POST /api/flows/{fid}/trigger that stamps manual_trigger (ms epoch) and the public /version endpoints expose a per-flow triggers map, which the vMix OVERLAY_HTML poller consumes to call placement.triggerNow() when _lastTrig changes."
+}
