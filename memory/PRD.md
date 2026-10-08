@@ -279,7 +279,15 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Media type detection is extension-based (URL without known ext defaults to image).
 
 ## Backlog / next
-### 2026-06 — Now-Playing fallback artwork
+### 2026-06 — "Overlay-first" restructure (pancarte concept removed)
+- Terminology/routes: designs are now **Overlays** (`/overlays`), timed sequences are **Reeksen** (`/reeksen`), uploaded HTML/video/image files are **Assets** (`/assets`). Nav + all page labels updated (Dutch). Backend collections (pancartes/flows/overlays) reused under the new UI names; no data loss (auto-migration by relabel).
+- Each Overlay (design) now has its OWN vMix link, individually selectable in vMix: `GET /api/public/overlay/{token}/overlay` + `/version` + `/values.json` + `/ticker/{form_id}`. Tokens backfilled on `GET /api/pancartes`. Shared renderer `_render_overlay_html(scene, token, pubkind)`; OVERLAY_HTML uses `PUBKIND`/`PUBBASE` so one template serves both scene and single-overlay outputs.
+- Now Playing is a selectable Overlay (one-click "Now Playing overlay" template on `/overlays`).
+- Reeksen: per-item seconds per overlay (`FlowInput.durations[]`) + optional loop (`FlowInput.loop`). Overlay cycler in OVERLAY_HTML uses recursive `setTimeout`/`durFor()` honoring per-item duration and loop (backward compatible: falls back to `interval`).
+- New **Scene Overview** page `/scenes/:id/overview`: combined scene iframe + scene vMix link, plus each placed reeks with every overlay's own copyable vMix link + live view. "Overview" button added in scene editor + scenes list.
+- Verified: testing agent iteration 21 — backend 7/7, frontend 100%, no bugs.
+
+
 - Added `fallback_artwork` to Now-Playing (radio) sources. When iTunes returns no album cover, the `artwork` field automatically uses a user-chosen image from the Media Library so overlays are never empty. Backend: `SourceInput.fallback_artwork`, `_prep_builtin`, create/update source, and `resolve_source_values` (fallback applied when iTunes empty). Frontend: `ImageUpload` field in Sources NP form (testid `np-fallback`). Verified via API + direct resolve unit test.
 
 - P1: Image/photo upload (object storage) instead of URL-only.

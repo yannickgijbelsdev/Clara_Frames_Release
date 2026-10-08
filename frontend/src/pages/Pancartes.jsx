@@ -47,7 +47,7 @@ export default function Pancartes() {
     try { const { data } = await api.get(`/sources?workspace_id=${current}`); sources = data; } catch (e) {}
     const np = sources.find((s) => s.type === "builtin_nowplaying");
     if (!np) {
-      toast.error("Create a 'Now Playing (radio)' source first on the API Sources page.");
+      toast.error("Maak eerst een 'Now Playing (radio)' bron aan onder API Sources.");
       return;
     }
     const { data } = await api.post("/pancartes", {
@@ -74,7 +74,7 @@ export default function Pancartes() {
     toast.success("Overlay duplicated"); load();
   };
   const remove = async (id) => { await api.delete(`/pancartes/${id}`); toast.success("Overlay deleted"); load(); };
-  const copyLink = (p) => { navigator.clipboard.writeText(`${BACKEND}/api/public/overlay/${p.public_token}/overlay`); toast.success("vMix overlay-link gekopieerd"); };
+  const copyLink = (p) => { try { navigator.clipboard.writeText(`${BACKEND}/api/public/overlay/${p.public_token}/overlay`); toast.success("vMix overlay-link gekopieerd"); } catch (e) { toast.error("Kon niet kopiëren"); } };
 
   return (
     <AppLayout title="Overlays" subtitle={`${items.length} overlay-ontwerp(en) · elk met eigen vMix-link, herbruikbaar in reeksen & scenes`}
