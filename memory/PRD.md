@@ -279,6 +279,9 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Media type detection is extension-based (URL without known ext defaults to image).
 
 ## Backlog / next
+### 2026-06 — Now-Playing fallback artwork
+- Added `fallback_artwork` to Now-Playing (radio) sources. When iTunes returns no album cover, the `artwork` field automatically uses a user-chosen image from the Media Library so overlays are never empty. Backend: `SourceInput.fallback_artwork`, `_prep_builtin`, create/update source, and `resolve_source_values` (fallback applied when iTunes empty). Frontend: `ImageUpload` field in Sources NP form (testid `np-fallback`). Verified via API + direct resolve unit test.
+
 - P1: Image/photo upload (object storage) instead of URL-only.
 - P1: Require re-auth (current password/TOTP) before 2FA reset.
 - P2: Per-column timezone/format for clock in data.json.

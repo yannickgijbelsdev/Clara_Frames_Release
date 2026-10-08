@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Plus, Trash2, Radio, Cloud, Clock, Globe, FlaskConical, Pencil, Music } from "lucide-react";
+import { ImageUpload } from "@/components/ImageUpload";
 
 const TYPE_META = {
   custom: { label: "Custom API", icon: Globe },
@@ -19,7 +20,7 @@ const TYPE_META = {
   builtin_live: { label: "Nu Speelt (live)", icon: Radio },
 };
 
-const empty = { name: "", type: "custom", format: "json", url: "", method: "GET", refresh_interval: 30, image_path: "", fields: [{ key: "", label: "", path: "" }], latitude: 50.85, longitude: 4.35, timezone: "Europe/Brussels", song_path: "", separator: " - ", artwork: true, reverse: false };
+const empty = { name: "", type: "custom", format: "json", url: "", method: "GET", refresh_interval: 30, image_path: "", fields: [{ key: "", label: "", path: "" }], latitude: 50.85, longitude: 4.35, timezone: "Europe/Brussels", song_path: "", separator: " - ", artwork: true, fallback_artwork: "", reverse: false };
 
 const deriveFormat = (s) => {
   if (s.format) return s.format;
@@ -160,6 +161,11 @@ export default function Sources() {
                   <input type="checkbox" checked={form.artwork !== false} onChange={(e) => setForm({ ...form, artwork: e.target.checked })} className="h-4 w-4 rounded accent-brand-600" />
                   Fetch album cover automatically (iTunes)
                 </label>
+                <div className="space-y-1.5">
+                  <Label>Fallback-afbeelding (als iTunes geen hoesje vindt)</Label>
+                  <ImageUpload value={form.fallback_artwork} onChange={(v) => setForm({ ...form, fallback_artwork: v })} testid="np-fallback" accept="image/*" />
+                  <p className="text-[11px] text-slate-400">Wordt automatisch in het <code className="font-mono">artwork</code>-veld gebruikt zodra iTunes geen album cover vindt, zodat je overlay nooit leeg blijft.</p>
+                </div>
                 <p className="text-[11px] text-slate-400">Exposes separate fields: <code className="font-mono">artist</code>, <code className="font-mono">title</code>, <code className="font-mono">song</code> and <code className="font-mono">artwork</code>. Place each as its own element to style independently; bind an image to <code className="font-mono">artwork</code> for the album cover.</p>
               </>
             )}

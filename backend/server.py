@@ -218,6 +218,7 @@ class SourceInput(BaseModel):
     song_path: Optional[str] = None
     separator: Optional[str] = None
     artwork: Optional[bool] = None
+    fallback_artwork: Optional[str] = None
     reverse: Optional[bool] = None
     format: Optional[str] = None  # custom API: text | json | image
     image_path: Optional[str] = None
@@ -834,6 +835,8 @@ async def resolve_source_values(source: dict) -> Dict[str, Any]:
             else:
                 artwork = await _itunes_artwork(((artist + " " + title).strip()) or song)
                 await db.sources.update_one({"id": source["id"]}, {"$set": {"np_cache": {"song": song, "artwork": artwork}}})
+        if not artwork:
+            artwork = (source.get("fallback_artwork") or "").strip()
         return {"song": song, "artist": artist, "title": title, "artwork": artwork}
     values = {}
     for f in source.get("fields", []):
@@ -864,6 +867,7 @@ def _prep_builtin(body: SourceInput) -> dict:
         return {"url": body.url, "fields": [dict(f) for f in NOWPLAYING_FIELDS],
                 "song_path": body.song_path or "", "separator": body.separator or " - ",
                 "artwork": True if body.artwork is None else bool(body.artwork),
+                "fallback_artwork": (body.fallback_artwork or "").strip(),
                 "reverse": bool(body.reverse), "refresh_interval": int(body.refresh_interval or 15)}
     if body.type == "builtin_live":
         return {"url": "", "fields": [dict(f) for f in LIVE_FIELDS]}
@@ -984,6 +988,7 @@ async def create_source(body: SourceInput, user: dict = Depends(get_current_user
         "song_path": prep.get("song_path"),
         "separator": prep.get("separator"),
         "artwork": prep.get("artwork"),
+        "fallback_artwork": prep.get("fallback_artwork"),
         "reverse": prep.get("reverse"),
         "format": prep.get("format"),
         "image_path": prep.get("image_path"),
@@ -1009,6 +1014,7 @@ async def update_source(source_id: str, body: SourceInput, user: dict = Depends(
         "song_path": prep.get("song_path"),
         "separator": prep.get("separator"),
         "artwork": prep.get("artwork"),
+        "fallback_artwork": prep.get("fallback_artwork"),
         "reverse": prep.get("reverse"),
         "format": prep.get("format"),
         "image_path": prep.get("image_path"),
