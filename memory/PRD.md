@@ -279,6 +279,9 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Media type detection is extension-based (URL without known ext defaults to image).
 
 ## Backlog / next
+### 2026-06 — On-change + separate interval for elements
+- Elements in "Show when data changes" (onchange) mode can now ALSO appear on their own interval: new `timing.alsoInterval` flag reusing `gap`/`gapUnit` + `showSeconds`. In the overlay generator the onchange branch OR-combines the trigger visibility with a clock-aligned interval window. Inspector: "Also show on an interval" toggle + interval (sec/min/hour). Verified: timing persists round-trip, overlay HTML 200 + embeds the logic. (Also translated remaining Dutch inspector strings to English.)
+
 ### 2026-06 — Sequence timing rework (fix "repeats after seconds / never plays out")
 - Root cause: timing was split between the sequence (per-item seconds) and a scene-placement everyX/showSeconds schedule that ignored per-item durations and chopped playback at 20s. Timing now lives entirely on the sequence (reeks).
 - New per-sequence model (FlowInput + create/update + overlay generator): `durations[]` (per-item seconds), `playouts[]` (per-item "play out" = wait for the overlay's `<video>` to end), `repeat` = loop | once | interval, `repeatEvery` (minutes for interval), and HTML `intro`/`transition`/`outro` overlays ({overlayId,url,kind,fit,seconds}). Transition plays between each overlay; intro once before; outro once after.

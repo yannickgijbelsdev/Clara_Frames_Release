@@ -277,7 +277,7 @@ export default function ElementInspector({ sel, sources = [], overlays = [], for
                   </Select>
                 </div>
               </div>
-              <p className="text-[11px] text-slate-400">Klok-uitgelijnd: verschijnt, blijft {sel.timing?.showSeconds ?? 10}s, verdwijnt, herhaalt.</p>
+              <p className="text-[11px] text-slate-400">Clock-aligned: appears, stays {sel.timing?.showSeconds ?? 10}s, disappears, repeats.</p>
             </>
           )}
           {sel.timing?.mode === "onchange" && (
@@ -294,7 +294,31 @@ export default function ElementInspector({ sel, sources = [], overlays = [], for
                   <SelectTrigger className="rounded-xl" data-testid="el-trigger-field"><SelectValue placeholder="Choose field" /></SelectTrigger>
                   <SelectContent>{triggerFields.map((f) => <SelectItem key={f.key} value={f.key}>{f.key}</SelectItem>)}</SelectContent>
                 </Select></div>
-              <p className="text-[11px] text-slate-400">Verschijnt {sel.timing?.showSeconds ?? 10}s zodra dit veld verandert (bv. de titel van een nieuw Now-Playing-nummer), daarna weg. Koppel hier je achtergrond-afbeelding of overlay aan je now-playing-bron.</p>
+              <p className="text-[11px] text-slate-400">Appears {sel.timing?.showSeconds ?? 10}s as soon as this field changes (e.g. the title of a new Now-Playing track), then hides. Link your background image or overlay to your now-playing source here.</p>
+              <label className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 cursor-pointer" data-testid="el-also-interval">
+                <span className="text-sm font-medium text-slate-700">Also show on an interval</span>
+                <input type="checkbox" checked={!!sel.timing?.alsoInterval}
+                  onChange={(e) => updateEl(sel.id, { timing: { ...sel.timing, alsoInterval: e.target.checked, gap: sel.timing?.gap ?? 5, gapUnit: sel.timing?.gapUnit ?? "min" } })}
+                  className="h-4 w-4 rounded accent-brand-600" />
+              </label>
+              {sel.timing?.alsoInterval && (
+                <div className="space-y-1.5"><Label>Interval between appearances</Label>
+                  <div className="flex gap-2">
+                    <Input type="number" min="0" value={sel.timing?.gap ?? 5}
+                      onChange={(e) => updateEl(sel.id, { timing: { ...sel.timing, gap: parseFloat(e.target.value) || 0 } })}
+                      className="rounded-xl text-sm" data-testid="el-onchange-gap" />
+                    <Select value={sel.timing?.gapUnit || "min"} onValueChange={(v) => updateEl(sel.id, { timing: { ...sel.timing, gapUnit: v } })}>
+                      <SelectTrigger className="rounded-xl w-32" data-testid="el-onchange-gap-unit"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sec">seconds</SelectItem>
+                        <SelectItem value="min">minutes</SelectItem>
+                        <SelectItem value="hour">hours</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-[11px] text-slate-400">On top of the on-change trigger, it also appears every {sel.timing?.gap ?? 5} {sel.timing?.gapUnit || "min"} for {sel.timing?.showSeconds ?? 10}s.</p>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -345,7 +369,7 @@ export default function ElementInspector({ sel, sources = [], overlays = [], for
             <input type="range" min="0.2" max="3" step="0.1" value={sel.props.exitDuration ?? 0.6} onChange={(e) => updateProps({ exitDuration: parseFloat(e.target.value) })} className="flex-1 accent-brand-600" data-testid="prop-exit-dur" />
           </div>
         )}
-        <p className="text-[11px] text-slate-400">Speelt af wanneer het element verdwijnt (via timing: interval of bij data-wijziging).</p>
+        <p className="text-[11px] text-slate-400">Plays when the element disappears (via timing: interval or on data change).</p>
       </div>
 
       <div className="space-y-1.5 pt-3 border-t border-slate-100">

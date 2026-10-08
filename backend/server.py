@@ -1907,7 +1907,13 @@ function tick(){
     } else if(t.timing.mode==='onchange'){
       var v = t.key ? lastValues[t.key] : null;
       if(v!=null && v!=='' && v!==t._lastVal){ t._lastVal=v; t._showUntil=Date.now()+Math.max(1,(t.timing.showSeconds||10))*1000; }
-      setElVis(t, !!(t._showUntil && Date.now()<t._showUntil));
+      var visible = !!(t._showUntil && Date.now()<t._showUntil);
+      if(t.timing.alsoInterval){
+        var oshow=Math.max(1, t.timing.showSeconds||10);
+        var ocyc=oshow+elGapSeconds(t.timing);
+        if((_sod % ocyc) < oshow) visible=true;
+      }
+      setElVis(t, visible);
     }
   });
 }
