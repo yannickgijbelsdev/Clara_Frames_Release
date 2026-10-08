@@ -275,6 +275,12 @@ class FormInput(BaseModel):
     fields: List[Dict[str, Any]] = []
     workspace_id: Optional[str] = None
 
+class StreamInput(BaseModel):
+    name: str
+    url: str
+    kind: Optional[str] = None  # hls | vimeo (auto-detected from url when omitted)
+    workspace_id: Optional[str] = None
+
 class ChangePassword(BaseModel):
     current_password: str
     new_password: str
@@ -1250,6 +1256,51 @@ async def update_flow(fid: str, body: FlowInput, user: dict = Depends(get_curren
 @api_router.delete("/flows/{fid}")
 async def delete_flow(fid: str, user: dict = Depends(get_current_user)):
     await db.flows.delete_one({"id": fid, "user_id": user["id"]})
+    return {"ok": True}
+
+# ---------------------------------------------------------------------------
+# Streams (HLS / Vimeo) CRUD — live source overview on the Timeline
+# ---------------------------------------------------------------------------
+def _detect_stream_kind(url: str, kind: Optional[str]) -> str:
+    if kind in ("hls", "vimeo"):
+        return kind
+    return "vimeo" if re.search(r"vimeo\.com", url or "", re.I) else "hls"
+
+@api_router.get("/streams")
+async def list_streams(workspace_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+    q = {"user_id": user["id"]}
+    if workspace_id:
+        q["workspace_id"] = workspace_id
+    docs = await db.streams.find(q).to_list(200)
+    for d in docs:
+        d.pop("_id", None)
+    return docs
+
+@api_router.post("/streams")
+async def create_stream(body: StreamInput, user: dict = Depends(get_current_user)):
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "id": str(uuid.uuid4()), "user_id": user["id"], "workspace_id": body.workspace_id,
+        "name": body.name, "url": body.url, "kind": _detect_stream_kind(body.url, body.kind),
+        "created_at": now, "updated_at": now,
+    }
+    await db.streams.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+@api_router.put("/streams/{sid}")
+async def update_stream(sid: str, body: StreamInput, user: dict = Depends(get_current_user)):
+    existing = await db.streams.find_one({"id": sid, "user_id": user["id"]})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Stream not found")
+    await db.streams.update_one({"id": sid}, {"$set": {
+        "name": body.name, "url": body.url, "kind": _detect_stream_kind(body.url, body.kind),
+        "updated_at": datetime.now(timezone.utc).isoformat()}})
+    return await db.streams.find_one({"id": sid}, {"_id": 0})
+
+@api_router.delete("/streams/{sid}")
+async def delete_stream(sid: str, user: dict = Depends(get_current_user)):
+    await db.streams.delete_one({"id": sid, "user_id": user["id"]})
     return {"ok": True}
 
 @api_router.post("/flows/{fid}/trigger")

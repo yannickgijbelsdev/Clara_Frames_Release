@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import api from "@/lib/api";
@@ -8,8 +8,9 @@ import { nextStartMs, nextStarts, fmtCountdown, fmtClock, sequenceDuration } fro
 import { toast } from "sonner";
 import SceneCanvas from "@/components/SceneCanvas";
 import PancarteView from "@/components/PancarteView";
+import StreamMonitor from "@/components/StreamMonitor";
 import { injectFontFaces } from "@/lib/fonts";
-import { Clock, Film, Radio, Repeat, CalendarClock, Layers, Database, ChevronDown, ChevronRight, Zap, Play, Square, RotateCcw, Tv } from "lucide-react";
+import { Clock, Film, Radio, Repeat, CalendarClock, Layers, Database, ChevronDown, ChevronRight, Zap, Play, Square, RotateCcw, Tv, LayoutGrid, MonitorPlay, Volume2, Plus } from "lucide-react";
 
 const unitMult = (u) => (u === "hour" ? 3600 : u === "min" ? 60 : 1);
 
@@ -51,6 +52,45 @@ function SeqThumb({ pancarte, sourceValues }) {
   );
 }
 
+function SceneLiveCard({ scene, seqs, sourceValues, flowsData, now, onEdit }) {
+  return (
+    <div data-testid={`live-scene-${scene.id}`} className="rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="relative bg-slate-900">
+        <SceneCanvas scene={scene} sourceValues={sourceValues} flowsData={flowsData} />
+        <span className="absolute top-2 left-2 inline-flex items-center gap-1 text-[10px] font-bold text-white bg-rose-600/90 rounded-full px-2 py-0.5 pointer-events-none">
+          <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />LIVE
+        </span>
+      </div>
+      <div className="p-3">
+        <div className="flex items-center gap-2">
+          <Layers className="h-4 w-4 text-brand-600 shrink-0" />
+          <span className="font-semibold text-slate-900 truncate">{scene.name}</span>
+          <button onClick={onEdit} className="ml-auto text-xs text-brand-600 font-medium shrink-0">Edit →</button>
+        </div>
+        {seqs.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {seqs.map(({ flow, placement }) => {
+              const r = flow.repeat || "loop";
+              const sched = r === "schedule";
+              const next = sched ? nextStartMs(flow, now) : null;
+              const [txt, cls] = flow.paused ? ["Paused", "bg-amber-50 text-amber-700"]
+                : sched ? [`next ${fmtCountdown(next - now)}`, "bg-blue-50 text-blue-700"]
+                : r === "loop" ? ["On air", "bg-emerald-50 text-emerald-700"]
+                : r === "once" ? ["one-shot", "bg-slate-100 text-slate-600"]
+                : ["cyclic", "bg-slate-100 text-slate-600"];
+              return (
+                <span key={placement.id} data-testid={`live-seq-${flow.id}`} className={`inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-2 py-0.5 ${cls}`}>
+                  <Film className="h-2.5 w-2.5" />{flow.name}: {txt}
+                </span>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Timeline() {
   const nav = useNavigate();
   const { current } = useWorkspace();
@@ -59,6 +99,12 @@ export default function Timeline() {
   const [sources, setSources] = useState([]);
   const [pancartes, setPancartes] = useState([]);
   const [sourceValues, setSourceValues] = useState({});
+  const [streams, setStreams] = useState([]);
+  const [viewMode, setViewMode] = useState("grid");
+  const [audioOn, setAudioOn] = useState(false);
+  const audioCtxRef = useRef(null);
+  const [sName, setSName] = useState("");
+  const [sUrl, setSUrl] = useState("");
   const [now, setNow] = useState(Date.now());
   const [expanded, setExpanded] = useState({});
 
@@ -68,6 +114,7 @@ export default function Timeline() {
     api.get(`/flows?workspace_id=${current}`).then(({ data }) => setFlows(data)).catch(() => {});
     api.get(`/sources?workspace_id=${current}`).then(({ data }) => setSources(data)).catch(() => {});
     api.get(`/pancartes?workspace_id=${current}`).then(({ data }) => setPancartes(data)).catch(() => {});
+    api.get(`/streams?workspace_id=${current}`).then(({ data }) => setStreams(data)).catch(() => {});
     api.get(`/fonts?workspace_id=${current}`).then(({ data }) => injectFontFaces(data)).catch(() => {});
     const fetchVals = () => api.get(`/sources/values?workspace_id=${current}`).then(({ data }) => setSourceValues(data)).catch(() => {});
     fetchVals();
@@ -156,6 +203,34 @@ export default function Timeline() {
     }
   };
 
+  const enableAudio = async () => {
+    try {
+      if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      await audioCtxRef.current.resume();
+      setAudioOn(true);
+      toast.success("Audio monitoring enabled");
+    } catch (e) { toast.error("Could not start audio"); }
+  };
+
+  const addStream = async (e) => {
+    e?.preventDefault();
+    if (!sUrl.trim()) { toast.error("Enter a stream URL"); return; }
+    try {
+      const { data } = await api.post("/streams", { name: sName.trim() || "Stream", url: sUrl.trim(), workspace_id: current });
+      setStreams((s) => [...s, data]);
+      setSName(""); setSUrl("");
+      toast.success("Stream added");
+    } catch (e2) { toast.error("Could not add stream"); }
+  };
+
+  const removeStream = async (id) => {
+    try { await api.delete(`/streams/${id}`); setStreams((s) => s.filter((x) => x.id !== id)); }
+    catch (e) { toast.error("Delete failed"); }
+  };
+
+  const hlsCount = streams.filter((s) => s.kind !== "vimeo").length;
+  const liveScenes = sceneData.filter((s) => s.seqs.length || (s.scene.elements || []).length);
+
   const repeatLabel = (flow) => {
     const r = flow.repeat || "loop";
     if (r === "schedule") return flow.scheduleMode === "times" ? `at ${(flow.scheduleTimes || []).join(", ") || "—"}` : `every ${flow.scheduleEveryMin ?? 15} min`;
@@ -167,55 +242,85 @@ export default function Timeline() {
   return (
     <AppLayout title="Timeline" subtitle="What is programmed and when it comes on screen — live countdowns across all scenes.">
       <div className="space-y-6">
-        {/* Live now — on-screen previews */}
-        <div className="bg-white rounded-3xl clara-soft p-5" data-testid="timeline-livenow">
-          <div className="flex items-center gap-2 mb-4">
+        {/* Live monitor: streams + on-screen previews with a view switcher */}
+        <div className="bg-white rounded-3xl clara-soft p-5" data-testid="timeline-monitor">
+          <div className="flex flex-wrap items-center gap-2 mb-4">
             <Tv className="h-5 w-5 text-brand-600" />
-            <h2 className="font-display font-semibold text-slate-900">Live now — on-screen preview</h2>
-            <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-bold text-rose-600">
-              <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />LIVE
+            <h2 className="font-display font-semibold text-slate-900">Live monitor</h2>
+            <span className="ml-auto inline-flex items-center rounded-xl bg-slate-100 p-1 gap-1" data-testid="view-switcher">
+              <button data-testid="view-grid" onClick={() => setViewMode("grid")}
+                className={`inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 transition-colors ${viewMode === "grid" ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+                <LayoutGrid className="h-3.5 w-3.5" />Previews
+              </button>
+              <button data-testid="view-streams" onClick={() => setViewMode("streams")}
+                className={`inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 transition-colors ${viewMode === "streams" ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+                <MonitorPlay className="h-3.5 w-3.5" />Streams big
+              </button>
             </span>
+            {hlsCount > 0 && !audioOn && (
+              <button data-testid="enable-audio-btn" onClick={enableAudio}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 bg-brand-600 text-white hover:bg-brand-700 transition-colors">
+                <Volume2 className="h-3.5 w-3.5" />Enable audio
+              </button>
+            )}
+            {audioOn && <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600"><Volume2 className="h-3.5 w-3.5" />Monitoring</span>}
           </div>
-          {sceneData.filter((s) => s.seqs.length || (s.scene.elements || []).length).length === 0 ? (
-            <p className="text-sm text-slate-400">No scenes to preview yet. Build a scene with elements or sequences.</p>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {sceneData.filter((s) => s.seqs.length || (s.scene.elements || []).length).map(({ scene, seqs }) => (
-                <div key={scene.id} data-testid={`live-scene-${scene.id}`} className="rounded-2xl border border-slate-200 overflow-hidden">
-                  <div className="relative bg-slate-900">
-                    <SceneCanvas scene={scene} sourceValues={sourceValues} flowsData={flowsData} />
-                    <span className="absolute top-2 left-2 inline-flex items-center gap-1 text-[10px] font-bold text-white bg-rose-600/90 rounded-full px-2 py-0.5 pointer-events-none">
-                      <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />LIVE
-                    </span>
-                  </div>
-                  <div className="p-3">
-                    <div className="flex items-center gap-2">
-                      <Layers className="h-4 w-4 text-brand-600 shrink-0" />
-                      <span className="font-semibold text-slate-900 truncate">{scene.name}</span>
-                      <button onClick={() => nav(`/scenes/${scene.id}`)} className="ml-auto text-xs text-brand-600 font-medium shrink-0">Edit →</button>
-                    </div>
-                    {seqs.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {seqs.map(({ flow, placement }) => {
-                          const r = flow.repeat || "loop";
-                          const sched = r === "schedule";
-                          const next = sched ? nextStartMs(flow, now) : null;
-                          const [txt, cls] = flow.paused ? ["Paused", "bg-amber-50 text-amber-700"]
-                            : sched ? [`next ${fmtCountdown(next - now)}`, "bg-blue-50 text-blue-700"]
-                            : r === "loop" ? ["On air", "bg-emerald-50 text-emerald-700"]
-                            : r === "once" ? ["one-shot", "bg-slate-100 text-slate-600"]
-                            : ["cyclic", "bg-slate-100 text-slate-600"];
-                          return (
-                            <span key={placement.id} data-testid={`live-seq-${flow.id}`} className={`inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-2 py-0.5 ${cls}`}>
-                              <Film className="h-2.5 w-2.5" />{flow.name}: {txt}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    )}
+
+          {/* Add stream */}
+          <form onSubmit={addStream} className="flex flex-wrap items-center gap-2 mb-4" data-testid="add-stream-form">
+            <input data-testid="stream-name-input" value={sName} onChange={(e) => setSName(e.target.value)} placeholder="Stream name"
+              className="h-9 rounded-xl border border-slate-200 px-3 text-sm w-40" />
+            <input data-testid="stream-url-input" value={sUrl} onChange={(e) => setSUrl(e.target.value)} placeholder="HLS .m3u8 URL or https://vimeo.com/…"
+              className="h-9 rounded-xl border border-slate-200 px-3 text-sm flex-1 min-w-[220px]" />
+            <button type="submit" data-testid="add-stream-btn"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold rounded-xl px-4 h-9 bg-slate-900 text-white hover:bg-slate-800 transition-colors">
+              <Plus className="h-4 w-4" />Add stream
+            </button>
+          </form>
+
+          {viewMode === "streams" ? (
+            <div className="space-y-4">
+              {streams.length === 0 ? (
+                <p className="text-sm text-slate-400">No streams yet. Add an HLS (.m3u8) or Vimeo URL above to monitor the live source.</p>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" data-testid="streams-big">
+                  {streams.map((st) => (
+                    <StreamMonitor key={st.id} stream={st} large audioCtx={audioOn ? audioCtxRef.current : null} onRemove={() => removeStream(st.id)} />
+                  ))}
+                </div>
+              )}
+              {liveScenes.length > 0 && (
+                <div>
+                  <div className="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-2">Scene previews</div>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-testid="scene-previews-small">
+                    {liveScenes.map(({ scene, seqs }) => (
+                      <SceneLiveCard key={scene.id} scene={scene} seqs={seqs} sourceValues={sourceValues} flowsData={flowsData} now={now} onEdit={() => nav(`/scenes/${scene.id}`)} />
+                    ))}
                   </div>
                 </div>
-              ))}
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {liveScenes.length === 0 ? (
+                <p className="text-sm text-slate-400">No scenes to preview yet. Build a scene with elements or sequences.</p>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4" data-testid="scene-previews-grid">
+                  {liveScenes.map(({ scene, seqs }) => (
+                    <SceneLiveCard key={scene.id} scene={scene} seqs={seqs} sourceValues={sourceValues} flowsData={flowsData} now={now} onEdit={() => nav(`/scenes/${scene.id}`)} />
+                  ))}
+                </div>
+              )}
+              {streams.length > 0 && (
+                <div>
+                  <div className="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-2">Live streams</div>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-testid="streams-small">
+                    {streams.map((st) => (
+                      <StreamMonitor key={st.id} stream={st} audioCtx={audioOn ? audioCtxRef.current : null} onRemove={() => removeStream(st.id)} />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
