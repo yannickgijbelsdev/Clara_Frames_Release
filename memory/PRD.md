@@ -313,6 +313,9 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 
 - Added `fallback_artwork` to Now-Playing (radio) sources. When iTunes returns no album cover, the `artwork` field automatically uses a user-chosen image from the Media Library so overlays are never empty. Backend: `SourceInput.fallback_artwork`, `_prep_builtin`, create/update source, and `resolve_source_values` (fallback applied when iTunes empty). Frontend: `ImageUpload` field in Sources NP form (testid `np-fallback`). Verified via API + direct resolve unit test.
 
+- [2026-06] Sequence transition overlap fix (OVERLAY_HTML `play()`): transitions no longer blank the series layer. Overlay A stays visible, the transition plays on top (z-index), and the next overlay B is pre-rendered behind at the transition midpoint (`transMidTmr`, `preRendered`/`preRenderedNode`), so B is already there when the transition clears — no gap.
+- [2026-06] Source fetch https-fallback (`_fetch_source_sync`): on any failure for an `http://` URL (e.g. 404/redirect quirks on some networks like `http://clr.koodh.com/...`), it transparently retries over `https://`. Fixes recurring "fetch error on every API" where the endpoint only served data over HTTPS.
+
 - P1: Image/photo upload (object storage) instead of URL-only.
 - P1: Require re-auth (current password/TOTP) before 2FA reset.
 - P2: Per-column timezone/format for clock in data.json.

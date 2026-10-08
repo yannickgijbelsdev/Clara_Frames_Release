@@ -761,12 +761,23 @@ def _fetch_source_sync(url: str, method: str, headers: dict) -> Any:
         "Accept": "*/*",
     }
     hdrs.update(headers or {})
-    r = requests.request(method or "GET", url, headers=hdrs, timeout=8, allow_redirects=True)
-    r.raise_for_status()
+
+    def _do(u: str) -> Any:
+        r = requests.request(method or "GET", u, headers=hdrs, timeout=8, allow_redirects=True)
+        r.raise_for_status()
+        try:
+            return r.json()
+        except Exception:
+            return {"_text": r.text}
+
     try:
-        return r.json()
+        return _do(url)
     except Exception:
-        return {"_text": r.text}
+        # Many endpoints only serve the data over HTTPS (http:// may 404 or redirect
+        # oddly depending on the network). Transparently retry over https.
+        if isinstance(url, str) and url.startswith("http://"):
+            return _do("https://" + url[len("http://"):])
+        raise
 
 async def _itunes_artwork(term: str) -> str:
     term = (term or "").strip()
@@ -1876,22 +1887,41 @@ var placements = [];
     if(introNode) s.push({t:'part', node:introNode, sec:partSec(fIntro,3)});
     for(var i=0;i<pans.length;i++){
       s.push({t:'pan', i:i});
-      if(transNode && i<pans.length-1) s.push({t:'part', node:transNode, sec:partSec(fTrans,1)});
+      if(transNode && i<pans.length-1) s.push({t:'part', node:transNode, sec:partSec(fTrans,1), trans:true, nextPan:i+1});
     }
     if(outroNode) s.push({t:'part', node:outroNode, sec:partSec(fOutro,3)});
     return s;
   }
-  var stepArr=[], sIdx=-1, tmr=null, mediaCleanup=null;
-  function clearTmr(){ if(tmr){ clearTimeout(tmr); tmr=null; } if(mediaCleanup){ mediaCleanup(); mediaCleanup=null; } }
+  var stepArr=[], sIdx=-1, tmr=null, mediaCleanup=null, transMidTmr=null, preRendered=-1, preRenderedNode=null;
+  function clearTmr(){ if(tmr){ clearTimeout(tmr); tmr=null; } if(transMidTmr){ clearTimeout(transMidTmr); transMidTmr=null; } if(mediaCleanup){ mediaCleanup(); mediaCleanup=null; } }
   function play(k){
     clearTmr();
     if(!pans.length) return;
     if(k>=stepArr.length){ onEnd(); return; }
     sIdx=k; var st=stepArr[k];
-    if(st.t==='part'){ showPart(st.node); tmr=setTimeout(function(){ play(sIdx+1); }, st.sec*1000); }
+    if(st.t==='part'){
+      if(st.trans){
+        // Overlap transition: keep the current overlay (A) visible underneath, play the
+        // transition on top, then swap in the next overlay (B) behind it at the midpoint
+        // so there is no blank gap — when the transition clears, B is already there.
+        seriesLayer.style.display='block';
+        hideParts();
+        st.node.style.display='block'; restartPart(st.node);
+        transMidTmr=setTimeout(function(){ preRenderedNode=renderPan(st.nextPan); preRendered=st.nextPan; }, Math.max(0, st.sec*1000*0.5));
+        tmr=setTimeout(function(){
+          if(preRendered!==st.nextPan){ preRenderedNode=renderPan(st.nextPan); preRendered=st.nextPan; }
+          st.node.style.display='none';
+          play(sIdx+1);
+        }, st.sec*1000);
+      } else {
+        showPart(st.node); tmr=setTimeout(function(){ play(sIdx+1); }, st.sec*1000);
+      }
+    }
     else {
       hideParts(); seriesLayer.style.display='block';
-      var node=renderPan(st.i);
+      var node;
+      if(preRendered===st.i){ node=preRenderedNode; preRendered=-1; preRenderedNode=null; }
+      else { node=renderPan(st.i); }
       if(playoutFor(st.i)){ mediaCleanup=waitMediaEnd(node, function(){ play(sIdx+1); }, durFor(st.i)); }
       else { tmr=setTimeout(function(){ play(sIdx+1); }, durFor(st.i)*1000); }
     }
