@@ -133,6 +133,27 @@ export default function SceneEditor() {
               onSelect={(sid) => { setSelId(sid); setSelFlowId(null); }}
               onReorder={reorderEls} onToggleVisible={toggleVisible} onDelete={deleteEl} />
           </div>
+          {(scene.flows || []).length > 0 && (
+            <div className="mt-5" data-testid="scene-sequences-list">
+              <div className="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-2">Sequences in scene</div>
+              <div className="space-y-1">
+                {(scene.flows || []).map((pl) => {
+                  const def = flows.find((f) => f.id === pl.flow_id);
+                  const active = pl.id === selFlowId;
+                  return (
+                    <button key={pl.id} data-testid={`scene-seq-${pl.id}`}
+                      onClick={() => { setSelFlowId(pl.id); setSelId(null); }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border transition-colors ${active ? "bg-brand-50 border-brand-300 text-brand-700" : "text-slate-700 border-slate-100 hover:bg-slate-50"}`}>
+                      <Film className="h-3.5 w-3.5 text-brand-600 shrink-0" />
+                      <span className="truncate flex-1 text-left">{def?.name || "Pick a sequence…"}</span>
+                      {pl.enabled === false && <span className="text-[10px] text-slate-400 shrink-0">off</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1.5">Click to select &amp; position a sequence — it stays hidden on the canvas while editing.</p>
+            </div>
+          )}
           <div className="mt-5 space-y-2">
             <Label className="text-[11px] uppercase tracking-widest text-slate-400 font-bold">Background</Label>
             {(() => {
@@ -233,7 +254,7 @@ export default function SceneEditor() {
               selectedFlowId={selFlowId} onSelectFlow={(fid) => { setSelFlowId(fid); if (fid) setSelId(null); }} onUpdateFlow={updateFlow} flowsData={flowsData} sourceValues={sourceValues} showFlowPreview={showFlows} />
           </div>
           <p className="text-xs text-slate-400 mt-2 text-center">
-            {showFlows ? "Realistic preview — sequences render live but never block editing underneath." : "Sequences are hidden so you can edit freely. Drag the labelled chip to move a sequence; toggle preview to see the realistic image."}
+            {showFlows ? "Realistic preview — sequences render live but never block editing underneath." : "Sequences are hidden so you can edit freely. Select one under \u201CSequences in scene\u201D to position it, or toggle preview to see the realistic image."}
           </p>
         </div>
 

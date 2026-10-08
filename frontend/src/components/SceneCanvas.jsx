@@ -54,14 +54,17 @@ function FlowRegion({ placement, flowData, editable, selected, onPointerDownRegi
   }
   const showingSomething = !flowOff && (pan || showIntro || showOutro);
   const flowName = flow?.name || "Overlay sequence";
+  // When preview is OFF and the sequence isn't selected, render NOTHING in the edit field
+  // (fully transparent, non-interactive) so it never gets in the way of editing base elements.
+  const showChrome = editable && (showFlowPreview || selected);
 
   return (
     <div data-testid={`canvas-flow-${placement.id}`}
       style={{ position: "absolute", left: placement.x, top: placement.y, width: placement.w, height: placement.h, overflow: "hidden",
         pointerEvents: "none",
-        outline: selected ? "2px dashed #5f6da6" : (showFlowPreview ? "none" : "1px dashed rgba(95,109,166,.5)"), outlineOffset: 3,
+        outline: selected ? "2px dashed #5f6da6" : (showFlowPreview ? "none" : "none"), outlineOffset: 3,
         opacity: flowOff ? 0.4 : 1,
-        background: showFlowPreview ? (showingSomething ? "transparent" : "rgba(148,163,184,.12)") : "rgba(95,109,166,.05)" }}>
+        background: showFlowPreview ? (showingSomething ? "transparent" : "rgba(148,163,184,.12)") : (selected ? "rgba(95,109,166,.06)" : "transparent") }}>
 
       {showFlowPreview ? (
         !flow ? (
@@ -92,7 +95,7 @@ function FlowRegion({ placement, flowData, editable, selected, onPointerDownRegi
         ))
       ) : null}
 
-      {editable && (
+      {showChrome && (
         <div data-testid={`flow-handle-${placement.id}`}
           onPointerDown={(e) => onPointerDownRegion(e, placement, "move")}
           title="Drag to move sequence"
