@@ -1,0 +1,244 @@
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import api from "@/lib/api";
+import AppLayout from "@/components/AppLayout";
+import { useWorkspace } from "@/context/WorkspaceContext";
+import { nextStartMs, nextStarts, fmtCountdown, fmtClock, sequenceDuration } from "@/lib/schedule";
+import { Clock, Film, Radio, Repeat, CalendarClock, Layers, Database, ChevronDown, ChevronRight, Zap } from "lucide-react";
+
+const unitMult = (u) => (u === "hour" ? 3600 : u === "min" ? 60 : 1);
+
+// Next clock-aligned appearance for an element with interval timing.
+function elementIntervalNext(timing, nowMs) {
+  const show = Math.max(1, timing.showSeconds || 10);
+  const gap = Math.max(0, (parseFloat(timing.gap) || 0) * unitMult(timing.gapUnit || "min"));
+  const cyc = show + gap;
+  const d = new Date(nowMs);
+  const sod = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+  const phase = sod % cyc;
+  const onNow = phase < show;
+  const untilNext = onNow ? 0 : cyc - phase;
+  return { onNow, untilNext, show, cyc };
+}
+
+function MiniTimeline({ marks, windowMs = 3600000 }) {
+  // marks: array of ms offsets from now within window
+  return (
+    <div className="relative h-8 rounded-lg bg-slate-100 overflow-hidden" data-testid="mini-timeline">
+      {[0, 15, 30, 45, 60].map((m) => (
+        <div key={m} className="absolute top-0 bottom-0 border-l border-slate-200" style={{ left: `${(m / 60) * 100}%` }}>
+          <span className="absolute -top-0.5 left-1 text-[9px] text-slate-400">{m === 0 ? "now" : `+${m}m`}</span>
+        </div>
+      ))}
+      {marks.filter((o) => o >= 0 && o <= windowMs).map((o, i) => (
+        <div key={i} className="absolute top-2 bottom-2 w-1 rounded-full bg-brand-500" style={{ left: `${(o / windowMs) * 100}%` }} title={`+${Math.round(o / 60000)}m`} />
+      ))}
+    </div>
+  );
+}
+
+export default function Timeline() {
+  const nav = useNavigate();
+  const { current } = useWorkspace();
+  const [scenes, setScenes] = useState([]);
+  const [flows, setFlows] = useState([]);
+  const [sources, setSources] = useState([]);
+  const [now, setNow] = useState(Date.now());
+  const [expanded, setExpanded] = useState({});
+
+  useEffect(() => {
+    if (!current) return;
+    api.get(`/scenes?workspace_id=${current}`).then(({ data }) => setScenes(data)).catch(() => {});
+    api.get(`/flows?workspace_id=${current}`).then(({ data }) => setFlows(data)).catch(() => {});
+    api.get(`/sources?workspace_id=${current}`).then(({ data }) => setSources(data)).catch(() => {});
+  }, [current]);
+
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+
+  const flowById = useMemo(() => Object.fromEntries(flows.map((f) => [f.id, f])), [flows]);
+  const srcById = useMemo(() => Object.fromEntries(sources.map((s) => [s.id, s])), [sources]);
+
+  // Build per-scene programmed items
+  const sceneData = useMemo(() => scenes.map((scene) => {
+    const seqs = [], timedEls = [], srcIds = new Set();
+    const collectEl = (el, where) => {
+      const p = el.props || {};
+      if (p.sourceId) srcIds.add(p.sourceId);
+      const tm = el.timing || {};
+      if (tm.triggerSource) srcIds.add(tm.triggerSource);
+      if (tm.mode && tm.mode !== "always") {
+        timedEls.push({ id: el.id, name: p.name || el.type, type: el.type, timing: tm, where,
+          source: tm.triggerSource ? srcById[tm.triggerSource] : (p.sourceId ? srcById[p.sourceId] : null), field: tm.triggerField || p.fieldKey });
+      }
+    };
+    (scene.elements || []).forEach((el) => collectEl(el, "scene"));
+    (scene.flows || []).filter((pl) => pl.flow_id).forEach((pl) => {
+      const flow = flowById[pl.flow_id];
+      if (!flow) return;
+      seqs.push({ placement: pl, flow });
+      (flow.pancarte_ids || []).forEach(() => {}); // overlays' elements may bind sources too (resolved live)
+    });
+    return { scene, seqs, timedEls, srcIds: [...srcIds] };
+  }), [scenes, flowById, srcById]);
+
+  // Global "next up": scheduled sequences across all scenes sorted by next start
+  const nextUp = useMemo(() => {
+    const rows = [];
+    sceneData.forEach(({ scene, seqs }) => {
+      seqs.forEach(({ flow }) => {
+        if ((flow.repeat || "loop") === "schedule") {
+          rows.push({ scene, flow, next: nextStartMs(flow, now) });
+        }
+      });
+    });
+    return rows.sort((a, b) => a.next - b.next);
+  }, [sceneData, now]);
+
+  const toggle = (id) => setExpanded((e) => ({ ...e, [id]: !e[id] }));
+
+  const repeatLabel = (flow) => {
+    const r = flow.repeat || "loop";
+    if (r === "schedule") return flow.scheduleMode === "times" ? `at ${(flow.scheduleTimes || []).join(", ") || "—"}` : `every ${flow.scheduleEveryMin ?? 15} min`;
+    if (r === "interval") return `play, wait ${flow.repeatEvery ?? 5} min, repeat`;
+    if (r === "once") return "play once, then stop";
+    return "continuous loop";
+  };
+
+  return (
+    <AppLayout title="Timeline" subtitle="What is programmed and when it comes on screen — live countdowns across all scenes.">
+      <div className="space-y-6">
+        {/* Global next up */}
+        <div className="bg-white rounded-3xl clara-soft p-5" data-testid="timeline-nextup">
+          <div className="flex items-center gap-2 mb-4">
+            <CalendarClock className="h-5 w-5 text-brand-600" />
+            <h2 className="font-display font-semibold text-slate-900">Next up — scheduled sequences</h2>
+            <span className="ml-auto text-sm text-slate-400 tabular-nums">{fmtClock(now)}</span>
+          </div>
+          {nextUp.length === 0 ? (
+            <p className="text-sm text-slate-400">No scheduled sequences yet. Open a sequence and set "Play on a schedule".</p>
+          ) : (
+            <div className="space-y-3">
+              {nextUp.map(({ scene, flow, next }) => {
+                const marks = nextStarts(flow, 8, now).map((t) => t - now);
+                return (
+                  <div key={`${scene.id}-${flow.id}`} className="rounded-2xl border border-slate-200 p-3" data-testid={`nextup-${flow.id}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Film className="h-4 w-4 text-brand-600 shrink-0" />
+                      <button onClick={() => nav(`/sequences/${flow.id}`)} className="font-semibold text-slate-900 hover:text-brand-600 truncate">{flow.name}</button>
+                      <span className="text-xs text-slate-400 truncate">in {scene.name} · {repeatLabel(flow)}</span>
+                      <div className="ml-auto flex items-center gap-2 shrink-0">
+                        <span className="text-xs text-slate-400">next {fmtClock(next)}</span>
+                        <span className="text-lg font-bold tabular-nums text-brand-700 bg-brand-50 rounded-lg px-2 py-0.5" data-testid={`nextup-cd-${flow.id}`}>{fmtCountdown(next - now)}</span>
+                      </div>
+                    </div>
+                    <MiniTimeline marks={marks} />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Per-scene */}
+        {sceneData.map(({ scene, seqs, timedEls, srcIds }) => {
+          const open = expanded[scene.id] ?? true;
+          return (
+            <div key={scene.id} className="bg-white rounded-3xl clara-soft overflow-hidden" data-testid={`timeline-scene-${scene.id}`}>
+              <button onClick={() => toggle(scene.id)} className="w-full flex items-center gap-2 p-4 border-b border-slate-100 text-left">
+                {open ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+                <Layers className="h-5 w-5 text-brand-600" />
+                <span className="font-display font-semibold text-slate-900">{scene.name}</span>
+                <span className="text-xs text-slate-400">{seqs.length} sequence(s) · {timedEls.length} timed element(s) · {srcIds.length} source(s)</span>
+                <button onClick={(e) => { e.stopPropagation(); nav(`/scenes/${scene.id}/overview`); }} className="ml-auto text-xs text-brand-600 font-medium">Overview →</button>
+              </button>
+              {open && (
+                <div className="p-4 space-y-4">
+                  {/* Sequences */}
+                  {seqs.length > 0 && (
+                    <div>
+                      <div className="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-2 flex items-center gap-1.5"><Film className="h-3 w-3" />Sequences</div>
+                      <div className="space-y-2">
+                        {seqs.map(({ flow, placement }) => {
+                          const r = flow.repeat || "loop";
+                          const sched = r === "schedule";
+                          const next = sched ? nextStartMs(flow, now) : null;
+                          return (
+                            <div key={placement.id} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2" data-testid={`tl-seq-${flow.id}`}>
+                              <button onClick={() => nav(`/sequences/${flow.id}`)} className="font-medium text-slate-800 hover:text-brand-600 truncate">{flow.name}</button>
+                              <span className="text-xs text-slate-400 flex items-center gap-1 truncate"><Repeat className="h-3 w-3" />{repeatLabel(flow)} · ~{sequenceDuration(flow)}s / run{placement.enabled === false ? " · disabled" : ""}</span>
+                              {sched && <span className="ml-auto text-sm font-bold tabular-nums text-brand-700 bg-brand-50 rounded-lg px-2 py-0.5 shrink-0">{fmtCountdown(next - now)}</span>}
+                              {!sched && <span className="ml-auto text-xs text-slate-400 shrink-0">{r === "loop" ? "always on" : r === "once" ? "one-shot" : "cyclic"}</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Timed elements */}
+                  {timedEls.length > 0 && (
+                    <div>
+                      <div className="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-2 flex items-center gap-1.5"><Zap className="h-3 w-3" />Timed elements</div>
+                      <div className="space-y-2">
+                        {timedEls.map((el) => {
+                          const tm = el.timing;
+                          const iv = tm.mode === "interval" || tm.alsoInterval;
+                          const info = iv ? elementIntervalNext(tm, now) : null;
+                          return (
+                            <div key={el.id} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2" data-testid={`tl-el-${el.id}`}>
+                              <span className="font-medium text-slate-800 truncate">{el.name}</span>
+                              <span className="text-xs text-slate-400 truncate">
+                                {tm.mode === "onchange" ? `on change${el.source ? ` · ${el.source.name}:${el.field || ""}` : ""}${tm.alsoInterval ? ` + every ${tm.gap ?? 5}${(tm.gapUnit || "min").slice(0, 3)}` : ""}` : `every ${tm.gap ?? 5} ${tm.gapUnit || "min"} · stays ${tm.showSeconds ?? 10}s`}
+                                {el.where === "scene" ? "" : " · in overlay"}
+                              </span>
+                              {info ? (
+                                <span className="ml-auto text-sm font-bold tabular-nums shrink-0 rounded-lg px-2 py-0.5" style={{ background: info.onNow ? "#dcfce7" : "#eff6ff", color: info.onNow ? "#15803d" : "#1d4ed8" }}>
+                                  {info.onNow ? "ON NOW" : fmtCountdown(info.untilNext * 1000)}
+                                </span>
+                              ) : (
+                                <span className="ml-auto text-xs text-slate-400 shrink-0">on data change</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Linked sources */}
+                  {srcIds.length > 0 && (
+                    <div>
+                      <div className="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-2 flex items-center gap-1.5"><Database className="h-3 w-3" />Linked API sources</div>
+                      <div className="flex flex-wrap gap-2">
+                        {srcIds.map((sid) => {
+                          const s = srcById[sid];
+                          return (
+                            <button key={sid} onClick={() => nav("/sources")} className="text-xs px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 inline-flex items-center gap-1.5" data-testid={`tl-src-${sid}`}>
+                              <Radio className="h-3 w-3" />{s ? s.name : "Unknown source"}{s?.refresh_interval ? ` · ${s.refresh_interval}s` : ""}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {seqs.length === 0 && timedEls.length === 0 && srcIds.length === 0 && (
+                    <p className="text-sm text-slate-400">Nothing programmed in this scene yet.</p>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {scenes.length === 0 && (
+          <div className="bg-white rounded-3xl clara-soft p-12 text-center">
+            <Clock className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500">No scenes yet. Create a scene and add scheduled sequences to see the timeline.</p>
+          </div>
+        )}
+      </div>
+    </AppLayout>
+  );
+}

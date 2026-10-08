@@ -256,8 +256,13 @@ class FlowInput(BaseModel):
     pancarte_ids: List[str] = []
     durations: Optional[List[float]] = None   # per-item seconds (parallel to pancarte_ids)
     playouts: Optional[List[bool]] = None     # per-item "play out" flag (wait for media end)
-    repeat: Optional[str] = "loop"            # loop | once | interval
+    repeat: Optional[str] = "loop"            # loop | once | interval | schedule
     repeatEvery: Optional[float] = 5          # minutes, used when repeat == interval
+    scheduleMode: Optional[str] = "everyMin"  # times | everyMin (used when repeat == schedule)
+    scheduleTimes: Optional[List[str]] = None # ["08:00","12:30"] clock times
+    scheduleEveryMin: Optional[float] = 15    # clock-aligned minutes
+    showCountdown: Optional[bool] = False     # show on-screen countdown while waiting
+    countdownLabel: Optional[str] = None      # optional prefix label for the countdown
     intro: Optional[Dict[str, Any]] = None    # {overlayId,url,kind,fit,seconds}
     transition: Optional[Dict[str, Any]] = None  # shown between overlays
     outro: Optional[Dict[str, Any]] = None
@@ -1192,6 +1197,9 @@ async def create_flow(body: FlowInput, user: dict = Depends(get_current_user)):
         "entranceDuration": body.entranceDuration, "pancarte_ids": body.pancarte_ids,
         "durations": body.durations, "playouts": body.playouts,
         "repeat": body.repeat or "loop", "repeatEvery": body.repeatEvery,
+        "scheduleMode": body.scheduleMode or "everyMin", "scheduleTimes": body.scheduleTimes,
+        "scheduleEveryMin": body.scheduleEveryMin, "showCountdown": bool(body.showCountdown),
+        "countdownLabel": body.countdownLabel,
         "intro": body.intro, "transition": body.transition, "outro": body.outro,
         "loop": True if body.loop is None else bool(body.loop),
         "created_at": now, "updated_at": now,
@@ -1217,6 +1225,9 @@ async def update_flow(fid: str, body: FlowInput, user: dict = Depends(get_curren
         "entranceDuration": body.entranceDuration, "pancarte_ids": body.pancarte_ids,
         "durations": body.durations, "playouts": body.playouts,
         "repeat": body.repeat or "loop", "repeatEvery": body.repeatEvery,
+        "scheduleMode": body.scheduleMode or "everyMin", "scheduleTimes": body.scheduleTimes,
+        "scheduleEveryMin": body.scheduleEveryMin, "showCountdown": bool(body.showCountdown),
+        "countdownLabel": body.countdownLabel,
         "intro": body.intro, "transition": body.transition, "outro": body.outro,
         "loop": True if body.loop is None else bool(body.loop),
         "updated_at": datetime.now(timezone.utc).isoformat()}})
@@ -1770,6 +1781,36 @@ function waitMediaEnd(root, cb, fallbackSec){
   return function(){ done=true; timers.forEach(clearTimeout); if(v){ try{ v.removeEventListener('ended', finish); }catch(e){} } };
 }
 
+// Next scheduled start (ms epoch) strictly after fromMs, for repeat='schedule'.
+function nextStartMs(flow, fromMs){
+  var from = new Date(fromMs);
+  if(flow && flow.scheduleMode==='times' && flow.scheduleTimes && flow.scheduleTimes.length){
+    var best=null;
+    for(var dday=0; dday<2; dday++){
+      for(var i=0;i<flow.scheduleTimes.length;i++){
+        var parts=String(flow.scheduleTimes[i]).split(':');
+        var hh=parseInt(parts[0],10)||0, mm=parseInt(parts[1],10)||0;
+        var d=new Date(from.getFullYear(),from.getMonth(),from.getDate()+dday,hh,mm,0,0);
+        if(d.getTime()>fromMs+500 && (best===null || d.getTime()<best)) best=d.getTime();
+      }
+      if(best!==null) break;
+    }
+    return best!==null ? best : fromMs+60000;
+  }
+  // everyMin: clock-aligned from midnight
+  var n=Math.max(1,(flow&&flow.scheduleEveryMin!=null?flow.scheduleEveryMin:15));
+  var midnight=new Date(from.getFullYear(),from.getMonth(),from.getDate(),0,0,0,0).getTime();
+  var minsSince=(fromMs-midnight)/60000;
+  var nextSlot=(Math.floor(minsSince/n)+1)*n;
+  return midnight + nextSlot*60000;
+}
+function fmtCountdown(ms){
+  if(ms<0) ms=0;
+  var s=Math.floor(ms/1000), h=Math.floor(s/3600), m=Math.floor((s%3600)/60), ss=s%60;
+  function p(x){ return (x<10?'0':'')+x; }
+  return (h>0? p(h)+':' : '') + p(m)+':'+p(ss);
+}
+
 var placements = [];
 (SCENE.flows||[]).forEach(function(pl){
   var flow = pl._flow || null;
@@ -1784,6 +1825,13 @@ var placements = [];
   var seriesLayer=document.createElement('div');
   seriesLayer.style.position='absolute'; seriesLayer.style.top=0; seriesLayer.style.left=0; seriesLayer.style.width='100%'; seriesLayer.style.height='100%';
   cont.appendChild(seriesLayer);
+
+  // On-screen countdown shown while waiting (schedule/interval + showCountdown)
+  var cdNode=document.createElement('div');
+  cdNode.style.cssText='position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#fff;font-family:Inter,system-ui,sans-serif;text-align:center;';
+  var cdLabel=document.createElement('div'); cdLabel.style.cssText='font-size:28px;opacity:.75;font-weight:600;';
+  var cdTime=document.createElement('div'); cdTime.style.cssText='font-size:88px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1;';
+  cdNode.appendChild(cdLabel); cdNode.appendChild(cdTime); cont.appendChild(cdNode);
 
   // Timing/overlays live on the sequence (flow); fall back to legacy placement intro/outro.
   var fIntro = (flow && flow.intro) || sc.intro || null;
@@ -1848,16 +1896,33 @@ var placements = [];
       else { tmr=setTimeout(function(){ play(sIdx+1); }, durFor(st.i)*1000); }
     }
   }
+  function hideEverything(){ hideParts(); seriesLayer.style.display='none'; }
+  var waitUntil=0;
+  function enterWait(untilMs){
+    clearTmr(); hideEverything(); waitUntil=untilMs;
+    if(flow && flow.showCountdown){ cdNode.style.display='flex'; cdLabel.textContent=(flow.countdownLabel||'Starts in'); }
+  }
   function onEnd(){
-    if(repeat==='once'){ return; }
-    if(repeat==='interval'){ hideParts(); var wait=Math.max(1,(flow&&flow.repeatEvery!=null?flow.repeatEvery:5))*60000; tmr=setTimeout(start, wait); return; }
+    if(repeat==='once'){ clearTmr(); hideEverything(); cdNode.style.display='none'; return; }
+    if(repeat==='interval'){ enterWait(Date.now()+Math.max(1,(flow&&flow.repeatEvery!=null?flow.repeatEvery:5))*60000); return; }
+    if(repeat==='schedule'){ enterWait(nextStartMs(flow, Date.now())); return; }
     start();
   }
-  function start(){ stepArr=buildSteps(); play(0); }
-  if(pans.length){ start(); }
+  function start(){ waitUntil=0; cdNode.style.display='none'; stepArr=buildSteps(); play(0); }
+  if(pans.length){
+    if(repeat==='schedule'){ enterWait(nextStartMs(flow, Date.now())); }
+    else { start(); }
+  }
+
+  function tickPlacement(nowMs){
+    if(waitUntil){
+      if(flow && flow.showCountdown){ cdTime.textContent=fmtCountdown(waitUntil-nowMs); }
+      if(nowMs>=waitUntil){ start(); }
+    }
+  }
 
   placements.push({pl:pl, flow:flow, pans:pans, cont:cont, seriesLayer:seriesLayer,
-    getCur:function(){return cur;}, _state:null});
+    getCur:function(){return cur;}, tickPlacement:tickPlacement, _state:null});
 });
 
 function showTimedPart(node, on){
@@ -1896,6 +1961,7 @@ function tick(){
     t._vis=vis;
   });
   placements.forEach(function(f){
+    if(f.tickPlacement) f.tickPlacement(Date.now());
     var cur=f.getCur(); cur.clocks.forEach(function(c){ c.d.textContent=fmtClock(c.p.timezone,c.p.format); });
   });
   var _tn=new Date(); var _sod=_tn.getHours()*3600+_tn.getMinutes()*60+_tn.getSeconds();

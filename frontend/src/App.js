@@ -10,6 +10,7 @@ import Dashboard from "@/pages/Dashboard";
 import Scenes from "@/pages/Scenes";
 import SceneEditor from "@/pages/SceneEditor";
 import SceneOverview from "@/pages/SceneOverview";
+import Timeline from "@/pages/Timeline";
 import Pancartes from "@/pages/Pancartes";
 import PancarteEditor from "@/pages/PancarteEditor";
 import Flows from "@/pages/Flows";
@@ -60,6 +61,7 @@ function App() {
               <Route path="/overlays/:id" element={<Protected><PancarteEditor /></Protected>} />
               <Route path="/sequences" element={<Protected><Flows /></Protected>} />
               <Route path="/sequences/:id" element={<Protected><FlowEditor /></Protected>} />
+              <Route path="/timeline" element={<Protected><Timeline /></Protected>} />
               <Route path="/forms" element={<Protected><Forms /></Protected>} />
               <Route path="/forms/:id" element={<Protected><FormEditor /></Protected>} />
               <Route path="/messages" element={<Protected><Messages /></Protected>} />

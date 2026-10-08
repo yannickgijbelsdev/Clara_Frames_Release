@@ -135,6 +135,7 @@ export default function AppLayout({ children, title, subtitle, actions }) {
     { to: "/scenes", label: "Scenes" },
     { to: "/overlays", label: "Overlays" },
     { to: "/sequences", label: "Sequences" },
+    { to: "/timeline", label: "Timeline" },
     { to: "/forms", label: "Forms" },
     { to: "/messages", label: "Messages", badge: unread },
     { to: "/sources", label: "API Sources" },

@@ -4,6 +4,7 @@ import api from "@/lib/api";
 import AppLayout from "@/components/AppLayout";
 import { PrimaryButton, SecondaryButton } from "@/components/PrimaryButton";
 import PancarteView from "@/components/PancarteView";
+import { nextStartMs, fmtCountdown } from "@/lib/schedule";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -87,6 +88,19 @@ function PartPicker({ label, hint, value, assets, onChange, testid }) {
   );
 }
 
+// Live "next start" countdown for scheduled sequences.
+function NextStartCountdown({ flow }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const next = nextStartMs(flow, now);
+  return (
+    <div className="rounded-xl bg-slate-900 text-white px-3 py-2.5 flex items-center justify-between" data-testid="flow-next-start">
+      <span className="text-xs opacity-70">Next start</span>
+      <span className="text-lg font-bold tabular-nums">{fmtCountdown(next - now)}</span>
+    </div>
+  );
+}
+
 export default function FlowEditor() {
   const { id } = useParams();
   const nav = useNavigate();
@@ -140,6 +154,8 @@ export default function FlowEditor() {
         name: flow.name, interval: flow.interval, entrance: flow.entrance, entranceDuration: flow.entranceDuration,
         pancarte_ids: flow.pancarte_ids, durations: norm(durs, baseDur), playouts: norm(plays, false),
         repeat: flow.repeat || "loop", repeatEvery: flow.repeatEvery ?? 5,
+        scheduleMode: flow.scheduleMode || "everyMin", scheduleTimes: flow.scheduleTimes || [],
+        scheduleEveryMin: flow.scheduleEveryMin ?? 15, showCountdown: !!flow.showCountdown, countdownLabel: flow.countdownLabel || "",
         intro: flow.intro || null, transition: flow.transition || null, outro: flow.outro || null,
       });
       if (!silent) toast.success("Sequence saved");
@@ -175,6 +191,7 @@ export default function FlowEditor() {
                   <SelectItem value="loop">Loop immediately</SelectItem>
                   <SelectItem value="once">Play once, then stop</SelectItem>
                   <SelectItem value="interval">Play all, wait, then repeat</SelectItem>
+                  <SelectItem value="schedule">Play on a schedule</SelectItem>
                 </SelectContent>
               </Select></div>
             {repeat === "interval" && (
@@ -183,6 +200,49 @@ export default function FlowEditor() {
                 <Input type="number" min="0.1" step="0.5" value={flow.repeatEvery ?? 5} onChange={(e) => setFlow({ ...flow, repeatEvery: parseFloat(e.target.value) || 1 })} className="w-20 rounded-lg text-xs h-8" data-testid="flow-repeatevery" />
                 <span className="text-xs text-slate-400">min before replaying</span>
               </div>
+            )}
+            {repeat === "schedule" && (
+              <div className="space-y-2.5" data-testid="flow-schedule-block">
+                <div className="space-y-1.5"><Label>Schedule type</Label>
+                  <Select value={flow.scheduleMode || "everyMin"} onValueChange={(v) => setFlow({ ...flow, scheduleMode: v })}>
+                    <SelectTrigger className="rounded-xl" data-testid="flow-sched-mode"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="everyMin">Every N minutes (clock-aligned)</SelectItem>
+                      <SelectItem value="times">At specific times</SelectItem>
+                    </SelectContent>
+                  </Select></div>
+                {(flow.scheduleMode || "everyMin") === "everyMin" ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 shrink-0">Every</span>
+                    <Input type="number" min="1" value={flow.scheduleEveryMin ?? 15} onChange={(e) => setFlow({ ...flow, scheduleEveryMin: parseInt(e.target.value) || 1 })} className="w-20 rounded-lg text-xs h-8" data-testid="flow-sched-every" />
+                    <span className="text-xs text-slate-400">min (e.g. :00 :15 :30 :45)</span>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5"><Label>Start times</Label>
+                    <div className="space-y-1.5">
+                      {(flow.scheduleTimes || []).map((t, i) => (
+                        <div key={i} className="flex items-center gap-2" data-testid={`sched-time-${i}`}>
+                          <Input type="time" value={t} onChange={(e) => setFlow({ ...flow, scheduleTimes: (flow.scheduleTimes || []).map((x, idx) => idx === i ? e.target.value : x) })} className="rounded-lg text-xs h-8" />
+                          <button onClick={() => setFlow({ ...flow, scheduleTimes: (flow.scheduleTimes || []).filter((_, idx) => idx !== i) })} className="h-7 w-7 flex items-center justify-center rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-600" data-testid={`sched-time-remove-${i}`}><X className="h-4 w-4" /></button>
+                        </div>
+                      ))}
+                      <button onClick={() => setFlow({ ...flow, scheduleTimes: [...(flow.scheduleTimes || []), "12:00"] })} className="text-xs text-brand-600 font-medium inline-flex items-center gap-1" data-testid="sched-time-add"><Plus className="h-3 w-3" />Add time</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {(repeat === "schedule" || repeat === "interval") && (
+              <>
+                <label className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 cursor-pointer" data-testid="flow-countdown-field">
+                  <span className="text-sm font-medium text-slate-700">Show on-screen countdown</span>
+                  <input type="checkbox" checked={!!flow.showCountdown} onChange={(e) => setFlow({ ...flow, showCountdown: e.target.checked })} className="h-4 w-4 rounded accent-brand-600" />
+                </label>
+                {flow.showCountdown && (
+                  <Input value={flow.countdownLabel ?? ""} onChange={(e) => setFlow({ ...flow, countdownLabel: e.target.value })} placeholder="Countdown label (e.g. Starts in)" className="rounded-xl text-sm" data-testid="flow-countdown-label" />
+                )}
+                {repeat === "schedule" && <NextStartCountdown flow={flow} />}
+              </>
             )}
             <div className="space-y-1.5"><Label>Entrance transition</Label>
               <Select value={flow.entrance || "none"} onValueChange={(v) => setFlow({ ...flow, entrance: v })}>
