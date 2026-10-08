@@ -1,0 +1,32 @@
+{
+  "summary": "Verified the new schedule + countdown + Timeline feature end-to-end. Backend pytest (6/6) in /app/backend/tests/test_schedule_countdown.py: new flow fields (repeat='schedule', scheduleMode 'everyMin'/'times', scheduleTimes[], scheduleEveryMin, showCountdown, countdownLabel) round-trip POST->GET /api/flows/{id}; 'repeat'='once' persists; the public overlay HTML (GET /api/public/scene/{token}/overlay) returns 200 and contains the scheduling client logic nextStartMs, fmtCountdown, enterWait; for a scheduled flow attached to the scene, scheduleEveryMin/scheduleTimes are embedded in the SCENE JSON. Regression lists /flows /scenes /overlays all 200. Frontend (Playwright, admin + MFA): (a) /timeline shows timeline-nextup (1 item for 'Sched Test'), per-scene timeline-scene-* panel, nextup-cd-<flowId> ticks live (04:43 -> 04:41 observed), mini-timeline bar renders, expanding scene shows tl-seq-* for the scheduled flow. (b) /sequences/<id> (Sched Test) exposes all new testids: flow-repeat-field, flow-schedule-block, flow-sched-mode, flow-sched-every, flow-countdown-field, flow-countdown-label, flow-next-start — flow-next-start ticks live (01:38->ticks). Switching flow-sched-mode to 'At specific times' hides flow-sched-every and reveals sched-time-add; add creates sched-time-{i} rows (0 -> 1 -> 2), sched-time-remove-0 removes a row; value '09:30' entered, save, reload — mode persisted as 'At specific times' and sched-time-0 value re-renders as 09:30. Repeat dropdown options: 'Loop immediately', 'Play once, then stop', 'Play all, wait, then repeat', 'Play on a schedule'. Countdown toggle+label visible in both schedule and interval modes. (c) /scenes still renders list; placed-flow timing hint lives inside flow panel (empty scene in this install, no placements to expand). Behaviour (once/schedule) is driven by the overlay HTML: onEnd() for repeat='once' calls hideEverything()+hides cdNode (nothing visible after last overlay); for repeat='schedule' overlay starts in enterWait(nextStartMs()) showing the countdown node, not the first pancarte.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Timeline.jsx scene header", "issue": "React hydration warning: <button> cannot be a descendant of <button>. The outer header toggle button (line 148) contains the inner 'Overview →' button (line 153). Replace outer <button> with a <div role=\"button\" onClick=...> or move 'Overview →' outside the toggle button.", "selector": "[data-testid^=\"timeline-scene-\"] > button > button", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_schedule_countdown.py",
+    "/app/test_reports/pytest/schedule_countdown.xml"
+  ],
+  "action_items": [
+    "Fix nested <button> inside Timeline scene header (hydration warning) — move the 'Overview →' button out of the collapsible toggle button, or make the toggle a non-button container."
+  ],
+  "critical_code_review_comments": [
+    "Timeline.jsx:148-153 renders a <button> inside a <button> — invalid HTML and causes React hydration console error on every /timeline load. Fix by changing the outer element to a div with role='button' (keyboard-accessible) or splitting the two controls.",
+    "schedule.js nextStartMs mirrors server.py — good; but server uses local server time while browser uses local browser time, so a client in a different timezone than the server will see a drifted 'next start'. Confirm this is intended (probably yes, since 'HH:MM' are user-local)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_schedule_countdown.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "yannick.gijbels@koodh.com / KYLovie13monx + TOTP(NKSPU7UH4M5BJ3X3353DNTNA54YNIJSY)",
+  "seed_data_creation": "Transient test flows TEST_sched_everymin / TEST_sched_times / TEST_once_flow / TEST_sched_overlay_check — all deleted at end of each test. UI test left the existing 'Sched Test' flow (35024371-eb4d-4169-91f1-54260aa8658b) back on scheduleMode='everyMin', scheduleEveryMin=15, showCountdown=true (same state as before), label 'Volgende show' (user had set it). One ephemeral '09:30' time was added during the times-mode persistence test and then reverted (mode set back to everyMin + saved).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Scheduling + countdown feature is production-green. New flow fields that persist: repeat ('loop'|'once'|'interval'|'schedule'), scheduleMode ('everyMin'|'times'), scheduleTimes[] (HH:MM strings), scheduleEveryMin (number), showCountdown (bool), countdownLabel (string|null). Overlay HTML embeds them in SCENE JSON and the client-side state machine lives in nextStartMs/fmtCountdown/enterWait/tickPlacement/onEnd — for repeat='once' onEnd hides everything; for repeat='schedule' overlay starts in enterWait(nextStartMs). FlowEditor testids: flow-repeat-field, flow-repeatevery-row/flow-repeatevery (interval only), flow-schedule-block, flow-sched-mode, flow-sched-every (everyMin only), sched-time-add, sched-time-{i}, sched-time-remove-{i}, flow-countdown-field, flow-countdown-label, flow-next-start. Timeline testids: timeline-nextup, nextup-{flowId}, nextup-cd-{flowId}, mini-timeline, timeline-scene-{sceneId}, tl-seq-{flowId}, tl-el-{elId}, tl-src-{sourceId}. Known cosmetic bug: nested <button> in Timeline.jsx scene header (hydration warning).",
+  "rca of the issue": "N/A — feature verification pass; the originally reported sequence-end bug for 'Play once' is fixed in /app/backend/server.py onEnd(): when repeat==='once' it clearTmr() + hideEverything() + hides the countdown node (nothing remains on screen). The new scheduling path (interval + schedule) uses enterWait(untilMs) which hides overlays, optionally shows the countdown node (if flow.showCountdown), and ticks fmtCountdown(waitUntil-nowMs) until the next slot."
+}

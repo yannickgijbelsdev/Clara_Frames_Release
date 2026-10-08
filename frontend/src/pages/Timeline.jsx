@@ -145,13 +145,13 @@ export default function Timeline() {
           const open = expanded[scene.id] ?? true;
           return (
             <div key={scene.id} className="bg-white rounded-3xl clara-soft overflow-hidden" data-testid={`timeline-scene-${scene.id}`}>
-              <button onClick={() => toggle(scene.id)} className="w-full flex items-center gap-2 p-4 border-b border-slate-100 text-left">
+              <div role="button" tabIndex={0} onClick={() => toggle(scene.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") toggle(scene.id); }} className="w-full flex items-center gap-2 p-4 border-b border-slate-100 text-left cursor-pointer select-none">
                 {open ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
                 <Layers className="h-5 w-5 text-brand-600" />
                 <span className="font-display font-semibold text-slate-900">{scene.name}</span>
                 <span className="text-xs text-slate-400">{seqs.length} sequence(s) · {timedEls.length} timed element(s) · {srcIds.length} source(s)</span>
                 <button onClick={(e) => { e.stopPropagation(); nav(`/scenes/${scene.id}/overview`); }} className="ml-auto text-xs text-brand-600 font-medium">Overview →</button>
-              </button>
+              </div>
               {open && (
                 <div className="p-4 space-y-4">
                   {/* Sequences */}

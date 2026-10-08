@@ -279,6 +279,13 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Media type detection is extension-based (URL without known ext defaults to image).
 
 ## Backlog / next
+### 2026-06 — Sequence scheduling, countdown & Timeline page
+- Fixed "sequence never stops": repeat `once` now plays through (incl. outro) then hides everything (`onEnd`→`hideEverything`).
+- New per-sequence schedule (repeat=`schedule`): `scheduleMode` `everyMin` (clock-aligned N min) or `times` (HH:MM list); sequence starts by waiting for the next slot, plays once-through, then waits for the following slot. `interval` repeat also now uses the shared wait path.
+- Countdown: `showCountdown` + `countdownLabel` render an on-screen countdown in vMix while waiting (`cdNode`, `nextStartMs`/`fmtCountdown`/`enterWait`/`tickPlacement`); plus a live "Next start" countdown in the sequence editor.
+- New **Timeline** page (`/timeline`): global "Next up" (scheduled sequences sorted by next start, live countdown + next-hour mini timeline) and per-scene expandable panels listing sequences (scheduled → countdown), timed elements (interval → ON NOW/countdown, on-change → label) and linked API sources. Shared `lib/schedule.js` mirrors the server logic.
+- Verified: testing agent iteration 23 — backend 6/6 (pytest), frontend 100%; fixed a LOW nested-button hydration warning in the Timeline scene header.
+
 ### 2026-06 — Real data in editor/list previews
 - The inline `PancarteView` previews (Overlays list, Sequences list + sequence editor live preview & thumbnails, Scene Overview overlay thumbnails) now load live source values via `/api/sources/values` (polled every 5s) and pass them to `PancarteView`, so api_field text and bound/Now-Playing artwork images render real data instead of placeholders. Verified: a live "Bohemian Rhapsody" song + cover showed correctly in the Overlays card preview.
 
