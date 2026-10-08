@@ -47,7 +47,7 @@ export default function Pancartes() {
     try { const { data } = await api.get(`/sources?workspace_id=${current}`); sources = data; } catch (e) {}
     const np = sources.find((s) => s.type === "builtin_nowplaying");
     if (!np) {
-      toast.error("Maak eerst een 'Now Playing (radio)' bron aan onder API Sources.");
+      toast.error("Create a 'Now Playing (radio)' source first under API Sources.");
       return;
     }
     const { data } = await api.post("/pancartes", {
@@ -74,10 +74,10 @@ export default function Pancartes() {
     toast.success("Overlay duplicated"); load();
   };
   const remove = async (id) => { await api.delete(`/pancartes/${id}`); toast.success("Overlay deleted"); load(); };
-  const copyLink = (p) => { try { navigator.clipboard.writeText(`${BACKEND}/api/public/overlay/${p.public_token}/overlay`); toast.success("vMix overlay-link gekopieerd"); } catch (e) { toast.error("Kon niet kopiëren"); } };
+  const copyLink = (p) => { try { navigator.clipboard.writeText(`${BACKEND}/api/public/overlay/${p.public_token}/overlay`); toast.success("vMix overlay link copied"); } catch (e) { toast.error("Could not copy"); } };
 
   return (
-    <AppLayout title="Overlays" subtitle={`${items.length} overlay-ontwerp(en) · elk met eigen vMix-link, herbruikbaar in reeksen & scenes`}
+    <AppLayout title="Overlays" subtitle={`${items.length} overlay design(s) · each with its own vMix link, reusable across sequences & scenes`}
       actions={<div className="flex items-center gap-2">
         <SecondaryButton icon={Music} data-testid="np-template-btn" onClick={createNowPlaying}>Now Playing overlay</SecondaryButton>
         <PrimaryButton icon={Plus} data-testid="new-pancarte-btn" onClick={() => setOpen(true)}>New overlay</PrimaryButton>
@@ -86,7 +86,7 @@ export default function Pancartes() {
       {items.length === 0 ? (
         <div className="bg-white rounded-3xl clara-soft p-12 text-center">
           <LayoutTemplate className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-          <p className="text-slate-500">Nog geen overlays. Ontwerp een overlay met eigen achtergrond, beelden en teksten.</p>
+          <p className="text-slate-500">No overlays yet. Design an overlay with its own background, images and texts.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
@@ -105,7 +105,7 @@ export default function Pancartes() {
                   <div className="text-xs text-slate-400">{(p.elements || []).length} element(s)</div>
                 </div>
                 <button data-testid={`live-pancarte-${p.id}`} onClick={() => setLiveItem(p)} title="Live view (vMix)" className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors"><Radio className="h-4 w-4" /></button>
-                <button data-testid={`link-pancarte-${p.id}`} onClick={() => copyLink(p)} title="Kopieer vMix-link" className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"><Link2 className="h-4 w-4" /></button>
+                <button data-testid={`link-pancarte-${p.id}`} onClick={() => copyLink(p)} title="Copy vMix link" className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"><Link2 className="h-4 w-4" /></button>
                 <button data-testid={`dup-pancarte-${p.id}`} onClick={() => duplicate(p)} className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"><Copy className="h-4 w-4" /></button>
                 <SecondaryButton icon={Pencil} data-testid={`edit-pancarte-${p.id}`} onClick={() => nav(`/overlays/${p.id}`)}>Edit</SecondaryButton>
                 <button data-testid={`del-pancarte-${p.id}`} onClick={() => remove(p.id)} className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"><Trash2 className="h-4 w-4" /></button>

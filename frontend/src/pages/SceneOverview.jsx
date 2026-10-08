@@ -13,7 +13,7 @@ function LinkRow({ url, testid }) {
   return (
     <div className="flex items-center gap-1.5">
       <code className="flex-1 min-w-0 truncate text-[10px] font-mono bg-slate-900 text-slate-100 rounded-lg px-2 py-1.5" data-testid={`${testid}-url`}>{url}</code>
-      <button data-testid={`${testid}-copy`} onClick={() => { navigator.clipboard.writeText(url); toast.success("vMix-link gekopieerd"); }}
+      <button data-testid={`${testid}-copy`} onClick={() => { try { navigator.clipboard.writeText(url); toast.success("vMix link copied"); } catch (e) { toast.error("Could not copy"); } }}
         className="h-7 w-7 shrink-0 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"><Link2 className="h-3.5 w-3.5" /></button>
     </div>
   );
@@ -33,7 +33,7 @@ export default function SceneOverview() {
       const ws = data.workspace_id || "";
       api.get(`/flows?workspace_id=${ws}`).then(({ data: f }) => setFlows(f)).catch(() => {});
       api.get(`/pancartes?workspace_id=${ws}`).then(({ data: p }) => setPancartes(p)).catch(() => {});
-    }).catch(() => { toast.error("Scene niet gevonden"); nav("/scenes"); });
+    }).catch(() => { toast.error("Scene not found"); nav("/scenes"); });
   }, [id]);
 
   const panById = useMemo(() => Object.fromEntries(pancartes.map((p) => [p.id, p])), [pancartes]);
@@ -45,10 +45,10 @@ export default function SceneOverview() {
   const placements = (scene.flows || []).filter((pl) => pl.flow_id);
 
   return (
-    <AppLayout title={`${scene.name} — Overzicht`} subtitle="De volledige scene plus elke losse overlay, elk met eigen vMix-link."
+    <AppLayout title={`${scene.name} — Overview`} subtitle="The full scene plus every individual overlay, each with its own vMix link."
       actions={<>
         <SecondaryButton icon={ArrowLeft} onClick={() => nav("/scenes")}>Scenes</SecondaryButton>
-        <SecondaryButton icon={Film} onClick={() => nav(`/scenes/${id}`)}>Bewerk scene</SecondaryButton>
+        <SecondaryButton icon={Film} onClick={() => nav(`/scenes/${id}`)}>Edit scene</SecondaryButton>
       </>}>
 
       <div className="space-y-6">
@@ -57,8 +57,8 @@ export default function SceneOverview() {
           <div className="p-4 flex items-center gap-2 border-b border-slate-100">
             <MonitorPlay className="h-5 w-5 text-brand-600" />
             <div className="flex-1 min-w-0">
-              <div className="font-display font-semibold text-slate-900">Volledige scene</div>
-              <div className="text-xs text-slate-400">Basislaag + {placements.length} reeks(en) · gecombineerde vMix-link</div>
+              <div className="font-display font-semibold text-slate-900">Full scene</div>
+              <div className="text-xs text-slate-400">Base layer + {placements.length} sequence(s) · combined vMix link</div>
             </div>
             <SecondaryButton icon={Radio} data-testid="overview-scene-live" onClick={() => setLive({ token: scene.public_token, name: scene.name, kind: "scene" })}>Live view</SecondaryButton>
           </div>
@@ -67,23 +67,23 @@ export default function SceneOverview() {
               <iframe title="scene" src={sceneUrl} scrolling="no" style={{ width: "100%", height: "100%", border: 0, background: "#0b1020" }} />
             </div>
             <div className="space-y-2 self-center">
-              <div className="text-[11px] uppercase tracking-widest text-slate-400 font-bold">vMix overlay-link (volledige scene)</div>
+              <div className="text-[11px] uppercase tracking-widest text-slate-400 font-bold">vMix overlay link (full scene)</div>
               <LinkRow url={sceneUrl} testid="overview-scene-link" />
-              <div className="text-xs text-slate-400">{(scene.elements || []).length} element(en) in de basislaag.</div>
+              <div className="text-xs text-slate-400">{(scene.elements || []).length} element(s) in the base layer.</div>
             </div>
           </div>
         </div>
 
-        {/* Individual overlays per reeks */}
+        {/* Individual overlays per sequence */}
         <div>
           <div className="flex items-center gap-2 mb-3">
             <Layers className="h-4 w-4 text-slate-400" />
-            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">Losse overlays in deze scene</h2>
+            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">Individual overlays in this scene</h2>
           </div>
 
           {placements.length === 0 ? (
             <div className="bg-white rounded-3xl clara-soft p-10 text-center">
-              <p className="text-slate-500">Nog geen reeksen in deze scene. Voeg een "Overlay-reeks" toe in de scene-editor.</p>
+              <p className="text-slate-500">No sequences in this scene yet. Add an "Overlay sequence" in the scene editor.</p>
             </div>
           ) : (
             <div className="space-y-5">
@@ -95,11 +95,11 @@ export default function SceneOverview() {
                   <div key={pl.id || pi} className="bg-white rounded-3xl clara-soft p-4" data-testid={`overview-reeks-${pl.id || pi}`}>
                     <div className="flex items-center gap-2 mb-3">
                       <Film className="h-4 w-4 text-brand-600" />
-                      <div className="font-semibold text-slate-900">{flow ? flow.name : "Onbekende reeks"}</div>
-                      <span className="text-xs text-slate-400">· {ids.length} overlay(s){pl.enabled === false ? " · uitgeschakeld" : ""}</span>
+                      <div className="font-semibold text-slate-900">{flow ? flow.name : "Unknown sequence"}</div>
+                      <span className="text-xs text-slate-400">· {ids.length} overlay(s){pl.enabled === false ? " · disabled" : ""}</span>
                     </div>
                     {ids.length === 0 ? (
-                      <p className="text-sm text-slate-400">Deze reeks bevat nog geen overlays.</p>
+                      <p className="text-sm text-slate-400">This sequence has no overlays yet.</p>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                         {ids.map((pid, i) => {
@@ -116,7 +116,7 @@ export default function SceneOverview() {
                               </div>
                               <div className="p-3 space-y-2">
                                 <div className="flex items-center gap-2">
-                                  <div className="flex-1 min-w-0 text-sm font-medium text-slate-800 truncate">{p.name}{off ? " (uit)" : ""}</div>
+                                  <div className="flex-1 min-w-0 text-sm font-medium text-slate-800 truncate">{p.name}{off ? " (off)" : ""}</div>
                                   <button data-testid={`overview-overlay-live-${p.id}`} onClick={() => setLive({ token: p.public_token, name: p.name, kind: "overlay" })}
                                     title="Live view" className="h-8 w-8 shrink-0 flex items-center justify-center rounded-full text-slate-400 hover:bg-brand-50 hover:text-brand-600"><Radio className="h-4 w-4" /></button>
                                 </div>

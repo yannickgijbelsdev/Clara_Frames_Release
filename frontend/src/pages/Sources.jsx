@@ -162,9 +162,9 @@ export default function Sources() {
                   Fetch album cover automatically (iTunes)
                 </label>
                 <div className="space-y-1.5">
-                  <Label>Fallback-afbeelding (als iTunes geen hoesje vindt)</Label>
+                  <Label>Fallback image (when iTunes finds no cover)</Label>
                   <ImageUpload value={form.fallback_artwork} onChange={(v) => setForm({ ...form, fallback_artwork: v })} testid="np-fallback" accept="image/*" />
-                  <p className="text-[11px] text-slate-400">Wordt automatisch in het <code className="font-mono">artwork</code>-veld gebruikt zodra iTunes geen album cover vindt, zodat je overlay nooit leeg blijft.</p>
+                  <p className="text-[11px] text-slate-400">Automatically used in the <code className="font-mono">artwork</code> field whenever iTunes finds no album cover, so your overlay is never empty.</p>
                 </div>
                 <p className="text-[11px] text-slate-400">Exposes separate fields: <code className="font-mono">artist</code>, <code className="font-mono">title</code>, <code className="font-mono">song</code> and <code className="font-mono">artwork</code>. Place each as its own element to style independently; bind an image to <code className="font-mono">artwork</code> for the album cover.</p>
               </>

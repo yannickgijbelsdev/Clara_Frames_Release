@@ -65,12 +65,12 @@ export default function Messages() {
         artwork: song.artwork || "", preview: song.preview || "",
       });
       setLive(data.live);
-      toast.success("Live gezet in de overlay");
-    } catch (e) { toast.error("Live zetten mislukt"); }
+      toast.success("Set live in the overlay");
+    } catch (e) { toast.error("Failed to set live"); }
   };
   const clearLive = async () => {
-    try { await api.delete(`/sources/live?workspace_id=${current}`); setLive(null); toast.success("Live leeggemaakt"); }
-    catch (e) { toast.error("Leegmaken mislukt"); }
+    try { await api.delete(`/sources/live?workspace_id=${current}`); setLive(null); toast.success("Live cleared"); }
+    catch (e) { toast.error("Failed to clear"); }
   };
 
   const formsById = useMemo(() => Object.fromEntries(forms.map((f) => [f.id, f])), [forms]);
@@ -103,9 +103,9 @@ export default function Messages() {
     try {
       const { data } = await api.put(`/submissions/${s.id}`, { data: draft });
       setSubs((arr) => arr.map((x) => x.id === s.id ? { ...x, data: data.data } : x));
-      toast.success("Bericht bijgewerkt");
+      toast.success("Message updated");
       setEditing(null); setDraft({});
-    } catch (e) { toast.error("Opslaan mislukt"); }
+    } catch (e) { toast.error("Save failed"); }
   };
   const setDraftVal = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
 
@@ -174,7 +174,7 @@ export default function Messages() {
                       <div className="mt-3 space-y-2.5" data-testid={`message-edit-${s.id}`}>
                         {[...fields, ...extraKeys.map((k) => ({ key: k, label: k }))].map((f) => {
                           const val = draft[f.key];
-                          if (f.type === "song_pick") return <div key={f.key} className="text-xs text-slate-400">{f.label}: nummers kunnen hier niet bewerkt worden.</div>;
+                          if (f.type === "song_pick") return <div key={f.key} className="text-xs text-slate-400">{f.label}: songs cannot be edited here.</div>;
                           if (f.type === "checkbox") return (
                             <label key={f.key} className="flex items-center gap-2 text-sm text-slate-700">
                               <input type="checkbox" checked={val === true || val === "true" || val === "on"} onChange={(e) => setDraftVal(f.key, e.target.checked)} className="h-4 w-4 accent-brand-600" data-testid={`edit-field-${f.key}`} />{f.label}

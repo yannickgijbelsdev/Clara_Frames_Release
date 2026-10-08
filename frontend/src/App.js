@@ -58,8 +58,8 @@ function App() {
               <Route path="/scenes/:id/export" element={<Protected><ExportPage /></Protected>} />
               <Route path="/overlays" element={<Protected><Pancartes /></Protected>} />
               <Route path="/overlays/:id" element={<Protected><PancarteEditor /></Protected>} />
-              <Route path="/reeksen" element={<Protected><Flows /></Protected>} />
-              <Route path="/reeksen/:id" element={<Protected><FlowEditor /></Protected>} />
+              <Route path="/sequences" element={<Protected><Flows /></Protected>} />
+              <Route path="/sequences/:id" element={<Protected><FlowEditor /></Protected>} />
               <Route path="/forms" element={<Protected><Forms /></Protected>} />
               <Route path="/forms/:id" element={<Protected><FormEditor /></Protected>} />
               <Route path="/messages" element={<Protected><Messages /></Protected>} />

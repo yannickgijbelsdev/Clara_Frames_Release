@@ -68,7 +68,7 @@ export default function Scenes() {
                   <div className="font-semibold text-slate-900 truncate">{s.name}</div>
                   <div className="text-xs text-slate-400">{(s.elements || []).length} element(s)</div>
                 </div>
-                <button data-testid={`overview-scene-${s.id}`} onClick={() => nav(`/scenes/${s.id}/overview`)} title="Overzicht"
+                <button data-testid={`overview-scene-${s.id}`} onClick={() => nav(`/scenes/${s.id}/overview`)} title="Overview"
                   className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors"><Layers className="h-4 w-4" /></button>
                 <button data-testid={`live-scene-${s.id}`} onClick={() => setLiveScene(s)} title="Live view"
                   className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors"><Radio className="h-4 w-4" /></button>

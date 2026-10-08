@@ -123,7 +123,7 @@ export default function SceneEditor() {
             ))}
             <button data-testid="add-flow" onClick={addFlow}
               className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 border border-brand-200 bg-brand-50/40 transition-colors">
-              <Film className="h-4 w-4 text-brand-600" />Overlay-reeks
+              <Film className="h-4 w-4 text-brand-600" />Overlay sequence
             </button>
           </div>
           <div className="mt-5">
@@ -230,15 +230,15 @@ export default function SceneEditor() {
           {selFlow ? (
             <div className="space-y-3" data-testid="flow-panel">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] uppercase tracking-widest text-slate-400 font-bold">Overlay-reeks</span>
+                <span className="text-[11px] uppercase tracking-widest text-slate-400 font-bold">Overlay sequence</span>
                 <button data-testid="delete-flow-btn" onClick={delFlow} className="text-slate-400 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
               </div>
-              <div className="space-y-1.5"><Label>Welke reeks</Label>
+              <div className="space-y-1.5"><Label>Which sequence</Label>
                 <Select value={selFlow.flow_id || ""} onValueChange={(v) => updateFlow(selFlow.id, { flow_id: v })}>
-                  <SelectTrigger className="rounded-xl" data-testid="flow-select"><SelectValue placeholder="Kies een reeks" /></SelectTrigger>
+                  <SelectTrigger className="rounded-xl" data-testid="flow-select"><SelectValue placeholder="Choose a sequence" /></SelectTrigger>
                   <SelectContent>{flows.map((f) => <SelectItem key={f.id} value={f.id}>{f.name} ({(f.pancarte_ids || []).length})</SelectItem>)}</SelectContent>
                 </Select>
-                <button onClick={() => nav("/reeksen")} className="text-xs text-brand-600 font-medium inline-flex items-center gap-1 mt-1"><Layers className="h-3 w-3" />Maak / bewerk reeksen</button>
+                <button onClick={() => nav("/sequences")} className="text-xs text-brand-600 font-medium inline-flex items-center gap-1 mt-1"><Layers className="h-3 w-3" />Create / edit sequences</button>
               </div>
               {selFlowDef && (
                 <div className="rounded-xl bg-slate-50 border border-slate-100 p-2.5 text-xs text-slate-500">
@@ -247,13 +247,13 @@ export default function SceneEditor() {
               )}
 
               <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2">
-                <span className="text-sm font-medium text-slate-700 inline-flex items-center gap-2"><Power className="h-4 w-4 text-brand-600" />Reeks actief in deze scene</span>
+                <span className="text-sm font-medium text-slate-700 inline-flex items-center gap-2"><Power className="h-4 w-4 text-brand-600" />Sequence enabled in this scene</span>
                 <Switch data-testid="flow-enabled-toggle" checked={selFlow.enabled !== false} onCheckedChange={(v) => updateFlow(selFlow.id, { enabled: v })} />
               </div>
 
               {selFlowDef && (selFlowDef.pancarte_ids || []).length > 0 && (
                 <div className="space-y-1.5">
-                  <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Overlays in deze scene</Label>
+                  <Label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Overlays in this scene</Label>
                   <div className="space-y-1" data-testid="flow-pancarte-toggles">
                     {(selFlowDef.pancarte_ids || []).map((pid) => {
                       const p = pancartesById[pid];
@@ -272,7 +272,7 @@ export default function SceneEditor() {
                       );
                     })}
                   </div>
-                  <p className="text-[11px] text-slate-400">Uitgezette overlays worden overgeslagen — enkel in deze scène.</p>
+                  <p className="text-[11px] text-slate-400">Disabled overlays are skipped — only in this scene.</p>
                 </div>
               )}
 
@@ -316,7 +316,7 @@ export default function SceneEditor() {
                         <div className="space-y-1.5"><Label>Overlaps first … sec</Label>
                           <Input type="number" min="0" value={sch.intro?.leadSeconds ?? 5} onChange={(e) => updateSchedule({ intro: { ...sch.intro, leadSeconds: parseInt(e.target.value) || 0 } })} className="rounded-xl text-sm" data-testid="flow-intro-lead" /></div>
                       )}
-                      {overlays.length === 0 && <p className="text-[11px] text-slate-400">Upload assets op de Assets-pagina om ze hier te gebruiken.</p>}
+                      {overlays.length === 0 && <p className="text-[11px] text-slate-400">Upload assets on the Assets page to use them here.</p>}
                     </div>
 
                     <div className="space-y-1.5 pt-2 border-t border-slate-100">
