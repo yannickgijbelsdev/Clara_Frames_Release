@@ -279,6 +279,9 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 - Media type detection is extension-based (URL without known ext defaults to image).
 
 ## Backlog / next
+### 2026-06 — Koodh favicon
+- Generated a centered, square favicon from the Koodh beak logo (`src/assets/koodh-beak.png`): trimmed + padded, exported to `public/favicon.ico` (16/32/48), `favicon.png` (64), `apple-touch-icon.png` (180), and 192/512 PWA icons. Added `<link rel="icon">` + apple-touch-icon in `index.html` and set `theme-color` to the brand blue (#6f7fbf). Verified all assets serve 200.
+
 ### 2026-06 — On-change + separate interval for elements
 - Elements in "Show when data changes" (onchange) mode can now ALSO appear on their own interval: new `timing.alsoInterval` flag reusing `gap`/`gapUnit` + `showSeconds`. In the overlay generator the onchange branch OR-combines the trigger visibility with a clock-aligned interval window. Inspector: "Also show on an interval" toggle + interval (sec/min/hour). Verified: timing persists round-trip, overlay HTML 200 + embeds the logic. (Also translated remaining Dutch inspector strings to English.)
 
