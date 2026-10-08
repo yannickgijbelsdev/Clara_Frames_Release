@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useLayoutEffect, useCallback } from "react";
+import { GripVertical } from "lucide-react";
 import { elBoxStyle, ElementContent, animStyle, entranceStyle, flowEntranceStyle, BackgroundLayer } from "@/lib/elementRender";
 import PancarteView from "@/components/PancarteView";
 
@@ -13,7 +14,7 @@ function OverlaySurface({ ov }) {
 
 const PREVIEW_GAP = 1.5; // compact pause between timed cycles in the editor preview
 
-function FlowRegion({ placement, flowData, editable, selected, onPointerDownRegion, sourceValues }) {
+function FlowRegion({ placement, flowData, editable, selected, onPointerDownRegion, sourceValues, showFlowPreview = true }) {
   const flow = flowData?.flow || null;
   const sc = placement.schedule || {};
   const disabled = new Set(placement.disabledPancartes || []);
@@ -52,57 +53,73 @@ function FlowRegion({ placement, flowData, editable, selected, onPointerDownRegi
     }
   }
   const showingSomething = !flowOff && (pan || showIntro || showOutro);
+  const flowName = flow?.name || "Overlay sequence";
 
   return (
     <div data-testid={`canvas-flow-${placement.id}`}
-      onPointerDown={editable ? (e) => onPointerDownRegion(e, placement, "move") : undefined}
-      onClick={(e) => e.stopPropagation()}
       style={{ position: "absolute", left: placement.x, top: placement.y, width: placement.w, height: placement.h, overflow: "hidden",
-        cursor: editable ? "move" : "default", outline: selected ? "2px dashed #5f6da6" : "none", outlineOffset: 3,
+        pointerEvents: "none",
+        outline: selected ? "2px dashed #5f6da6" : (showFlowPreview ? "none" : "1px dashed rgba(95,109,166,.5)"), outlineOffset: 3,
         opacity: flowOff ? 0.4 : 1,
-        background: showingSomething ? "transparent" : "rgba(148,163,184,.12)" }}>
-      {!flow ? (
-        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8",
-          border: "2px dashed rgba(148,163,184,.5)", borderRadius: 12, fontSize: 14, textAlign: "center", padding: 8 }}>
-          Pick a flow in the panel →
+        background: showFlowPreview ? (showingSomething ? "transparent" : "rgba(148,163,184,.12)") : "rgba(95,109,166,.05)" }}>
+
+      {showFlowPreview ? (
+        !flow ? (
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8",
+            border: "2px dashed rgba(148,163,184,.5)", borderRadius: 12, fontSize: 14, textAlign: "center", padding: 8 }}>
+            Pick a flow in the panel →
+          </div>
+        ) : flowOff ? (
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8",
+            border: "2px dashed rgba(148,163,184,.5)", borderRadius: 12, fontSize: 14, textAlign: "center", padding: 8 }}>
+            Flow disabled in this scene
+          </div>
+        ) : (!pancartes.length ? (
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8",
+            border: "2px dashed rgba(148,163,184,.5)", borderRadius: 12, fontSize: 14, textAlign: "center", padding: 8 }}>
+            {allPancartes.length ? "All pancartes turned off" : "Flow has no pancartes yet"}
+          </div>
+        ) : (
+          <div style={{ position: "absolute", inset: 0 }}>
+            {pan && (
+              <div key={pan.id} style={{ position: "absolute", inset: 0, ...flowEntranceStyle(flow) }}>
+                <PancarteView pancarte={pan} sourceValues={sourceValues} />
+              </div>
+            )}
+            {showIntro && <div style={{ position: "absolute", inset: 0, animation: "clara-in-fade .4s ease-out both" }}><OverlaySurface ov={sc.intro} /></div>}
+            {showOutro && <div style={{ position: "absolute", inset: 0, animation: "clara-in-fade .4s ease-out both" }}><OverlaySurface ov={sc.outro} /></div>}
+          </div>
+        ))
+      ) : null}
+
+      {editable && (
+        <div data-testid={`flow-handle-${placement.id}`}
+          onPointerDown={(e) => onPointerDownRegion(e, placement, "move")}
+          title="Drag to move sequence"
+          style={{ position: "absolute", top: 4, left: 4, pointerEvents: "auto", cursor: "move", maxWidth: "calc(100% - 8px)",
+            display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, letterSpacing: ".02em",
+            color: "#fff", background: selected ? "#5f6da6" : "rgba(15,23,42,.75)", padding: "3px 8px 3px 5px", borderRadius: 999 }}>
+          <GripVertical size={12} style={{ flexShrink: 0, opacity: .8 }} />
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{flowName}</span>
         </div>
-      ) : flowOff ? (
-        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8",
-          border: "2px dashed rgba(148,163,184,.5)", borderRadius: 12, fontSize: 14, textAlign: "center", padding: 8 }}>
-          Flow disabled in this scene
-        </div>
-      ) : (!pancartes.length ? (
-        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8",
-          border: "2px dashed rgba(148,163,184,.5)", borderRadius: 12, fontSize: 14, textAlign: "center", padding: 8 }}>
-          {allPancartes.length ? "All pancartes turned off" : "Flow has no pancartes yet"}
-        </div>
-      ) : (
-        <div style={{ position: "absolute", inset: 0 }}>
-          {pan && (
-            <div key={pan.id} style={{ position: "absolute", inset: 0, ...flowEntranceStyle(flow) }}>
-              <PancarteView pancarte={pan} sourceValues={sourceValues} />
-            </div>
-          )}
-          {showIntro && <div style={{ position: "absolute", inset: 0, animation: "clara-in-fade .4s ease-out both" }}><OverlaySurface ov={sc.intro} /></div>}
-          {showOutro && <div style={{ position: "absolute", inset: 0, animation: "clara-in-fade .4s ease-out both" }}><OverlaySurface ov={sc.outro} /></div>}
-        </div>
-      ))}
-      {timed && !flowOff && showingSomething && (
+      )}
+
+      {timed && showFlowPreview && !flowOff && showingSomething && (
         <span data-testid={`flow-phase-${placement.id}`}
-          style={{ position: "absolute", top: 6, left: 6, fontSize: 11, fontWeight: 700, letterSpacing: ".04em", textTransform: "uppercase",
+          style={{ position: "absolute", top: 6, right: 6, fontSize: 11, fontWeight: 700, letterSpacing: ".04em", textTransform: "uppercase",
             color: "#fff", background: "rgba(15,23,42,.72)", padding: "2px 8px", borderRadius: 999, pointerEvents: "none" }}>
           {showIntro ? "Intro + " : ""}{showOutro ? "End + " : ""}{label}
         </span>
       )}
       {selected && editable && (
         <div onPointerDown={(e) => onPointerDownRegion(e, placement, "resize")}
-          style={{ position: "absolute", right: -6, bottom: -6, width: 16, height: 16, background: "#5f6da6", borderRadius: 4, cursor: "nwse-resize", border: "2px solid #fff" }} />
+          style={{ position: "absolute", right: -6, bottom: -6, width: 16, height: 16, pointerEvents: "auto", background: "#5f6da6", borderRadius: 4, cursor: "nwse-resize", border: "2px solid #fff" }} />
       )}
     </div>
   );
 }
 
-export default function SceneCanvas({ scene, editable = false, selectedId, onSelect, onUpdate, sourceValues, selectedFlowId, onSelectFlow, onUpdateFlow, flowsData = {} }) {
+export default function SceneCanvas({ scene, editable = false, selectedId, onSelect, onUpdate, sourceValues, selectedFlowId, onSelectFlow, onUpdateFlow, flowsData = {}, showFlowPreview = true }) {
   const wrapRef = useRef(null);
   const [scale, setScale] = useState(0.3);
   const [, force] = useState(0);
@@ -190,7 +207,7 @@ export default function SceneCanvas({ scene, editable = false, selectedId, onSel
         })}
         {(scene.flows || []).map((pl) => (
           <FlowRegion key={pl.id} placement={pl} flowData={flowsData[pl.flow_id]} editable={editable}
-            selected={editable && pl.id === selectedFlowId} sourceValues={sourceValues}
+            selected={editable && pl.id === selectedFlowId} sourceValues={sourceValues} showFlowPreview={showFlowPreview}
             onPointerDownRegion={(e, item, mode) => onPointerDown(e, item, mode, "flow")} />
         ))}
       </div>

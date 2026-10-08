@@ -5,7 +5,8 @@ import api from "@/lib/api";
 import AppLayout from "@/components/AppLayout";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { nextStartMs, nextStarts, fmtCountdown, fmtClock, sequenceDuration } from "@/lib/schedule";
-import { Clock, Film, Radio, Repeat, CalendarClock, Layers, Database, ChevronDown, ChevronRight, Zap } from "lucide-react";
+import { toast } from "sonner";
+import { Clock, Film, Radio, Repeat, CalendarClock, Layers, Database, ChevronDown, ChevronRight, Zap, Play } from "lucide-react";
 
 const unitMult = (u) => (u === "hour" ? 3600 : u === "min" ? 60 : 1);
 
@@ -97,6 +98,15 @@ export default function Timeline() {
 
   const toggle = (id) => setExpanded((e) => ({ ...e, [id]: !e[id] }));
 
+  const triggerNow = async (flow) => {
+    try {
+      await api.post(`/flows/${flow.id}/trigger`);
+      toast.success(`"${flow.name}" triggered — live overlays start now`);
+    } catch (e) {
+      toast.error("Trigger failed");
+    }
+  };
+
   const repeatLabel = (flow) => {
     const r = flow.repeat || "loop";
     if (r === "schedule") return flow.scheduleMode === "times" ? `at ${(flow.scheduleTimes || []).join(", ") || "—"}` : `every ${flow.scheduleEveryMin ?? 15} min`;
@@ -130,6 +140,10 @@ export default function Timeline() {
                       <div className="ml-auto flex items-center gap-2 shrink-0">
                         <span className="text-xs text-slate-400">next {fmtClock(next)}</span>
                         <span className="text-lg font-bold tabular-nums text-brand-700 bg-brand-50 rounded-lg px-2 py-0.5" data-testid={`nextup-cd-${flow.id}`}>{fmtCountdown(next - now)}</span>
+                        <button data-testid={`nextup-trigger-${flow.id}`} onClick={() => triggerNow(flow)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold rounded-lg px-2.5 py-1 bg-brand-600 text-white hover:bg-brand-700 transition-colors">
+                          <Play className="h-3 w-3" />Now
+                        </button>
                       </div>
                     </div>
                     <MiniTimeline marks={marks} />
@@ -169,6 +183,10 @@ export default function Timeline() {
                               <span className="text-xs text-slate-400 flex items-center gap-1 truncate"><Repeat className="h-3 w-3" />{repeatLabel(flow)} · ~{sequenceDuration(flow)}s / run{placement.enabled === false ? " · disabled" : ""}</span>
                               {sched && <span className="ml-auto text-sm font-bold tabular-nums text-brand-700 bg-brand-50 rounded-lg px-2 py-0.5 shrink-0">{fmtCountdown(next - now)}</span>}
                               {!sched && <span className="ml-auto text-xs text-slate-400 shrink-0">{r === "loop" ? "always on" : r === "once" ? "one-shot" : "cyclic"}</span>}
+                              <button data-testid={`tl-seq-trigger-${flow.id}`} onClick={() => triggerNow(flow)} title="Start this sequence now on live overlays"
+                                className="inline-flex items-center gap-1 text-xs font-semibold rounded-lg px-2.5 py-1 bg-brand-600 text-white hover:bg-brand-700 transition-colors shrink-0">
+                                <Play className="h-3 w-3" />Now
+                              </button>
                             </div>
                           );
                         })}

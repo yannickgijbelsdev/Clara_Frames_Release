@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Save, Upload, Trash2, ArrowLeft, Loader2, Copy, Film, Layers, Radio, Power } from "lucide-react";
+import { Save, Upload, Trash2, ArrowLeft, Loader2, Copy, Film, Layers, Radio, Power, Eye, EyeOff } from "lucide-react";
 import { templates, TOOLS, uid } from "@/lib/elementDefs";
 import { Switch } from "@/components/ui/switch";
 import LiveViewDialog from "@/components/LiveViewDialog";
@@ -32,6 +32,7 @@ export default function SceneEditor() {
   const [selFlowId, setSelFlowId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [liveOpen, setLiveOpen] = useState(false);
+  const [showFlows, setShowFlows] = useState(false);
 
   useEffect(() => {
     api.get(`/scenes/${id}`).then(({ data }) => setScene(data)).catch(() => { toast.error("Scene not found"); nav("/scenes"); });
@@ -218,11 +219,22 @@ export default function SceneEditor() {
 
         {/* canvas */}
         <div className="bg-slate-100 rounded-3xl clara-soft p-4">
+          <div className="flex items-center justify-between mb-3 gap-2">
+            <span className="text-xs text-slate-500">Click an element to edit · drag the corner to resize</span>
+            <button data-testid="toggle-flow-preview"
+              onClick={() => setShowFlows((v) => !v)}
+              className={`inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-3 py-1.5 border transition-colors ${showFlows ? "bg-brand-600 text-white border-brand-600" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}>
+              {showFlows ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+              {showFlows ? "Overlay preview: on" : "Overlay preview: off"}
+            </button>
+          </div>
           <div className="rounded-2xl overflow-hidden ring-1 ring-slate-300 shadow-inner">
             <SceneCanvas scene={scene} editable selectedId={selId} onSelect={(sid) => { setSelId(sid); if (sid) setSelFlowId(null); }} onUpdate={updateEl}
-              selectedFlowId={selFlowId} onSelectFlow={(fid) => { setSelFlowId(fid); if (fid) setSelId(null); }} onUpdateFlow={updateFlow} flowsData={flowsData} sourceValues={sourceValues} />
+              selectedFlowId={selFlowId} onSelectFlow={(fid) => { setSelFlowId(fid); if (fid) setSelId(null); }} onUpdateFlow={updateFlow} flowsData={flowsData} sourceValues={sourceValues} showFlowPreview={showFlows} />
           </div>
-          <p className="text-xs text-slate-400 mt-2 text-center">Canvas {scene.width}×{scene.height} · click an element to edit · drag the corner to resize</p>
+          <p className="text-xs text-slate-400 mt-2 text-center">
+            {showFlows ? "Realistic preview — sequences render live but never block editing underneath." : "Sequences are hidden so you can edit freely. Drag the labelled chip to move a sequence; toggle preview to see the realistic image."}
+          </p>
         </div>
 
         {/* properties */}

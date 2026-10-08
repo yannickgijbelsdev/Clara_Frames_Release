@@ -1058,7 +1058,10 @@ async def test_source(source_id: str, user: dict = Depends(get_current_user)):
     source = await db.sources.find_one({"id": source_id, "user_id": user["id"]})
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
-    values = await resolve_source_values(source)
+    # "Test" is an explicit connectivity check — always force a fresh fetch (bypass the
+    # cache) so a stale last_error from a past failure never lingers once the API is back.
+    probe = {**source, "last_fetched": None, "last_raw": None}
+    values = await resolve_source_values(probe)
     refreshed = await db.sources.find_one({"id": source_id})
     return {"values": values, "error": refreshed.get("last_error"),
             "raw": refreshed.get("last_raw")}
@@ -1248,6 +1251,16 @@ async def update_flow(fid: str, body: FlowInput, user: dict = Depends(get_curren
 async def delete_flow(fid: str, user: dict = Depends(get_current_user)):
     await db.flows.delete_one({"id": fid, "user_id": user["id"]})
     return {"ok": True}
+
+@api_router.post("/flows/{fid}/trigger")
+async def trigger_flow(fid: str, user: dict = Depends(get_current_user)):
+    """Manually start a sequence right now (overlays pick this up via /version polling)."""
+    existing = await db.flows.find_one({"id": fid, "user_id": user["id"]})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Flow not found")
+    ts = int(datetime.now(timezone.utc).timestamp() * 1000)
+    await db.flows.update_one({"id": fid}, {"$set": {"manual_trigger": ts}})
+    return {"ok": True, "manual_trigger": ts}
 
 async def expand_scene_flows(scene: dict) -> dict:
     """Attach resolved flow + pancarte docs to each scene flow placement (for the overlay)."""
@@ -1952,7 +1965,8 @@ var placements = [];
   }
 
   placements.push({pl:pl, flow:flow, pans:pans, cont:cont, seriesLayer:seriesLayer,
-    getCur:function(){return cur;}, tickPlacement:tickPlacement, _state:null});
+    getCur:function(){return cur;}, tickPlacement:tickPlacement, _state:null,
+    _lastTrig:(flow && flow.manual_trigger) || 0, triggerNow:function(){ if(pans.length){ start(); } }});
 });
 
 function showTimedPart(node, on){
@@ -2033,22 +2047,40 @@ setInterval(poll, 5000); poll();
   setInterval(function(){
     fetch(PUBBASE + '/version', {cache:'no-store'})
       .then(function(r){ return r.json(); })
-      .then(function(d){ if(!d || !d.v) return; if(!_ver){ _ver = d.v; return; } if(d.v !== _ver){ location.reload(true); } })
+      .then(function(d){
+        if(!d) return;
+        if(d.triggers){ placements.forEach(function(f){ if(!f.flow) return; var t=d.triggers[f.flow.id]; if(t && t>(f._lastTrig||0)){ f._lastTrig=t; if(f.triggerNow) f.triggerNow(); } }); }
+        if(!d.v) return;
+        if(!_ver){ _ver = d.v; return; }
+        if(d.v !== _ver){ location.reload(true); }
+      })
       .catch(function(){});
   }, 4000);
 })();
 </script>
 </body></html>"""
 
+async def _scene_triggers(scene: dict) -> Dict[str, int]:
+    """Latest manual-trigger timestamp per sequence used in this scene (ms epoch)."""
+    out: Dict[str, int] = {}
+    for pl in scene.get("flows", []):
+        fid = pl.get("flow_id")
+        if not fid or fid in out:
+            continue
+        flow = await db.flows.find_one({"id": fid}, {"manual_trigger": 1})
+        if flow and flow.get("manual_trigger"):
+            out[fid] = flow["manual_trigger"]
+    return out
+
 @api_router.get("/public/scene/{token}/version")
 async def public_version(token: str):
     scene = await _get_public_scene(token)
-    return JSONResponse({"v": scene.get("updated_at") or ""}, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
+    return JSONResponse({"v": scene.get("updated_at") or "", "triggers": await _scene_triggers(scene)}, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
 
 @api_router.get("/public/overlay/{token}/version")
 async def public_overlay_version(token: str):
     scene = await _get_public_overlay_scene(token)
-    return JSONResponse({"v": scene.get("updated_at") or ""}, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
+    return JSONResponse({"v": scene.get("updated_at") or "", "triggers": await _scene_triggers(scene)}, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
 
 async def _scene_values(scene: dict) -> Dict[str, Any]:
     out: Dict[str, Any] = {}
