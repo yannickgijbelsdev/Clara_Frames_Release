@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, MonitorPlay, Radio, Layers } from "lucide-react";
+import { Plus, Pencil, Trash2, MonitorPlay, Radio, Layers, Check } from "lucide-react";
 import LiveViewDialog from "@/components/LiveViewDialog";
 
 export default function Scenes() {
@@ -20,6 +20,8 @@ export default function Scenes() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [liveScene, setLiveScene] = useState(null);
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameVal, setRenameVal] = useState("");
 
   const load = () => { if (current) api.get(`/scenes?workspace_id=${current}`).then(({ data }) => setScenes(data)).catch(() => {}); };
   useEffect(() => { load(); }, [current]);
@@ -43,6 +45,16 @@ export default function Scenes() {
     load();
   };
 
+  const startRename = (s) => { setRenamingId(s.id); setRenameVal(s.name || ""); };
+  const saveRename = async (s) => {
+    const nm = renameVal.trim();
+    setRenamingId(null);
+    if (!nm || nm === s.name) return;
+    setScenes((xs) => xs.map((x) => x.id === s.id ? { ...x, name: nm } : x));
+    try { await api.post(`/scenes/${s.id}/rename`, { name: nm }); toast.success("Renamed"); }
+    catch (e) { toast.error("Rename failed"); load(); }
+  };
+
   return (
     <AppLayout title="Scenes" subtitle={`${scenes.length} overlay scene(s)`}
       actions={<PrimaryButton icon={Plus} data-testid="new-scene-btn" onClick={() => setOpen(true)}>New scene</PrimaryButton>}>
@@ -63,16 +75,29 @@ export default function Scenes() {
                   <SceneCanvas scene={s} />
                 </div>
               </div>
-              <div className="p-4 flex items-center gap-3">
+              <div className="p-4 flex items-center gap-2">
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-slate-900 truncate">{s.name}</div>
-                  <div className="text-xs text-slate-400">{(s.elements || []).length} element(s)</div>
+                  {renamingId === s.id ? (
+                    <input autoFocus value={renameVal} onChange={(e) => setRenameVal(e.target.value)}
+                      onBlur={() => saveRename(s)}
+                      onKeyDown={(e) => { if (e.key === "Enter") saveRename(s); if (e.key === "Escape") setRenamingId(null); }}
+                      data-testid={`rename-scene-input-${s.id}`}
+                      className="w-full font-semibold text-slate-900 border-b-2 border-brand-400 outline-none bg-transparent" />
+                  ) : (
+                    <button onClick={() => startRename(s)} title="Click to rename" data-testid={`scene-title-${s.id}`}
+                      className="font-semibold text-slate-900 truncate hover:text-brand-600 text-left block w-full">{s.name}</button>
+                  )}
+                  <div className="text-xs text-slate-400">{(s.elements || []).length} element(s) · {(s.flows || []).length} sequence(s)</div>
                 </div>
+                <button data-testid={`rename-scene-${s.id}`} onClick={() => (renamingId === s.id ? saveRename(s) : startRename(s))} title="Rename"
+                  className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
+                  {renamingId === s.id ? <Check className="h-4 w-4 text-brand-600" /> : <Pencil className="h-4 w-4" />}
+                </button>
                 <button data-testid={`overview-scene-${s.id}`} onClick={() => nav(`/scenes/${s.id}/overview`)} title="Overview"
                   className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors"><Layers className="h-4 w-4" /></button>
                 <button data-testid={`live-scene-${s.id}`} onClick={() => setLiveScene(s)} title="Live view"
                   className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors"><Radio className="h-4 w-4" /></button>
-                <SecondaryButton icon={Pencil} data-testid={`edit-scene-${s.id}`} onClick={() => nav(`/scenes/${s.id}`)}>Edit</SecondaryButton>
+                <SecondaryButton icon={MonitorPlay} data-testid={`edit-scene-${s.id}`} onClick={() => nav(`/scenes/${s.id}`)}>Open</SecondaryButton>
                 <button data-testid={`del-scene-${s.id}`} onClick={() => remove(s.id)} className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"><Trash2 className="h-4 w-4" /></button>
               </div>
             </motion.div>

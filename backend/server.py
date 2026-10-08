@@ -281,6 +281,9 @@ class StreamInput(BaseModel):
     kind: Optional[str] = None  # hls | vimeo (auto-detected from url when omitted)
     workspace_id: Optional[str] = None
 
+class RenameInput(BaseModel):
+    name: str
+
 class ChangePassword(BaseModel):
     current_password: str
     new_password: str
@@ -1130,6 +1133,14 @@ async def delete_scene(scene_id: str, user: dict = Depends(get_current_user)):
     await db.scenes.delete_one({"id": scene_id, "user_id": user["id"]})
     return {"ok": True}
 
+@api_router.post("/scenes/{scene_id}/rename")
+async def rename_scene(scene_id: str, body: RenameInput, user: dict = Depends(get_current_user)):
+    existing = await db.scenes.find_one({"id": scene_id, "user_id": user["id"]})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Scene not found")
+    await db.scenes.update_one({"id": scene_id}, {"$set": {"name": body.name, "updated_at": datetime.now(timezone.utc).isoformat()}})
+    return {"ok": True, "name": body.name}
+
 @api_router.post("/scenes/{scene_id}/regenerate-token")
 async def regenerate_token(scene_id: str, user: dict = Depends(get_current_user)):
     existing = await db.scenes.find_one({"id": scene_id, "user_id": user["id"]})
@@ -1234,6 +1245,29 @@ async def get_flow(fid: str, user: dict = Depends(get_current_user)):
     if not doc:
         raise HTTPException(status_code=404, detail="Flow not found")
     return doc
+
+@api_router.post("/flows/{fid}/duplicate")
+async def duplicate_flow(fid: str, user: dict = Depends(get_current_user)):
+    src = await db.flows.find_one({"id": fid, "user_id": user["id"]}, {"_id": 0})
+    if not src:
+        raise HTTPException(status_code=404, detail="Flow not found")
+    now = datetime.now(timezone.utc).isoformat()
+    copy = {**src, "id": str(uuid.uuid4()), "name": f"{src.get('name', 'Sequence')} (copy)",
+            "created_at": now, "updated_at": now}
+    copy.pop("manual_trigger", None)
+    copy.pop("manual_stop", None)
+    copy.pop("paused", None)
+    await db.flows.insert_one(copy)
+    copy.pop("_id", None)
+    return copy
+
+@api_router.post("/flows/{fid}/rename")
+async def rename_flow(fid: str, body: RenameInput, user: dict = Depends(get_current_user)):
+    existing = await db.flows.find_one({"id": fid, "user_id": user["id"]})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Flow not found")
+    await db.flows.update_one({"id": fid}, {"$set": {"name": body.name, "updated_at": datetime.now(timezone.utc).isoformat()}})
+    return {"ok": True, "name": body.name}
 
 @api_router.put("/flows/{fid}")
 async def update_flow(fid: str, body: FlowInput, user: dict = Depends(get_current_user)):

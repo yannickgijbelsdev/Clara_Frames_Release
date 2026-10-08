@@ -327,6 +327,8 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 
 - [2026-06 follow-up] Timeline live-stream monitor: new `streams` collection + CRUD (`/api/streams`, auto-detects hls/vimeo). Timeline has an "Add stream" form (per workspace), a view switcher (Previews grid ↔ Streams big side-by-side), and `StreamMonitor` tiles — HLS via hls.js with a REAL stereo Web Audio VU meter (`VUMeter.jsx`, needs a one-time "Enable audio" gesture + CORS-enabled stream), Vimeo via background iframe with a LIVE indicator + "Audio not available via Vimeo" note (browser can't tap Vimeo iframe audio). Structural/flow verified via screenshot; live stream playback itself can't be verified in the headless preview sandbox.
 
+- [2026-06 follow-up] Sequences: duplicate + quick rename. New `POST /api/flows/{fid}/duplicate` (deep-copies all settings, name " (copy)", resets trigger/stop/paused) and safe `POST /api/flows/{fid}/rename` + `POST /api/scenes/{scene_id}/rename` (RenameInput — only the name is written, so sequence/scene config is never overwritten). Sequences list (`Flows.jsx`) and Scenes list (`Scenes.jsx`) have inline click-to-rename titles + rename/duplicate(sequences) icon buttons. Multiple sequences per scene already supported (SceneEditor "Overlay sequence" adds unlimited placements, each with its own sequence picker). Verified end-to-end + desktop/mobile screenshot.
+
 - P1: Image/photo upload (object storage) instead of URL-only.
 - P1: Require re-auth (current password/TOTP) before 2FA reset.
 - P2: Per-column timezone/format for clock in data.json.

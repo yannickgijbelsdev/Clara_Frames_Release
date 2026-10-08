@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Film, Clock } from "lucide-react";
+import { Plus, Pencil, Trash2, Film, Clock, Copy, Check } from "lucide-react";
 
 export default function Flows() {
   const nav = useNavigate();
@@ -20,6 +20,8 @@ export default function Flows() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [sourceValues, setSourceValues] = useState({});
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameVal, setRenameVal] = useState("");
 
   const load = () => {
     if (!current) return;
@@ -43,6 +45,19 @@ export default function Flows() {
     nav(`/sequences/${data.id}`);
   };
   const remove = async (id) => { await api.delete(`/flows/${id}`); toast.success("Sequence deleted"); load(); };
+  const duplicate = async (id) => {
+    try { await api.post(`/flows/${id}/duplicate`); toast.success("Sequence duplicated"); load(); }
+    catch (e) { toast.error("Duplicate failed"); }
+  };
+  const startRename = (f) => { setRenamingId(f.id); setRenameVal(f.name || ""); };
+  const saveRename = async (f) => {
+    const nm = renameVal.trim();
+    setRenamingId(null);
+    if (!nm || nm === f.name) return;
+    setFlows((xs) => xs.map((x) => x.id === f.id ? { ...x, name: nm } : x));
+    try { await api.post(`/flows/${f.id}/rename`, { name: nm }); toast.success("Renamed"); }
+    catch (e) { toast.error("Rename failed"); load(); }
+  };
 
   return (
     <AppLayout title="Sequences" subtitle={`${flows.length} sequence(s) · overlays that play one after another`}
@@ -66,12 +81,27 @@ export default function Flows() {
                     {first ? <PancarteView pancarte={first} sourceValues={sourceValues} /> : <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">No overlays</div>}
                   </div>
                 </div>
-                <div className="p-4 flex items-center gap-3">
+                <div className="p-4 flex items-center gap-2">
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-slate-900 truncate">{f.name}</div>
+                    {renamingId === f.id ? (
+                      <input autoFocus value={renameVal} onChange={(e) => setRenameVal(e.target.value)}
+                        onBlur={() => saveRename(f)}
+                        onKeyDown={(e) => { if (e.key === "Enter") saveRename(f); if (e.key === "Escape") setRenamingId(null); }}
+                        data-testid={`rename-flow-input-${f.id}`}
+                        className="w-full font-semibold text-slate-900 border-b-2 border-brand-400 outline-none bg-transparent" />
+                    ) : (
+                      <button onClick={() => startRename(f)} title="Click to rename" data-testid={`flow-title-${f.id}`}
+                        className="font-semibold text-slate-900 truncate hover:text-brand-600 text-left block w-full">{f.name}</button>
+                    )}
                     <div className="text-xs text-slate-400 flex items-center gap-1"><Clock className="h-3 w-3" />{(f.pancarte_ids || []).length} overlay(s) · {f.repeat === "once" ? "play once" : f.repeat === "interval" ? `repeat every ${f.repeatEvery ?? 5}m` : f.repeat === "schedule" ? (f.scheduleMode === "times" ? "scheduled times" : `every ${f.scheduleEveryMin ?? 15}m`) : "loop"}</div>
                   </div>
-                  <SecondaryButton icon={Pencil} data-testid={`edit-flow-${f.id}`} onClick={() => nav(`/sequences/${f.id}`)}>Edit</SecondaryButton>
+                  <button data-testid={`rename-flow-${f.id}`} onClick={() => (renamingId === f.id ? saveRename(f) : startRename(f))} title="Rename"
+                    className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
+                    {renamingId === f.id ? <Check className="h-4 w-4 text-brand-600" /> : <Pencil className="h-4 w-4" />}
+                  </button>
+                  <button data-testid={`dup-flow-${f.id}`} onClick={() => duplicate(f.id)} title="Duplicate sequence"
+                    className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors"><Copy className="h-4 w-4" /></button>
+                  <SecondaryButton icon={Film} data-testid={`edit-flow-${f.id}`} onClick={() => nav(`/sequences/${f.id}`)}>Open</SecondaryButton>
                   <button data-testid={`del-flow-${f.id}`} onClick={() => remove(f.id)} className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </motion.div>
