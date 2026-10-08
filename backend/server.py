@@ -2073,9 +2073,11 @@ async function poll(){
 }
 setInterval(poll, 5000); poll();
 
-// Auto-sync: reload the overlay when the scene is edited & saved (so vMix updates without manual refresh)
+// Auto-sync: reload the overlay when the scene / its sequences / its overlays are edited
+// & saved (so vMix updates without a manual refresh). The first poll establishes the
+// baseline version, so we never reload spuriously on load.
 (function(){
-  var _ver = SCENE.updated_at || '';
+  var _ver = '';
   setInterval(function(){
     fetch(PUBBASE + '/version', {cache:'no-store'})
       .then(function(r){ return r.json(); })
@@ -2095,17 +2097,21 @@ setInterval(poll, 5000); poll();
 </body></html>"""
 
 async def _scene_control(scene: dict):
-    """Per-sequence control state used by overlays: triggers, stops, paused (keyed by flow_id)."""
+    """Per-sequence control state + a composite version string for the overlay.
+    The version is the newest updated_at across the scene, its sequences (flows) and the
+    overlays (pancartes) they reference — so editing any of them auto-reloads the vMix overlay."""
     trig: Dict[str, int] = {}
     stops: Dict[str, int] = {}
     paused: Dict[str, bool] = {}
+    stamps = [scene.get("updated_at") or ""]
     seen = set()
+    pan_ids = set()
     for pl in scene.get("flows", []):
         fid = pl.get("flow_id")
         if not fid or fid in seen:
             continue
         seen.add(fid)
-        flow = await db.flows.find_one({"id": fid}, {"manual_trigger": 1, "manual_stop": 1, "paused": 1})
+        flow = await db.flows.find_one({"id": fid}, {"manual_trigger": 1, "manual_stop": 1, "paused": 1, "updated_at": 1, "pancarte_ids": 1})
         if not flow:
             continue
         if flow.get("manual_trigger"):
@@ -2114,19 +2120,28 @@ async def _scene_control(scene: dict):
             stops[fid] = flow["manual_stop"]
         if flow.get("paused"):
             paused[fid] = True
-    return trig, stops, paused
+        if flow.get("updated_at"):
+            stamps.append(flow["updated_at"])
+        for pid in (flow.get("pancarte_ids") or []):
+            pan_ids.add(pid)
+    for pid in pan_ids:
+        pan = await db.pancartes.find_one({"id": pid}, {"updated_at": 1})
+        if pan and pan.get("updated_at"):
+            stamps.append(pan["updated_at"])
+    v = max(stamps) if stamps else ""
+    return v, trig, stops, paused
 
 @api_router.get("/public/scene/{token}/version")
 async def public_version(token: str):
     scene = await _get_public_scene(token)
-    trig, stops, paused = await _scene_control(scene)
-    return JSONResponse({"v": scene.get("updated_at") or "", "triggers": trig, "stops": stops, "paused": paused}, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
+    v, trig, stops, paused = await _scene_control(scene)
+    return JSONResponse({"v": v, "triggers": trig, "stops": stops, "paused": paused}, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
 
 @api_router.get("/public/overlay/{token}/version")
 async def public_overlay_version(token: str):
     scene = await _get_public_overlay_scene(token)
-    trig, stops, paused = await _scene_control(scene)
-    return JSONResponse({"v": scene.get("updated_at") or "", "triggers": trig, "stops": stops, "paused": paused}, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
+    v, trig, stops, paused = await _scene_control(scene)
+    return JSONResponse({"v": v, "triggers": trig, "stops": stops, "paused": paused}, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
 
 async def _scene_values(scene: dict) -> Dict[str, Any]:
     out: Dict[str, Any] = {}

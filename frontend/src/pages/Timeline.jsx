@@ -6,7 +6,10 @@ import AppLayout from "@/components/AppLayout";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { nextStartMs, nextStarts, fmtCountdown, fmtClock, sequenceDuration } from "@/lib/schedule";
 import { toast } from "sonner";
-import { Clock, Film, Radio, Repeat, CalendarClock, Layers, Database, ChevronDown, ChevronRight, Zap, Play, Square, RotateCcw } from "lucide-react";
+import SceneCanvas from "@/components/SceneCanvas";
+import PancarteView from "@/components/PancarteView";
+import { injectFontFaces } from "@/lib/fonts";
+import { Clock, Film, Radio, Repeat, CalendarClock, Layers, Database, ChevronDown, ChevronRight, Zap, Play, Square, RotateCcw, Tv } from "lucide-react";
 
 const unitMult = (u) => (u === "hour" ? 3600 : u === "min" ? 60 : 1);
 
@@ -39,12 +42,23 @@ function MiniTimeline({ marks, windowMs = 3600000 }) {
   );
 }
 
+function SeqThumb({ pancarte, sourceValues }) {
+  return (
+    <div className="relative rounded-lg overflow-hidden ring-1 ring-slate-200 bg-slate-900 shrink-0" style={{ width: 104, aspectRatio: "16 / 9" }} data-testid="seq-thumb">
+      {pancarte ? <PancarteView pancarte={pancarte} sourceValues={sourceValues} />
+        : <div className="absolute inset-0 flex items-center justify-center text-[10px] text-slate-500">no overlay</div>}
+    </div>
+  );
+}
+
 export default function Timeline() {
   const nav = useNavigate();
   const { current } = useWorkspace();
   const [scenes, setScenes] = useState([]);
   const [flows, setFlows] = useState([]);
   const [sources, setSources] = useState([]);
+  const [pancartes, setPancartes] = useState([]);
+  const [sourceValues, setSourceValues] = useState({});
   const [now, setNow] = useState(Date.now());
   const [expanded, setExpanded] = useState({});
 
@@ -53,12 +67,24 @@ export default function Timeline() {
     api.get(`/scenes?workspace_id=${current}`).then(({ data }) => setScenes(data)).catch(() => {});
     api.get(`/flows?workspace_id=${current}`).then(({ data }) => setFlows(data)).catch(() => {});
     api.get(`/sources?workspace_id=${current}`).then(({ data }) => setSources(data)).catch(() => {});
+    api.get(`/pancartes?workspace_id=${current}`).then(({ data }) => setPancartes(data)).catch(() => {});
+    api.get(`/fonts?workspace_id=${current}`).then(({ data }) => injectFontFaces(data)).catch(() => {});
+    const fetchVals = () => api.get(`/sources/values?workspace_id=${current}`).then(({ data }) => setSourceValues(data)).catch(() => {});
+    fetchVals();
+    const t = setInterval(fetchVals, 15000);
+    return () => clearInterval(t);
   }, [current]);
 
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
 
   const flowById = useMemo(() => Object.fromEntries(flows.map((f) => [f.id, f])), [flows]);
   const srcById = useMemo(() => Object.fromEntries(sources.map((s) => [s.id, s])), [sources]);
+  const pancartesById = useMemo(() => Object.fromEntries(pancartes.map((p) => [p.id, p])), [pancartes]);
+  const flowsData = useMemo(() => {
+    const map = {};
+    flows.forEach((f) => { map[f.id] = { flow: f, pancartes: (f.pancarte_ids || []).map((pid) => pancartesById[pid]).filter(Boolean) }; });
+    return map;
+  }, [flows, pancartesById]);
 
   // Build per-scene programmed items
   const sceneData = useMemo(() => scenes.map((scene) => {
@@ -141,6 +167,59 @@ export default function Timeline() {
   return (
     <AppLayout title="Timeline" subtitle="What is programmed and when it comes on screen — live countdowns across all scenes.">
       <div className="space-y-6">
+        {/* Live now — on-screen previews */}
+        <div className="bg-white rounded-3xl clara-soft p-5" data-testid="timeline-livenow">
+          <div className="flex items-center gap-2 mb-4">
+            <Tv className="h-5 w-5 text-brand-600" />
+            <h2 className="font-display font-semibold text-slate-900">Live now — on-screen preview</h2>
+            <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-bold text-rose-600">
+              <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />LIVE
+            </span>
+          </div>
+          {sceneData.filter((s) => s.seqs.length || (s.scene.elements || []).length).length === 0 ? (
+            <p className="text-sm text-slate-400">No scenes to preview yet. Build a scene with elements or sequences.</p>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {sceneData.filter((s) => s.seqs.length || (s.scene.elements || []).length).map(({ scene, seqs }) => (
+                <div key={scene.id} data-testid={`live-scene-${scene.id}`} className="rounded-2xl border border-slate-200 overflow-hidden">
+                  <div className="relative bg-slate-900">
+                    <SceneCanvas scene={scene} sourceValues={sourceValues} flowsData={flowsData} />
+                    <span className="absolute top-2 left-2 inline-flex items-center gap-1 text-[10px] font-bold text-white bg-rose-600/90 rounded-full px-2 py-0.5 pointer-events-none">
+                      <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />LIVE
+                    </span>
+                  </div>
+                  <div className="p-3">
+                    <div className="flex items-center gap-2">
+                      <Layers className="h-4 w-4 text-brand-600 shrink-0" />
+                      <span className="font-semibold text-slate-900 truncate">{scene.name}</span>
+                      <button onClick={() => nav(`/scenes/${scene.id}`)} className="ml-auto text-xs text-brand-600 font-medium shrink-0">Edit →</button>
+                    </div>
+                    {seqs.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {seqs.map(({ flow, placement }) => {
+                          const r = flow.repeat || "loop";
+                          const sched = r === "schedule";
+                          const next = sched ? nextStartMs(flow, now) : null;
+                          const [txt, cls] = flow.paused ? ["Paused", "bg-amber-50 text-amber-700"]
+                            : sched ? [`next ${fmtCountdown(next - now)}`, "bg-blue-50 text-blue-700"]
+                            : r === "loop" ? ["On air", "bg-emerald-50 text-emerald-700"]
+                            : r === "once" ? ["one-shot", "bg-slate-100 text-slate-600"]
+                            : ["cyclic", "bg-slate-100 text-slate-600"];
+                          return (
+                            <span key={placement.id} data-testid={`live-seq-${flow.id}`} className={`inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-2 py-0.5 ${cls}`}>
+                              <Film className="h-2.5 w-2.5" />{flow.name}: {txt}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Global next up */}
         <div className="bg-white rounded-3xl clara-soft p-5" data-testid="timeline-nextup">
           <div className="flex items-center gap-2 mb-4">
@@ -157,6 +236,7 @@ export default function Timeline() {
                 return (
                   <div key={`${scene.id}-${flow.id}`} className="rounded-2xl border border-slate-200 p-3" data-testid={`nextup-${flow.id}`}>
                     <div className="flex items-center gap-2 mb-2">
+                      <SeqThumb pancarte={flowsData[flow.id]?.pancartes?.[0]} sourceValues={sourceValues} />
                       <Film className="h-4 w-4 text-brand-600 shrink-0" />
                       <button onClick={() => nav(`/sequences/${flow.id}`)} className="font-semibold text-slate-900 hover:text-brand-600 truncate">{flow.name}</button>
                       <span className="text-xs text-slate-400 truncate">in {scene.name} · {repeatLabel(flow)}</span>

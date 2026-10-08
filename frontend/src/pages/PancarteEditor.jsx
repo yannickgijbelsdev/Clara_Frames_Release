@@ -16,6 +16,7 @@ import { Save, ArrowLeft, Loader2, Link2, Radio } from "lucide-react";
 import { templates, TOOLS, uid } from "@/lib/elementDefs";
 import { BACKEND } from "@/lib/api";
 import LiveViewDialog from "@/components/LiveViewDialog";
+import { useAutoSave, AutoSaveBadge } from "@/lib/useAutoSave";
 
 export default function PancarteEditor() {
   const { id } = useParams();
@@ -68,11 +69,14 @@ export default function PancarteEditor() {
     setSaving(false);
   };
 
+  const autoStatus = useAutoSave(pan, () => api.put(`/pancartes/${id}`, { name: pan.name, width: pan.width, height: pan.height, background: pan.background, elements: pan.elements }), 1000);
+
   if (!pan) return <AppLayout title="Loading…"><div className="h-40 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div></AppLayout>;
 
   return (
     <AppLayout title={pan.name} subtitle="Design this overlay — its own background and freely-placed elements."
       actions={<>
+        <AutoSaveBadge status={autoStatus} />
         <SecondaryButton icon={ArrowLeft} onClick={() => nav("/overlays")}>Back</SecondaryButton>
         <SecondaryButton icon={Link2} data-testid="copy-overlay-link" onClick={() => { try { navigator.clipboard.writeText(`${BACKEND}/api/public/overlay/${pan.public_token}/overlay`); toast.success("vMix overlay link copied"); } catch (e) { toast.error("Could not copy"); } }}>vMix link</SecondaryButton>
         <SecondaryButton icon={Radio} data-testid="live-overlay-btn" onClick={async () => { await save(true); setLiveOpen(true); }}>Live view</SecondaryButton>

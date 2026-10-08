@@ -322,6 +322,9 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 
 - [2026-06 follow-up] Interrupt / stop a sequence from the Timeline: `POST /api/flows/{fid}/stop` (sets `manual_stop` ms + `paused:true`) and `POST /api/flows/{fid}/resume` (`paused:false`); `trigger` now also clears `paused`. Public `/version` endpoints return `triggers`, `stops`, `paused` maps; OVERLAY_HTML version-poll dispatches `stopNow()` (breaks off now, plays the outro, then hides — no countdown) and `setPaused()`/`resume()`. Baked `flow.paused` keeps it hidden after reload. Timeline shows "Paused" + a green "Resume" button in place of the countdown + Now/Stop when paused (`nextup-stop-<id>`, `nextup-resume-<id>`, `tl-seq-stop-<id>`, `tl-seq-resume-<id>`). Verified via authenticated screenshot (stop→Paused+Resume→resume restores).
 
+- [2026-06 follow-up] Auto-save → auto-sync to vMix: Overlay (PancarteEditor), Scene (SceneEditor) and Sequence (FlowEditor) editors now debounce-save (~1s, silent) via `useAutoSave`/`AutoSaveBadge` (`/lib/useAutoSave.jsx`); manual Save stays. The vMix `/version` poll now returns a COMPOSITE version = newest `updated_at` across the scene + its sequences + their pancartes (`_scene_control`), and the overlay baselines on first poll (`_ver=''`), so editing a pancarte/sequence/scene auto-reloads the live overlay without clicking Save. Verified: pancarte edit bumps scene version.
+- [2026-06 follow-up] Timeline visualization: new "Live now — on-screen preview" section renders a live, cycling 16:9 `SceneCanvas` preview per scene with a LIVE badge and per-sequence status (On air / next in Xs / Paused / cyclic). "Next up" rows now show a `SeqThumb` preview of the sequence's first overlay. Verified via authenticated screenshot.
+
 - P1: Image/photo upload (object storage) instead of URL-only.
 - P1: Require re-auth (current password/TOTP) before 2FA reset.
 - P2: Per-column timezone/format for clock in data.json.

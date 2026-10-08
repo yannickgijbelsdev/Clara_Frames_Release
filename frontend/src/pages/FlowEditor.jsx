@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Save, ArrowLeft, Loader2, ArrowUp, ArrowDown, X, Plus, LayoutTemplate, PlayCircle } from "lucide-react";
+import { useAutoSave, AutoSaveBadge } from "@/lib/useAutoSave";
 
 const DEFAULT_SEC = 5;
 
@@ -163,6 +164,15 @@ export default function FlowEditor() {
     setSaving(false);
   };
 
+  const autoStatus = useAutoSave(flow, () => api.put(`/flows/${id}`, {
+    name: flow.name, interval: flow.interval, entrance: flow.entrance, entranceDuration: flow.entranceDuration,
+    pancarte_ids: flow.pancarte_ids, durations: norm(durs, baseDur), playouts: norm(plays, false),
+    repeat: flow.repeat || "loop", repeatEvery: flow.repeatEvery ?? 5,
+    scheduleMode: flow.scheduleMode || "everyMin", scheduleTimes: flow.scheduleTimes || [],
+    scheduleEveryMin: flow.scheduleEveryMin ?? 15, showCountdown: !!flow.showCountdown, countdownLabel: flow.countdownLabel || "",
+    intro: flow.intro || null, transition: flow.transition || null, outro: flow.outro || null,
+  }), 1000);
+
   if (!flow) return <AppLayout title="Loading…"><div className="h-40 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div></AppLayout>;
 
   const repeat = flow.repeat || "loop";
@@ -171,6 +181,7 @@ export default function FlowEditor() {
   return (
     <AppLayout title={flow.name} subtitle="Order overlays and set the timing. Then place this sequence inside a scene."
       actions={<>
+        <AutoSaveBadge status={autoStatus} />
         <SecondaryButton icon={ArrowLeft} onClick={() => nav("/sequences")}>Back</SecondaryButton>
         <PrimaryButton icon={Save} data-testid="save-flow-btn" onClick={() => save(false)}>{saving ? "Saving…" : "Save"}</PrimaryButton>
       </>}>

@@ -16,6 +16,7 @@ import { Save, Upload, Trash2, ArrowLeft, Loader2, Copy, Film, Layers, Radio, Po
 import { templates, TOOLS, uid } from "@/lib/elementDefs";
 import { Switch } from "@/components/ui/switch";
 import LiveViewDialog from "@/components/LiveViewDialog";
+import { useAutoSave, AutoSaveBadge } from "@/lib/useAutoSave";
 
 export default function SceneEditor() {
   const { id } = useParams();
@@ -97,6 +98,8 @@ export default function SceneEditor() {
   };
   const goExport = async () => { await save(true); nav(`/scenes/${id}/export`); };
 
+  const autoStatus = useAutoSave(scene, () => api.put(`/scenes/${id}`, { name: scene.name, width: scene.width, height: scene.height, background: scene.background, elements: scene.elements, flows: scene.flows || [] }), 1000);
+
   if (!scene) return <AppLayout title="Loading…"><div className="h-40 flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div></AppLayout>;
 
   const selFlowDef = selFlow ? flowsData[selFlow.flow_id]?.flow : null;
@@ -104,6 +107,7 @@ export default function SceneEditor() {
   return (
     <AppLayout title={scene.name} subtitle="Drag elements on the 16:9 canvas, then export to vMix."
       actions={<>
+        <AutoSaveBadge status={autoStatus} />
         <SecondaryButton icon={ArrowLeft} onClick={() => nav("/scenes")}>Back</SecondaryButton>
         <SecondaryButton icon={Layers} data-testid="scene-overview-btn" onClick={async () => { await save(true); nav(`/scenes/${id}/overview`); }}>Overview</SecondaryButton>
         <SecondaryButton icon={Save} data-testid="save-scene-btn" onClick={() => save(false)}>{saving ? "Saving…" : "Save"}</SecondaryButton>
