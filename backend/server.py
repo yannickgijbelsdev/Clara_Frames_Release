@@ -255,7 +255,13 @@ class FlowInput(BaseModel):
     entranceDuration: float = 0.6
     pancarte_ids: List[str] = []
     durations: Optional[List[float]] = None   # per-item seconds (parallel to pancarte_ids)
-    loop: Optional[bool] = True
+    playouts: Optional[List[bool]] = None     # per-item "play out" flag (wait for media end)
+    repeat: Optional[str] = "loop"            # loop | once | interval
+    repeatEvery: Optional[float] = 5          # minutes, used when repeat == interval
+    intro: Optional[Dict[str, Any]] = None    # {overlayId,url,kind,fit,seconds}
+    transition: Optional[Dict[str, Any]] = None  # shown between overlays
+    outro: Optional[Dict[str, Any]] = None
+    loop: Optional[bool] = True               # legacy (kept for back-compat)
     workspace_id: Optional[str] = None
 
 class FormInput(BaseModel):
@@ -1184,7 +1190,10 @@ async def create_flow(body: FlowInput, user: dict = Depends(get_current_user)):
         "id": str(uuid.uuid4()), "user_id": user["id"], "workspace_id": body.workspace_id,
         "name": body.name, "interval": body.interval, "entrance": body.entrance,
         "entranceDuration": body.entranceDuration, "pancarte_ids": body.pancarte_ids,
-        "durations": body.durations, "loop": True if body.loop is None else bool(body.loop),
+        "durations": body.durations, "playouts": body.playouts,
+        "repeat": body.repeat or "loop", "repeatEvery": body.repeatEvery,
+        "intro": body.intro, "transition": body.transition, "outro": body.outro,
+        "loop": True if body.loop is None else bool(body.loop),
         "created_at": now, "updated_at": now,
     }
     await db.flows.insert_one(doc)
@@ -1206,7 +1215,10 @@ async def update_flow(fid: str, body: FlowInput, user: dict = Depends(get_curren
     await db.flows.update_one({"id": fid}, {"$set": {
         "name": body.name, "interval": body.interval, "entrance": body.entrance,
         "entranceDuration": body.entranceDuration, "pancarte_ids": body.pancarte_ids,
-        "durations": body.durations, "loop": True if body.loop is None else bool(body.loop),
+        "durations": body.durations, "playouts": body.playouts,
+        "repeat": body.repeat or "loop", "repeatEvery": body.repeatEvery,
+        "intro": body.intro, "transition": body.transition, "outro": body.outro,
+        "loop": True if body.loop is None else bool(body.loop),
         "updated_at": datetime.now(timezone.utc).isoformat()}})
     return await db.flows.find_one({"id": fid}, {"_id": 0})
 
@@ -1738,6 +1750,26 @@ function buildOverlayNode(ov){
   wrap.appendChild(node); return wrap;
 }
 
+function restartPart(wrap){
+  if(!wrap) return;
+  var v=wrap.querySelector('video'); if(v){ try{ v.currentTime=0; v.play(); }catch(e){} }
+  var f=wrap.querySelector('iframe'); if(f){ var s=f.src; f.src='about:blank'; setTimeout(function(){ f.src=s; }, 20); }
+}
+function waitMediaEnd(root, cb, fallbackSec){
+  var done=false, timers=[];
+  var v = root ? root.querySelector('video') : null;
+  function finish(){ if(done) return; done=true; timers.forEach(clearTimeout); if(v){ try{ v.removeEventListener('ended', finish); }catch(e){} } cb(); }
+  if(v){ v.loop=false; try{ v.currentTime=0; v.play(); }catch(e){}
+    v.addEventListener('ended', finish);
+    var fb = (fallbackSec && fallbackSec>0) ? fallbackSec : 3600;
+    timers.push(setTimeout(finish, fb*1000 + 2000));
+  } else {
+    var sec = (fallbackSec && fallbackSec>0) ? fallbackSec : 10;
+    timers.push(setTimeout(finish, sec*1000));
+  }
+  return function(){ done=true; timers.forEach(clearTimeout); if(v){ try{ v.removeEventListener('ended', finish); }catch(e){} } };
+}
+
 var placements = [];
 (SCENE.flows||[]).forEach(function(pl){
   var flow = pl._flow || null;
@@ -1749,17 +1781,35 @@ var placements = [];
   stage.appendChild(cont);
   if(pl.enabled===false){ cont.style.display='none'; return; }
 
-  var seriesLayer=document.createElement('div'); seriesLayer.style.position='absolute'; seriesLayer.style.top=0; seriesLayer.style.left=0; seriesLayer.style.width='100%'; seriesLayer.style.height='100%';
+  var seriesLayer=document.createElement('div');
+  seriesLayer.style.position='absolute'; seriesLayer.style.top=0; seriesLayer.style.left=0; seriesLayer.style.width='100%'; seriesLayer.style.height='100%';
   cont.appendChild(seriesLayer);
-  var introNode = buildOverlayNode(sc.intro);
-  var outroNode = buildOverlayNode(sc.outro);
+
+  // Timing/overlays live on the sequence (flow); fall back to legacy placement intro/outro.
+  var fIntro = (flow && flow.intro) || sc.intro || null;
+  var fTrans = (flow && flow.transition) || null;
+  var fOutro = (flow && flow.outro) || sc.outro || null;
+  var repeat = (flow && flow.repeat) || (flow && flow.loop===false ? 'once' : 'loop');
+  var introNode = buildOverlayNode(fIntro);
+  var transNode = buildOverlayNode(fTrans);
+  var outroNode = buildOverlayNode(fOutro);
   if(introNode) cont.appendChild(introNode);
+  if(transNode) cont.appendChild(transNode);
   if(outroNode) cont.appendChild(outroNode);
 
-  var idx=-1, adv=null, cur={clocks:[],apis:[],images:[]};
-  function render(i){
+  var cur={clocks:[],apis:[],images:[]};
+  function partSec(o, def){ if(!o) return def; if(o.seconds!=null) return Math.max(0.2, o.seconds); if(o.leadSeconds!=null) return Math.max(0.2, o.leadSeconds); return def; }
+  function panPos(i){ var pan=pans[((i%pans.length)+pans.length)%pans.length]; return (flow&&flow.pancarte_ids?flow.pancarte_ids:[]).indexOf(pan.id); }
+  function durFor(i){
+    var d = (flow && flow.interval!=null) ? flow.interval : 5;
+    var pos = panPos(i);
+    if(flow && flow.durations && pos>=0 && flow.durations[pos]!=null && flow.durations[pos]>0) d = flow.durations[pos];
+    return Math.max(0.2, d);
+  }
+  function playoutFor(i){ var pos=panPos(i); return !!(flow && flow.playouts && pos>=0 && flow.playouts[pos]); }
+  function renderPan(i){
     seriesLayer.innerHTML='';
-    if(!pans.length){ cur={clocks:[],apis:[],images:[]}; return; }
+    if(!pans.length){ cur={clocks:[],apis:[],images:[]}; return null; }
     var pan = pans[((i%pans.length)+pans.length)%pans.length];
     var r = renderPancarte(pan, pl.w, pl.h);
     var ea = entranceAnim({entrance: flow?flow.entrance:'none', entranceDuration: flow?flow.entranceDuration:0.6});
@@ -1769,32 +1819,45 @@ var placements = [];
     cur.clocks.forEach(function(c){ c.d.textContent = fmtClock(c.p.timezone, c.p.format); });
     updateApis(cur.apis, lastValues);
     updateImages(cur.images, lastValues);
+    return r.node;
   }
-  function durFor(i){
-    var d = (flow && flow.interval!=null) ? flow.interval : 5;
-    if(flow && flow.durations && flow.durations.length && pans.length){
-      var pan = pans[((i%pans.length)+pans.length)%pans.length];
-      var pos = (flow.pancarte_ids||[]).indexOf(pan.id);
-      if(pos>=0 && flow.durations[pos]!=null && flow.durations[pos]>0) d = flow.durations[pos];
+  function hideParts(){ if(introNode)introNode.style.display='none'; if(transNode)transNode.style.display='none'; if(outroNode)outroNode.style.display='none'; }
+  function showPart(node){ seriesLayer.style.display='none'; hideParts(); if(node){ node.style.display='block'; restartPart(node); } }
+  function buildSteps(){
+    var s=[];
+    if(introNode) s.push({t:'part', node:introNode, sec:partSec(fIntro,3)});
+    for(var i=0;i<pans.length;i++){
+      s.push({t:'pan', i:i});
+      if(transNode && i<pans.length-1) s.push({t:'part', node:transNode, sec:partSec(fTrans,1)});
     }
-    return Math.max(0.2, d);
+    if(outroNode) s.push({t:'part', node:outroNode, sec:partSec(fOutro,3)});
+    return s;
   }
-  function schedule(){ stopAdv(); if(pans.length>1){ adv=setTimeout(advance, durFor(idx)*1000); } }
-  function advance(){
-    var next = idx+1;
-    if(flow && flow.loop===false && next>=pans.length){ return; }
-    render(next); idx=next; schedule();
+  var stepArr=[], sIdx=-1, tmr=null, mediaCleanup=null;
+  function clearTmr(){ if(tmr){ clearTimeout(tmr); tmr=null; } if(mediaCleanup){ mediaCleanup(); mediaCleanup=null; } }
+  function play(k){
+    clearTmr();
+    if(!pans.length) return;
+    if(k>=stepArr.length){ onEnd(); return; }
+    sIdx=k; var st=stepArr[k];
+    if(st.t==='part'){ showPart(st.node); tmr=setTimeout(function(){ play(sIdx+1); }, st.sec*1000); }
+    else {
+      hideParts(); seriesLayer.style.display='block';
+      var node=renderPan(st.i);
+      if(playoutFor(st.i)){ mediaCleanup=waitMediaEnd(node, function(){ play(sIdx+1); }, durFor(st.i)); }
+      else { tmr=setTimeout(function(){ play(sIdx+1); }, durFor(st.i)*1000); }
+    }
   }
-  function startAdv(){ schedule(); }
-  function stopAdv(){ if(adv){ clearTimeout(adv); adv=null; } }
+  function onEnd(){
+    if(repeat==='once'){ return; }
+    if(repeat==='interval'){ hideParts(); var wait=Math.max(1,(flow&&flow.repeatEvery!=null?flow.repeatEvery:5))*60000; tmr=setTimeout(start, wait); return; }
+    start();
+  }
+  function start(){ stepArr=buildSteps(); play(0); }
+  if(pans.length){ start(); }
 
-  if(sc.mode==='everyX'){
-    cont.style.display='block'; seriesLayer.style.display='none';
-  } else {
-    render(0); idx=0; startAdv();
-  }
-  placements.push({pl:pl, flow:flow, pans:pans, cont:cont, seriesLayer:seriesLayer, introNode:introNode, outroNode:outroNode,
-    getCur:function(){return cur;}, setIdx:function(i){ if(i!==idx){ render(i); idx=i; } }, _state:null});
+  placements.push({pl:pl, flow:flow, pans:pans, cont:cont, seriesLayer:seriesLayer,
+    getCur:function(){return cur;}, _state:null});
 });
 
 function showTimedPart(node, on){
@@ -1833,26 +1896,6 @@ function tick(){
     t._vis=vis;
   });
   placements.forEach(function(f){
-    var sc=f.pl.schedule||{};
-    if(sc.mode==='everyX'){
-      var cycle=Math.max(1,(sc.everyMinutes||5))*60;
-      var per=Math.max(1,(f.flow&&f.flow.interval)||5);
-      var count=f.pans.length;
-      var introSec=(f.introNode && sc.intro)?Math.max(0,(sc.intro.leadSeconds!=null?sc.intro.leadSeconds:5)):0;
-      var showDur=Math.max(1,(sc.showSeconds!=null?sc.showSeconds:20));
-      var outroSec=(f.outroNode && sc.outro)?Math.max(0,(sc.outro.seconds!=null?sc.outro.seconds:5)):0;
-      var d=new Date();
-      var secOfDay=d.getHours()*3600+d.getMinutes()*60+d.getSeconds();
-      var phase=secOfDay%cycle;
-      var on=phase<showDur;
-      var showSeries=on && count>0;
-      var panIdx=showSeries?Math.floor(phase/per)%count:0;
-      // Intro/outro overlap the pancarte series (crossfade), they do not add extra time
-      showTimedPart(f.introNode, on && phase<introSec);
-      showTimedPart(f.outroNode, on && phase>=(showDur-outroSec));
-      if(showSeries){ if(f._state!=='series') f.seriesLayer.style.display='block'; f.setIdx(panIdx); f._state='series'; }
-      else { if(f._state==='series') f.seriesLayer.style.display='none'; f._state='none'; }
-    }
     var cur=f.getCur(); cur.clocks.forEach(function(c){ c.d.textContent=fmtClock(c.p.timezone,c.p.format); });
   });
   var _tn=new Date(); var _sod=_tn.getHours()*3600+_tn.getMinutes()*60+_tn.getSeconds();

@@ -61,7 +61,7 @@ export default function Flows() {
                 <div className="p-4 flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-slate-900 truncate">{f.name}</div>
-                    <div className="text-xs text-slate-400 flex items-center gap-1"><Clock className="h-3 w-3" />{(f.pancarte_ids || []).length} overlay(s) · {f.interval || 5}s each{f.loop === false ? " · no loop" : ""}</div>
+                    <div className="text-xs text-slate-400 flex items-center gap-1"><Clock className="h-3 w-3" />{(f.pancarte_ids || []).length} overlay(s) · {f.repeat === "once" ? "play once" : f.repeat === "interval" ? `repeat every ${f.repeatEvery ?? 5}m` : "loop"}</div>
                   </div>
                   <SecondaryButton icon={Pencil} data-testid={`edit-flow-${f.id}`} onClick={() => nav(`/sequences/${f.id}`)}>Edit</SecondaryButton>
                   <button data-testid={`del-flow-${f.id}`} onClick={() => remove(f.id)} className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"><Trash2 className="h-4 w-4" /></button>
