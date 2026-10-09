@@ -111,7 +111,7 @@ export default function StreamMonitor({ stream, audioCtx, large = false, onRemov
             <VolumeX className="h-3 w-3" />Audio not available via Vimeo
           </div>
         ) : (
-          <div className={`absolute bottom-2 right-2 ${large ? "w-44" : "w-32"} rounded-lg overflow-hidden shadow-lg ring-1 ring-black/30`}>
+          <div className={`absolute bottom-2 right-2 ${large ? "w-7 h-28" : "w-5 h-20"}`}>
             <VUMeter left={lvl.l} right={lvl.r} />
           </div>
         )}
