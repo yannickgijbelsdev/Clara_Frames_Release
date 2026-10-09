@@ -333,6 +333,8 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 
 - [2026-06 follow-up] Ticker live-updates on show/hide: the vMix overlay ticker now polls `/ticker/{formId}` every 3s (was 10s) with `cache:'no-store'`, and both the overlay JS and the inline React `Ticker` only re-render when the item set actually changed (signature compare) — so toggling a message's ticker flag in Messages reflects within ~3s without restarting the scroll animation. Verified end-to-end (submit → show adds item → hide removes it).
 
+- [2026-06 follow-up] VU meter rebuilt + audio fix. Root cause of "VU not moving": the HLS `<video>` was `muted` for autoplay, and a muted element feeds silence into Web Audio once routed via `createMediaElementSource`. Fix (`StreamMonitor.jsx`): on wiring, add `src→gain(0)→destination` (keeps the graph pulled/rendering but inaudible) and set `video.muted=false`; `muted` is now managed imperatively (not via JSX attr, which React doesn't update reliably). `VUMeter.jsx` is now a CLASSIC analog needle gauge (SVG: cream dial, arc scale −20/0/+3, red over-zone, swinging needle with fast-attack/slow-release ballistics) instead of the LED-bar look. Classic visual verified via screenshot; live needle movement can't be verified in the headless sandbox (external streams don't autoplay there).
+
 - P1: Image/photo upload (object storage) instead of URL-only.
 - P1: Require re-auth (current password/TOTP) before 2FA reset.
 - P2: Per-column timezone/format for clock in data.json.

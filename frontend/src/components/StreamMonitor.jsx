@@ -30,6 +30,7 @@ export default function StreamMonitor({ stream, audioCtx, large = false, onRemov
     let hls;
     const onPlay = () => setPlaying(true);
     const onErr = () => setErr(true);
+    video.muted = true; // required for autoplay; unmuted (silently) once audio monitoring wires up
     video.addEventListener("playing", onPlay);
     video.addEventListener("error", onErr);
     if (Hls.isSupported()) {
@@ -47,17 +48,23 @@ export default function StreamMonitor({ stream, audioCtx, large = false, onRemov
   useEffect(() => {
     if (isVimeo || !audioCtx || !videoRef.current || wiredRef.current) return;
     try {
-      const src = audioCtx.createMediaElementSource(videoRef.current);
+      const video = videoRef.current;
+      const src = audioCtx.createMediaElementSource(video);
       const splitter = audioCtx.createChannelSplitter(2);
       src.connect(splitter);
+      // Keep the graph "pulled" (so analysers actually run) but inaudible via a 0-gain path.
+      const gain = audioCtx.createGain(); gain.gain.value = 0;
+      src.connect(gain); gain.connect(audioCtx.destination);
       const aL = audioCtx.createAnalyser(); const aR = audioCtx.createAnalyser();
-      aL.fftSize = 256; aR.fftSize = 256; aL.smoothingTimeConstant = 0.55; aR.smoothingTimeConstant = 0.55;
+      aL.fftSize = 512; aR.fftSize = 512; aL.smoothingTimeConstant = 0.7; aR.smoothingTimeConstant = 0.7;
       splitter.connect(aL, 0); splitter.connect(aR, 1);
+      // A muted element feeds silence into Web Audio — unmute now that output is routed to a 0-gain node.
+      video.muted = false;
       wiredRef.current = true;
       const bL = new Uint8Array(aL.fftSize); const bR = new Uint8Array(aR.fftSize);
       const tick = () => {
         aL.getByteTimeDomainData(bL); aR.getByteTimeDomainData(bR);
-        setLvl({ l: Math.min(1, rms(bL) * 2.4), r: Math.min(1, rms(bR) * 2.4) });
+        setLvl({ l: Math.min(1, rms(bL) * 3.2), r: Math.min(1, rms(bR) * 3.2) });
         rafRef.current = requestAnimationFrame(tick);
       };
       tick();
@@ -77,7 +84,7 @@ export default function StreamMonitor({ stream, audioCtx, large = false, onRemov
             <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">Invalid Vimeo URL</div>
           )
         ) : (
-          <video ref={videoRef} muted autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" />
+          <video ref={videoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" />
         )}
 
         {/* header */}
@@ -104,7 +111,7 @@ export default function StreamMonitor({ stream, audioCtx, large = false, onRemov
             <VolumeX className="h-3 w-3" />Audio not available via Vimeo
           </div>
         ) : (
-          <div className={`absolute bottom-2 right-2 ${large ? "h-28" : "h-20"} flex items-end bg-black/45 rounded-xl p-2 backdrop-blur-sm`}>
+          <div className={`absolute bottom-2 right-2 ${large ? "w-44" : "w-32"} rounded-lg overflow-hidden shadow-lg ring-1 ring-black/30`}>
             <VUMeter left={lvl.l} right={lvl.r} />
           </div>
         )}
