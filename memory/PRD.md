@@ -331,6 +331,8 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 
 - [2026-06 PERMANENT FETCH FIX] API source reliability overhaul (`_fetch_source_sync` + new `_get_http_session`): all external fetches now use one shared `requests.Session` with a urllib3 `Retry` (total=2, backoff 0.5, retries on connection errors + 429/5xx) and connection pooling; timeout raised to (connect 6s, read 20s) so slow radio/now-playing servers don't false-fail; on failure it transparently tries the alternate scheme (http↔https), not just http→https. iTunes artwork lookup uses the same session. Root cause of recurring "sources not reachable": short 8s timeout + no retries + the earlier force-refresh-on-Test surfacing every transient hiccup. Verified: authenticated Test on `http://clr.koodh.com/...now-playing.txt` returns error=null with song/artist/title/cover, twice.
 
+- [2026-06 follow-up] Ticker live-updates on show/hide: the vMix overlay ticker now polls `/ticker/{formId}` every 3s (was 10s) with `cache:'no-store'`, and both the overlay JS and the inline React `Ticker` only re-render when the item set actually changed (signature compare) — so toggling a message's ticker flag in Messages reflects within ~3s without restarting the scroll animation. Verified end-to-end (submit → show adds item → hide removes it).
+
 - P1: Image/photo upload (object storage) instead of URL-only.
 - P1: Require re-auth (current password/TOTP) before 2FA reset.
 - P2: Per-column timezone/format for clock in data.json.

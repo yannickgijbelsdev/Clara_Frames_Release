@@ -45,13 +45,21 @@ export function StreamBackground({ background }) {
 function Ticker({ el }) {
   const p = el.props || {};
   const [items, setItems] = useState([]);
+  const lastSig = useRef("");
   useEffect(() => {
-    if (!p.formId) { setItems([]); return; }
+    if (!p.formId) { setItems([]); lastSig.current = ""; return; }
     let alive = true;
     const fq = (p.fields && p.fields.length) ? `?fields=${encodeURIComponent(p.fields.join(","))}` : "";
-    const pull = () => api.get(`/forms/${p.formId}/ticker-items${fq}`).then(({ data }) => { if (alive) setItems(data.items || []); }).catch(() => {});
+    const pull = () => api.get(`/forms/${p.formId}/ticker-items${fq}`).then(({ data }) => {
+      if (!alive) return;
+      const list = data.items || [];
+      const sig = list.join("\u0001");
+      if (sig === lastSig.current) return;   // only update when a message was shown/hidden
+      lastSig.current = sig;
+      setItems(list);
+    }).catch(() => {});
     pull();
-    const t = setInterval(pull, 10000);
+    const t = setInterval(pull, 3000);
     return () => { alive = false; clearInterval(t); };
   }, [p.formId, (p.fields || []).join(",")]);
   const sep = ` \u00A0${p.icon || "\u25CF"}\u00A0 `;

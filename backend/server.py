@@ -1820,13 +1820,17 @@ function buildElementNode(el){
     inner.style.overflow='hidden'; inner.style.whiteSpace='nowrap'; inner.style.display='flex'; inner.style.alignItems='center';
     var track=document.createElement('div'); track.style.display='inline-block'; track.style.whiteSpace='nowrap'; track.style.willChange='transform'; track.style.flex='0 0 auto';
     inner.appendChild(track);
+    var _lastTick='';
     function renderTicker(items){
       var sep = ' \u00A0'+(p.icon||'\u25CF')+'\u00A0 ';
       var base = [];
       if(p.freeText) base.push(p.freeText);
       (items||[]).forEach(function(s){ if(s) base.push(s); });
       var one = base.length ? (base.join(sep) + sep) : (p.freeText||'');
-      if(!one){ track.textContent=''; return; }
+      var sig = one;
+      if(sig === _lastTick) return;   // nothing changed -> don't restart the scroll
+      _lastTick = sig;
+      if(!one){ track.textContent=''; track.style.animation='none'; return; }
       track.textContent = one + one;
       var secs = Math.max(8, Math.round((one.length) * (parseFloat(p.speed)||0.35)));
       track.style.animation = 'clara-ticker ' + secs + 's linear infinite';
@@ -1834,8 +1838,8 @@ function buildElementNode(el){
     renderTicker([]);
     if(p.formId){
       var fq = (p.fields && p.fields.length) ? ('?fields=' + encodeURIComponent(p.fields.join(','))) : '';
-      function pullTicker(){ fetch(PUBBASE + '/ticker/' + p.formId + fq).then(function(r){return r.json();}).then(function(d){ renderTicker(d.items||[]); }).catch(function(){}); }
-      pullTicker(); setInterval(pullTicker, 10000);
+      function pullTicker(){ fetch(PUBBASE + '/ticker/' + p.formId + fq, {cache:'no-store'}).then(function(r){return r.json();}).then(function(d){ renderTicker(d.items||[]); }).catch(function(){}); }
+      pullTicker(); setInterval(pullTicker, 3000);
     }
   } else {
     inner.textContent = p.text || '';
