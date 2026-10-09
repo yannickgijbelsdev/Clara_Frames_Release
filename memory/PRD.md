@@ -329,6 +329,8 @@ Platform met MFA-login. Doel: API's/overlays maken die in vMix ingeladen worden 
 
 - [2026-06 follow-up] Sequences: duplicate + quick rename. New `POST /api/flows/{fid}/duplicate` (deep-copies all settings, name " (copy)", resets trigger/stop/paused) and safe `POST /api/flows/{fid}/rename` + `POST /api/scenes/{scene_id}/rename` (RenameInput — only the name is written, so sequence/scene config is never overwritten). Sequences list (`Flows.jsx`) and Scenes list (`Scenes.jsx`) have inline click-to-rename titles + rename/duplicate(sequences) icon buttons. Multiple sequences per scene already supported (SceneEditor "Overlay sequence" adds unlimited placements, each with its own sequence picker). Verified end-to-end + desktop/mobile screenshot.
 
+- [2026-06 PERMANENT FETCH FIX] API source reliability overhaul (`_fetch_source_sync` + new `_get_http_session`): all external fetches now use one shared `requests.Session` with a urllib3 `Retry` (total=2, backoff 0.5, retries on connection errors + 429/5xx) and connection pooling; timeout raised to (connect 6s, read 20s) so slow radio/now-playing servers don't false-fail; on failure it transparently tries the alternate scheme (http↔https), not just http→https. iTunes artwork lookup uses the same session. Root cause of recurring "sources not reachable": short 8s timeout + no retries + the earlier force-refresh-on-Test surfacing every transient hiccup. Verified: authenticated Test on `http://clr.koodh.com/...now-playing.txt` returns error=null with song/artist/title/cover, twice.
+
 - P1: Image/photo upload (object storage) instead of URL-only.
 - P1: Require re-auth (current password/TOTP) before 2FA reset.
 - P2: Per-column timezone/format for clock in data.json.

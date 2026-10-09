@@ -21,6 +21,11 @@ import bcrypt
 import pyotp
 import qrcode
 import requests
+from requests.adapters import HTTPAdapter
+try:
+    from urllib3.util.retry import Retry
+except Exception:  # pragma: no cover
+    Retry = None
 import boto3
 from botocore.config import Config
 from bson import ObjectId
@@ -764,15 +769,36 @@ def _resolve_path(data: Any, path: str) -> Any:
             return None
     return cur
 
+_http_session = None
+
+def _get_http_session() -> requests.Session:
+    """Shared HTTP session: connection pooling + automatic retries with backoff on
+    transient network errors and 5xx/429 — makes external API fetches reliable."""
+    global _http_session
+    if _http_session is None:
+        s = requests.Session()
+        if Retry is not None:
+            retry = Retry(total=2, connect=2, read=2, backoff_factor=0.5,
+                          status_forcelist=[429, 500, 502, 503, 504],
+                          allowed_methods=frozenset(["GET", "POST", "HEAD"]),
+                          raise_on_status=False)
+            adapter = HTTPAdapter(max_retries=retry, pool_connections=20, pool_maxsize=20)
+            s.mount("http://", adapter)
+            s.mount("https://", adapter)
+        _http_session = s
+    return _http_session
+
 def _fetch_source_sync(url: str, method: str, headers: dict) -> Any:
     hdrs = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36",
         "Accept": "*/*",
     }
     hdrs.update(headers or {})
+    sess = _get_http_session()
 
     def _do(u: str) -> Any:
-        r = requests.request(method or "GET", u, headers=hdrs, timeout=8, allow_redirects=True)
+        # (connect, read) timeout — generous read so slow radio/now-playing servers don't false-fail.
+        r = sess.request(method or "GET", u, headers=hdrs, timeout=(6, 20), allow_redirects=True)
         r.raise_for_status()
         try:
             return r.json()
@@ -782,10 +808,16 @@ def _fetch_source_sync(url: str, method: str, headers: dict) -> Any:
     try:
         return _do(url)
     except Exception:
-        # Many endpoints only serve the data over HTTPS (http:// may 404 or redirect
-        # oddly depending on the network). Transparently retry over https.
-        if isinstance(url, str) and url.startswith("http://"):
-            return _do("https://" + url[len("http://"):])
+        # Transparently try the alternate scheme once (http<->https). Handles endpoints that
+        # only serve over HTTPS, odd redirects, or a flaky scheme on a given network.
+        alt = None
+        if isinstance(url, str):
+            if url.startswith("http://"):
+                alt = "https://" + url[len("http://"):]
+            elif url.startswith("https://"):
+                alt = "http://" + url[len("https://"):]
+        if alt:
+            return _do(alt)
         raise
 
 async def _itunes_artwork(term: str) -> str:
@@ -793,8 +825,8 @@ async def _itunes_artwork(term: str) -> str:
     if not term:
         return ""
     try:
-        r = await asyncio.to_thread(requests.get, "https://itunes.apple.com/search",
-                                    params={"term": term, "media": "music", "entity": "song", "limit": 1}, timeout=8)
+        r = await asyncio.to_thread(_get_http_session().get, "https://itunes.apple.com/search",
+                                    params={"term": term, "media": "music", "entity": "song", "limit": 1}, timeout=(5, 12))
         results = r.json().get("results", [])
     except Exception:
         return ""
